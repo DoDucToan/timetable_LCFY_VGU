@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Timetable Builder</title>
+  <link rel="icon" type="image/png" href="/static/favicon.png" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <noscript><div style="color: red; font-weight: bold;">JavaScript is disabled in your browser. Please enable JavaScript to use this app.</div></noscript>
+  <div class="page">
+    <div id="js-fallback-message" style="display:none;color:red;font-weight:bold;">JavaScript did not execute. Please check your browser console for errors.</div>
+    <header class="topbar">
+      <div>
+        <h1>Timetable Builder</h1>
+        <p class="muted">Workflow: create cycle, choose cycle, create timetable, deploy timetable, then add groups and classes inside that timetable.</p>
+      </div>
+      <div class="header-actions">
+        <a class="primary-btn" id="exportBtn" href="/export.xlsx" download="timetable.xlsx">Export Excel</a>
+        <button type="button" class="ghost-btn" id="exportProgramBtn">Export by program</button>
+        <div class="toolbar-menu">
+          <button type="button" class="ghost-btn small" id="manageMenuBtn">Manage</button>
+          <div class="menu-dropdown hidden" id="manageMenuDropdown">
+            <button type="button" class="menu-item" data-jump="#groupTagsSection">Group tags</button>
+            <button type="button" class="menu-item" data-jump="#courseTagsSection">Course tags</button>
+            <button type="button" class="menu-item" data-jump="#programsSection">Study programs</button>
+            <button type="button" class="menu-item" data-jump="#roomsSection">Rooms</button>
+            <button type="button" class="menu-item" data-jump="#teachersSection">Teachers</button>
+            <button type="button" class="menu-item" data-jump="#coursesSection">Courses</button>
+            <button type="button" class="menu-item" data-jump="#groupProgramPanel">Group programs</button>
+            <button type="button" class="menu-item" data-jump="#teacherLoadList">Teacher load</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <nav class="top-nav card">
+      <button class="ghost-btn small" data-jump="#groupTagsSection">Group tags</button>
+      <button class="ghost-btn small" data-jump="#courseTagsSection">Course tags</button>
+      <button class="ghost-btn small" data-jump="#programsSection">Study programs</button>
+      <button class="ghost-btn small" data-jump="#roomsSection">Rooms</button>
+      <button class="ghost-btn small" data-jump="#teachersSection">Teachers</button>
+      <button class="ghost-btn small" data-jump="#coursesSection">Courses</button>
+    </nav>
+
+    <section class="selection-bar card" id="selectionPanel">
+      <div class="top-filters">
+        <div class="filter-block">
+          <label>Cycle</label>
+          <div class="inline controls-row">
+            <select id="cycleSelect"></select>
+            <button class="ghost-btn" data-open-entity="cycle">+ Add</button>
+            <button class="ghost-btn" id="editCycleBtn">Edit</button>
+            <button class="danger-btn" id="deleteCycleBtn">Delete</button>
+          </div>
+        </div>
+        <div class="filter-block">
+          <label>Timetable</label>
+          <div class="inline controls-row">
+            <select id="timetableSelect"></select>
+            <button class="ghost-btn" data-open-entity="timetable">+ Add</button>
+            <button class="ghost-btn" id="editTimetableBtn">Edit</button>
+            <button class="ghost-btn" id="deployTimetableBtn">Deploy</button>
+            <button class="danger-btn" id="deleteTimetableBtn">Delete</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="selection-row">
+        <div>
+          <strong>Selected:</strong>
+          <span id="selectionText">No cells selected.</span>
+        </div>
+        <div class="selection-actions">
+          <button id="clearSelectionBtn" class="ghost-btn">Clear</button>
+          <button id="refreshBtn" class="ghost-btn">Refresh</button>
+          <button id="openAddClassBtn" class="primary-btn" disabled>Add class</button>
+        </div>
+      </div>
+    </section>
+
+    <main class="layout">
+      <section class="board-panel card" id="boardPanel">
+        <div class="board-wrap">
+          <table id="timetableBoard"></table>
+        </div>
+      </section>
+
+      <!-- Requirements section below timetable -->
+      <section id="requirementsSection" class="card">
+        <h2>Requirements</h2>
+        <div style="margin-bottom: 10px;">
+          <button type="button" class="primary-btn" id="addGroupTagRequirementPanelBtn">+ Add Group Tag Requirement</button>
+          <button type="button" class="primary-btn" id="addStudyProgramRequirementPanelBtn">+ Add Study Program Requirement</button>
+          <button type="button" class="primary-btn" id="addGroupOnlyRequirementPanelBtn">+ Add Group-only Requirement</button>
+        </div>
+        <div id="requirementsList"></div>
+      </section>
+
+      <aside class="side-panel">
+        <section class="card side-block" id="groupTagsSection">
+          <div class="subheader-row">
+            <h2>Group tags</h2>
+            <button class="ghost-btn" data-open-entity="group_tag">Add</button>
+          </div>
+          <div id="groupTagList" class="entity-list"></div>
+        </section>
+
+        <section class="card side-block" id="courseTagsSection">
+          <div class="subheader-row">
+            <h2>Course tags</h2>
+            <button class="ghost-btn" data-open-entity="course_tag">Add</button>
+          </div>
+          <div id="courseTagList" class="entity-list"></div>
+        </section>
+
+        <section class="card side-block" id="programsSection">
+          <div class="subheader-row">
+            <h2>Study programs</h2>
+            <button class="ghost-btn" data-open-entity="program">Add</button>
+          </div>
+          <div id="programList" class="entity-list"></div>
+        </section>
+
+        <section class="card side-block" id="roomsSection">
+          <div class="subheader-row">
+            <h2>Rooms</h2>
+            <button class="ghost-btn" data-open-entity="room">Add</button>
+          </div>
+          <div id="roomList" class="entity-list"></div>
+        </section>
+
+        <section class="card side-block" id="teachersSection">
+          <div class="subheader-row">
+            <h2>Teachers</h2>
+            <button class="ghost-btn" data-open-entity="teacher">Add</button>
+          </div>
+          <div id="teacherList" class="entity-list"></div>
+        </section>
+
+        <section class="card side-block" id="coursesSection">
+          <div class="subheader-row">
+            <h2>Courses</h2>
+            <button class="ghost-btn" data-open-entity="course">Add</button>
+          </div>
+          <div id="courseList" class="entity-list"></div>
+        </section>
+
+        <section class="card side-block" id="groupProgramPanel">
+          <div class="subheader-row">
+            <h2>Group programs</h2>
+            <button class="ghost-btn small hidden" id="clearGroupProgramSelectionBtn">Clear</button>
+          </div>
+          <div id="groupProgramPanelContent">
+            <div id="groupProgramPanelTitle" class="muted">Select a group from the board to edit its programs.</div>
+            <div id="groupProgramCheckboxes" class="checkbox-grid"></div>
+            <div class="form-actions">
+              <button type="button" class="primary-btn hidden" id="saveGroupProgramsBtn">Save programs</button>
+            </div>
+            <div id="groupProgramPanelMessage" class="error-list"></div>
+          </div>
+        </section>
+        <section class="card side-block">
+          <h2>Teacher load</h2>
+          <div id="teacherLoadList" class="teacher-load-list"></div>
+        </section>
+      </aside>
+    </main>
+
+    <div class="modal hidden" id="entityModal">
+      <div class="modal-card wide">
+        <div class="modal-header">
+          <h2 id="entityModalTitle">Manage item</h2>
+          <button class="icon-btn" data-close="entityModal">×</button>
+        </div>
+        <form id="entityForm" class="form-grid">
+                    <fieldset id="entityGroupsWrap" class="full-span hidden">
+                      <legend>Groups</legend>
+                      <button type="button" id="selectAllEntityGroupsBtn" class="ghost-btn small">All groups</button>
+                      <div id="entityGroups" class="checkbox-grid"></div>
+                    </fieldset>
+          <input type="hidden" name="entity_type" />
+          <input type="hidden" name="entity_id" />
+
+          <label id="entityNameWrap" class="full-span">
+            <span>Name</span>
+            <input name="name" />
+          </label>
+          <label id="entityCodeWrap">
+            <span>Code</span>
+            <input name="code" />
+          </label>
+          <label id="entityYearWrap" class="hidden">
+            <span>Year starting</span>
+            <input type="number" name="year_starting" />
+          </label>
+          <label id="entityCapacityWrap" class="hidden">
+            <span>Capacity</span>
+            <input type="number" name="capacity" />
+          </label>
+          <label id="entityCycleWrap" class="hidden">
+            <span>Cycle</span>
+            <select name="cycle_id" id="entityCycleSelect"></select>
+          </label>
+          <label id="entityCourseTagWrap" class="hidden">
+            <span>Course tag</span>
+            <select name="course_tag_id" id="entityCourseTagSelect"></select>
+          </label>
+          <label id="entityInActionWrap" class="full-span hidden inline-checkbox plain-box">
+            <input type="checkbox" name="in_action" />
+            <span>Mark as active timetable</span>
+          </label>
+
+          <fieldset id="entityTeacherTagsWrap" class="full-span hidden">
+            <legend>Teacher can teach course tags</legend>
+            <div id="entityTeacherTags" class="checkbox-grid"></div>
+          </fieldset>
+
+          <fieldset id="entityCourseProgramsWrap" class="full-span hidden">
+            <legend>Study programs for this course</legend>
+            <div id="entityCoursePrograms" class="checkbox-grid"></div>
+          </fieldset>
+
+          <div id="entityCourseFlagsWrap" class="full-span hidden plain-box">
+            <label class="inline-checkbox"><input type="checkbox" name="require_all" /> <span>Require all students in group</span></label>
+            <label class="inline-checkbox"><input type="checkbox" name="elective" /> <span>Elective</span></label>
+          </div>
+
+          <div id="entityRequirementsWrap" class="full-span hidden">
+            <div class="subheader-row">
+              <h3>Required courses for this group tag</h3>
+              <button type="button" class="ghost-btn" id="addEntityRequirementBtn">+ Add requirement</button>
+            </div>
+            <div id="entityRequirementRows" class="requirement-list"></div>
+          </div>
+
+          <div id="entityErrors" class="error-list full-span"></div>
+
+          <div class="full-span form-actions between-actions">
+            <button type="button" id="entityDeleteBtn" class="danger-btn hidden">Delete</button>
+            <div class="right-actions">
+              <button type="button" class="ghost-btn" data-close="entityModal">Cancel</button>
+              <button type="submit" class="primary-btn">Save</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal hidden" id="exportProgramModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2>Export study programs</h2>
+          <button class="icon-btn" data-close="exportProgramModal">×</button>
+        </div>
+        <form id="exportProgramForm" class="form-grid">
+          <div class="full-span">
+            <span>Select study programs</span>
+            <div id="exportProgramOptions" class="checkbox-grid"></div>
+          </div>
+          <div class="full-span form-actions between-actions">
+            <button type="button" class="ghost-btn" data-close="exportProgramModal">Cancel</button>
+            <button type="submit" class="primary-btn">Export</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal hidden" id="groupModal">
+      <div class="modal-card wide">
+        <div class="modal-header">
+          <h2 id="groupModalTitle">Add group</h2>
+          <button class="icon-btn" data-close="groupModal">×</button>
+        </div>
+        <form id="groupForm" class="form-grid">
+          <div class="group-modal-panels">
+            <!-- Panel 5: Group info (scrollable) -->
+            <section class="group-panel group-panel-info">
+              <div class="group-info-scroll">
+                <label>
+                  <span>Group code</span>
+                  <input type="text" name="code" required />
+                </label>
+                <label>
+                  <span>Display name</span>
+                  <input type="text" name="name" />
+                </label>
+                <label>
+                  <span>Group tag</span>
+                  <select name="group_tag_id" id="groupTagSelect" required></select>
+                </label>
+                <label>
+                  <span>Capacity</span>
+                  <input type="number" name="capacity" min="1" value="40" required />
+                </label>
+                <input type="hidden" name="group_id" />
+              </div>
+            </section>
+            <section class="group-panel group-panel-programs full-span">
+              <div class="subheader-row">
+                <h3>Study programs</h3>
+              </div>
+              <div id="groupProgramOptions" class="checkbox-grid"></div>
+            </section>
+          </div>
+          <div class="full-span form-actions between-actions">
+            <button type="button" id="deleteGroupBtn" class="danger-btn hidden">Delete group</button>
+            <div class="right-actions">
+              <button type="button" class="ghost-btn" data-close="groupModal">Cancel</button>
+              <button type="submit" class="primary-btn" id="saveGroupBtn">Save group</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal hidden" id="classModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2 id="classModalTitle">Add class</h2>
+          <button class="icon-btn" data-close="classModal">×</button>
+        </div>
+        <form id="classForm" class="form-grid">
+          <div class="full-span info-box" id="classTargetInfo"></div>
+          <div class="full-span form-actions between-actions">
+            <button type="button" id="addGroupTagRequirementBtn" class="ghost-btn">+ Add group tag requirement</button>
+            <button type="button" id="addStudyProgramRequirementBtn" class="ghost-btn">+ Add study program requirement</button>
+          </div>
+
+          <fieldset class="full-span">
+            <legend>Class type</legend>
+            <div class="radio-row">
+              <label><input type="radio" name="mode" value="required_all" checked /> Require all students in group</label>
+              <label><input type="radio" name="mode" value="program" /> Study program class</label>
+              <label><input type="radio" name="mode" value="elective" /> Elective</label>
+            </div>
+          </fieldset>
+
+          <fieldset class="full-span hidden" id="programSelectionBox">
+            <legend>Study programs for this class</legend>
+            <div id="classProgramOptions" class="checkbox-grid"></div>
+          </fieldset>
+          <div class="full-span info-box hidden" id="programClassHint">
+            Select one or more study programs first to configure a Study program class.
+          </div>
+          <label class="full-span">
+            <span>Course</span>
+            <select name="course_id" id="courseSelect" required></select>
+          </label>
+          <label>
+            <span>Teacher</span>
+            <select name="teacher_id" id="teacherSelect"></select>
+          </label>
+          <label>
+            <span>Room</span>
+            <select name="room_id" id="roomSelect"></select>
+          </label>
+          <div id="classUpdateWarning" class="warning-note hidden">When editing a study program class, change only teacher or only room in a single update. Bulk apply will only work if the other attribute is identical across the group.</div>
+          <label>
+            <span>Expected size</span>
+            <input type="number" name="expected_size" min="1" />
+          </label>
+          <label class="full-span">
+            <span>Notes</span>
+            <textarea name="notes" rows="3"></textarea>
+          </label>
+
+          <div class="full-span form-actions">
+            <button type="button" class="ghost-btn" data-close="classModal">Cancel</button>
+            <button type="submit" class="primary-btn" id="classSubmitBtn">Create class</button>
+          </div>
+          <div id="classErrors" class="error-list full-span"></div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal hidden" id="addRequirementModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2 id="addRequirementModalTitle">Add Requirement</h2>
+          <button class="icon-btn" data-close="addRequirementModal">×</button>
+        </div>
+        <form id="addRequirementForm" class="form-grid">
+          <label id="requirementTagOrProgramLabel" class="full-span">
+            <span id="requirementTagOrProgramText">Group Tag(s)</span>
+            <select id="requirementTagOrProgramSelect" multiple size="6" required></select>
+          </label>
+          <label class="full-span">
+            <span>Course</span>
+            <select id="requirementCourseSelect" required></select>
+          </label>
+          <label class="full-span" id="requirementSessionsRow">
+            <span>Sessions</span>
+            <input type="number" id="requirementSessionsInput" min="1" value="1" required />
+          </label>
+          <div class="full-span form-actions between-actions">
+            <button type="button" class="ghost-btn" data-close="addRequirementModal">Cancel</button>
+            <button type="submit" class="primary-btn">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal hidden" id="groupOnlyRequirementModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2 id="groupOnlyRequirementModalTitle">Add group-only requirement</h2>
+          <button class="icon-btn" data-close="groupOnlyRequirementModal">×</button>
+        </div>
+        <form id="groupOnlyRequirementForm" class="form-grid">
+          <label class="full-span">
+            <span>Group(s)</span>
+            <select id="groupOnlyRequirementGroupSelect" multiple size="6" required></select>
+          </label>
+          <label class="full-span">
+            <span>Course</span>
+            <select id="groupOnlyRequirementCourseSelect" required></select>
+          </label>
+          <label class="full-span">
+            <span>Sessions</span>
+            <input type="number" id="groupOnlyRequirementSessionsInput" min="1" value="1" required />
+          </label>
+          <div class="full-span form-actions between-actions">
+            <button type="button" class="ghost-btn" data-close="groupOnlyRequirementModal">Cancel</button>
+            <button type="submit" class="primary-btn">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <template id="requirementRowTemplate">
+      <div class="requirement-row">
+        <input class="requirement-course" list="courseOptions" placeholder="Select or search course" />
+        <datalist id="courseOptions">
+          <!-- Options will be populated by JS -->
+        </datalist>
+        <input type="number" class="requirement-count" min="1" value="1" />
+        <button type="button" class="icon-btn remove-row-btn">×</button>
+      </div>
+    </template>
+
+    <script src="/static/script.js?v={{ version }}"></script>
+    <script>
+      // If this runs, JS is working. Hide fallback message.
+      document.getElementById('js-fallback-message').style.display = 'none';
+    </script>
+  </div>
+</body>
+</html>

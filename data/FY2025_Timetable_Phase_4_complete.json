@@ -1,0 +1,2914 @@
+{
+  "meta": {
+    "title": "Foundation Year 2025/26:",
+    "subtitle": "Semester 2 - Phase 4: 20.04.2026 - 19.06.2026",
+    "note": "Timetable: All groups - based on teachers",
+    "as_of": "31 Mar 2026",
+    "source_workbook": "FY2025_Timetable_Phase 4.xlsx",
+    "source_sheet": "FY2025-Timetable_P4",
+    "parser_note": "display_groups are the visual merged-column span from the workbook; cohort_ids are inferred from the cell text where possible, otherwise they match the visual span."
+  },
+  "groups": [
+    {
+      "id": "PRE-A",
+      "label": "Group PRE-A (BBA/BSE/CSE/ECE)",
+      "programs": [
+        "BBA",
+        "BSE",
+        "CSE",
+        "ECE"
+      ]
+    },
+    {
+      "id": "A1",
+      "label": "Group A1 (ARC/BBA/BFA/BSE/BCE/CSE/ECE/SME/SPE)",
+      "programs": [
+        "ARC",
+        "BBA",
+        "BFA",
+        "BSE",
+        "BCE",
+        "CSE",
+        "ECE",
+        "SME",
+        "SPE"
+      ]
+    },
+    {
+      "id": "B1",
+      "label": "Group B1 (ARC/BBA/BFA/BSE)",
+      "programs": [
+        "ARC",
+        "BBA",
+        "BFA",
+        "BSE"
+      ]
+    },
+    {
+      "id": "B2",
+      "label": "Group B2 (BCE/SME/SPE/CSE)",
+      "programs": [
+        "BCE",
+        "SME",
+        "SPE",
+        "CSE"
+      ]
+    },
+    {
+      "id": "C1",
+      "label": "Group C1 (ARC/ BBA/BFA/BSE)",
+      "programs": [
+        "ARC",
+        "BBA",
+        "BFA",
+        "BSE"
+      ]
+    },
+    {
+      "id": "C2",
+      "label": "Group C2 (BBA/BFA/BSE)",
+      "programs": [
+        "BBA",
+        "BFA",
+        "BSE"
+      ]
+    },
+    {
+      "id": "C3",
+      "label": "Group C3 (BCE/SME/SPE)",
+      "programs": [
+        "BCE",
+        "SME",
+        "SPE"
+      ]
+    },
+    {
+      "id": "C5",
+      "label": "Group C5 (CSE)",
+      "programs": [
+        "CSE"
+      ]
+    },
+    {
+      "id": "C7",
+      "label": "Group C7 (German class for students who get IELTS certificate 6.0 or above in Phase 1) BFA/CSE/ECE/MEN/SPE/MEC",
+      "programs": [
+        "German class for students who get IELTS certificate 6.0 or above in Phase 1"
+      ]
+    },
+    {
+      "id": "C8",
+      "label": "Group C8 (German class for students who get IELTS certificate 6.0 or above in Phase 2)",
+      "programs": [
+        "German class for students who get IELTS certificate 6.0 or above in Phase 2"
+      ]
+    },
+    {
+      "id": "C9",
+      "label": "Group C9 (German class for students who get IELTS certificate 6.0 or above in Phase 3)",
+      "programs": [
+        "German class for students who get IELTS certificate 6.0 or above in Phase 3"
+      ]
+    },
+    {
+      "id": "D1",
+      "label": "Group D1 (ARC)",
+      "programs": [
+        "ARC"
+      ]
+    },
+    {
+      "id": "D2",
+      "label": "Group D2 (ARC/BBA/BFA/BSE)",
+      "programs": [
+        "ARC",
+        "BBA",
+        "BFA",
+        "BSE"
+      ]
+    },
+    {
+      "id": "D3",
+      "label": "Group D3 (BBA/BFA/BSE)",
+      "programs": [
+        "BBA",
+        "BFA",
+        "BSE"
+      ]
+    },
+    {
+      "id": "D4",
+      "label": "Group D4 (BBA/BFA/BSE)",
+      "programs": [
+        "BBA",
+        "BFA",
+        "BSE"
+      ]
+    },
+    {
+      "id": "D5",
+      "label": "Group D5 (BCE/SME)",
+      "programs": [
+        "BCE",
+        "SME"
+      ]
+    },
+    {
+      "id": "D6",
+      "label": "Group D6 (SPE)",
+      "programs": [
+        "SPE"
+      ]
+    },
+    {
+      "id": "D7",
+      "label": "Group D7 (ECE)",
+      "programs": [
+        "ECE"
+      ]
+    },
+    {
+      "id": "D8",
+      "label": "Group D8 (ECE)",
+      "programs": [
+        "ECE"
+      ]
+    },
+    {
+      "id": "D9",
+      "label": "Group D9 (ECE)",
+      "programs": [
+        "ECE"
+      ]
+    },
+    {
+      "id": "D10",
+      "label": "Group D10  (CSE)",
+      "programs": [
+        "CSE"
+      ]
+    },
+    {
+      "id": "D11",
+      "label": "Group D11  (CSE)",
+      "programs": [
+        "CSE"
+      ]
+    },
+    {
+      "id": "D12",
+      "label": "Group D12 (CSE)",
+      "programs": [
+        "CSE"
+      ]
+    },
+    {
+      "id": "D13",
+      "label": "Group D13  (CSE)",
+      "programs": [
+        "CSE"
+      ]
+    },
+    {
+      "id": "GPEM+MSST",
+      "label": "GPEM+MSST",
+      "programs": []
+    },
+    {
+      "id": "SUD+CompEng",
+      "label": "SUD+CompEng",
+      "programs": []
+    },
+    {
+      "id": "BIS+MBA (even)",
+      "label": "BIS+MBA (even)",
+      "programs": [
+        "even"
+      ]
+    },
+    {
+      "id": "Staff",
+      "label": "Staff",
+      "programs": []
+    }
+  ],
+  "slots": [
+    {
+      "id": "MON_AM",
+      "day": "MONDAY",
+      "label": "8.45 - 12.00",
+      "session": "AM",
+      "day_label_local": "Sáng Hai",
+      "row_range": "7:11",
+      "order": 1
+    },
+    {
+      "id": "MON_PM",
+      "day": "MONDAY",
+      "label": "13.00 - 16.15",
+      "session": "PM",
+      "day_label_local": "Chiều Hai",
+      "row_range": "13:16",
+      "order": 2
+    },
+    {
+      "id": "TUE_AM",
+      "day": "TUESDAY",
+      "label": "8.45 - 12.00",
+      "session": "AM",
+      "day_label_local": "Sáng Ba",
+      "row_range": "19:26",
+      "order": 3
+    },
+    {
+      "id": "TUE_PM",
+      "day": "TUESDAY",
+      "label": "13.00 - 16.15",
+      "session": "PM",
+      "day_label_local": "Chiều Ba",
+      "row_range": "28:33",
+      "order": 4
+    },
+    {
+      "id": "WED_AM",
+      "day": "WEDNESDAY",
+      "label": "08.45 - 12.00",
+      "session": "AM",
+      "day_label_local": "Sáng Tư",
+      "row_range": "36:40",
+      "order": 5
+    },
+    {
+      "id": "WED_PM",
+      "day": "WEDNESDAY",
+      "label": "13.00 - 16.15",
+      "session": "PM",
+      "day_label_local": "Chiều Tư",
+      "row_range": "42:44",
+      "order": 6
+    },
+    {
+      "id": "THU_AM",
+      "day": "THURSDAY",
+      "label": "08.45 - 12.00",
+      "session": "AM",
+      "day_label_local": "Sáng Năm",
+      "row_range": "47:52",
+      "order": 7
+    },
+    {
+      "id": "THU_PM",
+      "day": "THURSDAY",
+      "label": "13:00 - 16:15",
+      "session": "PM",
+      "day_label_local": "Chiều Năm",
+      "row_range": "54:59",
+      "order": 8
+    },
+    {
+      "id": "FRI_AM",
+      "day": "FRIDAY",
+      "label": "08.45 - 12.00",
+      "session": "AM",
+      "day_label_local": "Sáng Sáu",
+      "row_range": "62:65",
+      "order": 9
+    },
+    {
+      "id": "FRI_PM",
+      "day": "FRIDAY",
+      "label": "13:00 - 16:15",
+      "session": "PM",
+      "day_label_local": "Chiều Sáu",
+      "row_range": "67:71",
+      "order": 10
+    }
+  ],
+  "activities": [
+    {
+      "fixed_slot_id": "MON_AM",
+      "display_groups": [
+        "B1"
+      ],
+      "cohort_ids": [
+        "B1"
+      ],
+      "title": "IELTS 4",
+      "teacher_display": "Mr. Terry",
+      "room_display": "LH - 418",
+      "notes": null,
+      "raw_text": "IELTS 4 | Mr. Terry | Room: LH - 418",
+      "source_range": "E7:E7",
+      "fill_color": "FF9FC5E8",
+      "color_key": "ielts",
+      "id": "ielts_4__mon_am__b1"
+    },
+    {
+      "fixed_slot_id": "MON_AM",
+      "display_groups": [
+        "C1"
+      ],
+      "cohort_ids": [
+        "C1"
+      ],
+      "title": "AE6",
+      "teacher_display": "Dr. Tiến",
+      "room_display": "C1 - 318",
+      "notes": null,
+      "raw_text": "AE6 | Dr. Tiến | Room: C1 - 318",
+      "source_range": "G7:G7",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae6__mon_am__c1"
+    },
+    {
+      "fixed_slot_id": "MON_AM",
+      "display_groups": [
+        "C2"
+      ],
+      "cohort_ids": [
+        "C2"
+      ],
+      "title": "AE1",
+      "teacher_display": "Mr. Charles",
+      "room_display": "LH - 401",
+      "notes": null,
+      "raw_text": "AE1 | Mr. Charles | Room: LH - 401",
+      "source_range": "H7:H7",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae1__mon_am__c2"
+    },
+    {
+      "fixed_slot_id": "MON_AM",
+      "display_groups": [
+        "C3"
+      ],
+      "cohort_ids": [
+        "C3"
+      ],
+      "title": "AE5",
+      "teacher_display": "Mr. Được",
+      "room_display": "C1 - 232",
+      "notes": null,
+      "raw_text": "AE5 | Mr. Được | Room: C1 - 232",
+      "source_range": "I7:I7",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae5__mon_am__c3"
+    },
+    {
+      "fixed_slot_id": "MON_AM",
+      "display_groups": [
+        "D1"
+      ],
+      "cohort_ids": [
+        "D1"
+      ],
+      "title": "German 4",
+      "teacher_display": "Ms. Son",
+      "room_display": "LH - 311",
+      "notes": null,
+      "raw_text": "German 4 | Ms. Son | Room: LH - 311",
+      "source_range": "N7:N7",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_4__mon_am__d1"
+    },
+    {
+      "fixed_slot_id": "MON_AM",
+      "display_groups": [
+        "D2"
+      ],
+      "cohort_ids": [
+        "D2"
+      ],
+      "title": "German 4",
+      "teacher_display": "Ms. Nguyet An",
+      "room_display": "LH - 325",
+      "notes": null,
+      "raw_text": "German 4 | Ms. Nguyet An | Room: LH - 325",
+      "source_range": "O7:O7",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_4__mon_am__d2"
+    },
+    {
+      "fixed_slot_id": "MON_AM",
+      "display_groups": [
+        "D3"
+      ],
+      "cohort_ids": [
+        "D3"
+      ],
+      "title": "German 4",
+      "teacher_display": "Ms. Van Anh",
+      "room_display": "LH - 323",
+      "notes": null,
+      "raw_text": "German 4 | Ms. Van Anh | Room: LH - 323",
+      "source_range": "P7:P7",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_4__mon_am__d3"
+    },
+    {
+      "fixed_slot_id": "MON_AM",
+      "display_groups": [
+        "D4"
+      ],
+      "cohort_ids": [
+        "D4"
+      ],
+      "title": "German 4",
+      "teacher_display": "Ms. Ha",
+      "room_display": "LH - 316",
+      "notes": null,
+      "raw_text": "German 4 | Ms. Ha | Room: LH - 316",
+      "source_range": "Q7:Q7",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_4__mon_am__d4"
+    },
+    {
+      "fixed_slot_id": "MON_AM",
+      "display_groups": [
+        "D5"
+      ],
+      "cohort_ids": [
+        "D5"
+      ],
+      "title": "German 4",
+      "teacher_display": "Ms. Thu An",
+      "room_display": "LH - 321",
+      "notes": null,
+      "raw_text": "German 4 | Ms. Thu An | Room: LH - 321",
+      "source_range": "R7:R7",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_4__mon_am__d5"
+    },
+    {
+      "fixed_slot_id": "MON_AM",
+      "display_groups": [
+        "D6"
+      ],
+      "cohort_ids": [
+        "D6"
+      ],
+      "title": "German 4",
+      "teacher_display": "Ms. Tuyen",
+      "room_display": "LH - 322",
+      "notes": null,
+      "raw_text": "German 4 | Ms. Tuyen | Room: LH - 322",
+      "source_range": "S7:S7",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_4__mon_am__d6"
+    },
+    {
+      "fixed_slot_id": "MON_AM",
+      "display_groups": [
+        "PRE-A",
+        "A1",
+        "B1",
+        "B2"
+      ],
+      "cohort_ids": [
+        "PRE-A",
+        "A1",
+        "B2"
+      ],
+      "title": "CSE (PRE-A+ A1+B2): English for Information and Communication Technology 2_Mr. Tuấn_Class No.1 _ Room: LH - 510",
+      "teacher_display": "Mr. Tuấn",
+      "room_display": "LH - 510",
+      "notes": null,
+      "raw_text": "CSE (PRE-A+ A1+B2): English for Information and Communication Technology 2_Mr. Tuấn_Class No.1 _ Room: LH - 510",
+      "source_range": "C10:F10",
+      "fill_color": "FFC27BA0",
+      "color_key": "cse",
+      "id": "cse_pre_a_a1_b2_english_for_informa__mon_am__pre_a_a1_b2"
+    },
+    {
+      "fixed_slot_id": "MON_AM",
+      "display_groups": [
+        "PRE-A",
+        "A1",
+        "B1",
+        "B2",
+        "C1",
+        "C2",
+        "C3",
+        "C5",
+        "C7",
+        "C8",
+        "C9",
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+        "D6",
+        "D7",
+        "D8",
+        "D9",
+        "D10",
+        "D11",
+        "D12",
+        "D13"
+      ],
+      "cohort_ids": [
+        "PRE-A",
+        "A1",
+        "B1",
+        "B2",
+        "C1",
+        "C2",
+        "C3",
+        "C5",
+        "C7",
+        "C8",
+        "C9",
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+        "D6",
+        "D7",
+        "D8",
+        "D9",
+        "D10",
+        "D11",
+        "D12",
+        "D13"
+      ],
+      "title": "[Elective for registered students] Introduction to German Culture_Class No. 1_ Mr. Beck _Room: LH - 609",
+      "teacher_display": "Mr. Beck",
+      "room_display": "LH - 609",
+      "notes": null,
+      "raw_text": "[Elective for registered students] Introduction to German Culture_Class No. 1_ Mr. Beck _Room: LH - 609",
+      "source_range": "C11:Z11",
+      "fill_color": "FF93C47D",
+      "color_key": "elective",
+      "id": "elective_for_registered_students_in__mon_am__pre_a_a1_b1"
+    },
+    {
+      "fixed_slot_id": "MON_PM",
+      "display_groups": [
+        "PRE-A"
+      ],
+      "cohort_ids": [
+        "PRE-A"
+      ],
+      "title": "IELTS 3",
+      "teacher_display": "Mr. Terry",
+      "room_display": "LH - 417",
+      "notes": null,
+      "raw_text": "IELTS 3 | Mr. Terry | Room: LH - 417",
+      "source_range": "C13:C13",
+      "fill_color": "FF9FC5E8",
+      "color_key": "ielts",
+      "id": "ielts_3__mon_pm__pre_a"
+    },
+    {
+      "fixed_slot_id": "MON_PM",
+      "display_groups": [
+        "A1"
+      ],
+      "cohort_ids": [
+        "A1"
+      ],
+      "title": "IELTS 4",
+      "teacher_display": "Ms. Jan",
+      "room_display": "LH - 420",
+      "notes": null,
+      "raw_text": "IELTS 4 | Ms. Jan | Room: LH - 420",
+      "source_range": "D13:D13",
+      "fill_color": "FF9FC5E8",
+      "color_key": "ielts",
+      "id": "ielts_4__mon_pm__a1"
+    },
+    {
+      "fixed_slot_id": "MON_PM",
+      "display_groups": [
+        "B2"
+      ],
+      "cohort_ids": [
+        "B2"
+      ],
+      "title": "IELTS 4",
+      "teacher_display": "Mr. Vinh",
+      "room_display": "LH - 419",
+      "notes": null,
+      "raw_text": "IELTS 4 | Mr. Vinh | Room: LH - 419",
+      "source_range": "F13:F13",
+      "fill_color": "FF9FC5E8",
+      "color_key": "ielts",
+      "id": "ielts_4__mon_pm__b2"
+    },
+    {
+      "fixed_slot_id": "MON_PM",
+      "display_groups": [
+        "C1"
+      ],
+      "cohort_ids": [
+        "C1"
+      ],
+      "title": "AE7",
+      "teacher_display": "Dr. Duy Anh",
+      "room_display": "C1 - 318",
+      "notes": null,
+      "raw_text": "AE7 | Dr. Duy Anh | Room: C1 - 318",
+      "source_range": "G13:G13",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae7__mon_pm__c1"
+    },
+    {
+      "fixed_slot_id": "MON_PM",
+      "display_groups": [
+        "C5"
+      ],
+      "cohort_ids": [
+        "C5"
+      ],
+      "title": "CSE (C5): English for Information and Communication Technology 2_Mr. Tuấn_Class No.2   Room: LH - 510",
+      "teacher_display": "Mr. Tuấn",
+      "room_display": "LH - 510",
+      "notes": null,
+      "raw_text": "CSE (C5): English for Information and Communication Technology 2_Mr. Tuấn_Class No.2 Room: LH - 510",
+      "source_range": "J13:J15",
+      "fill_color": "FFC27BA0",
+      "color_key": "cse",
+      "id": "cse_c5_english_for_information_and___mon_pm__c5"
+    },
+    {
+      "fixed_slot_id": "MON_PM",
+      "display_groups": [
+        "C9"
+      ],
+      "cohort_ids": [
+        "C9"
+      ],
+      "title": "German 1",
+      "teacher_display": "Ms. Van Anh",
+      "room_display": "LH - 213",
+      "notes": null,
+      "raw_text": "German 1 | Ms. Van Anh | Room: LH - 213",
+      "source_range": "M13:M13",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_1__mon_pm__c9"
+    },
+    {
+      "fixed_slot_id": "MON_PM",
+      "display_groups": [
+        "D1"
+      ],
+      "cohort_ids": [
+        "D1"
+      ],
+      "title": "AE5",
+      "teacher_display": "Mr. Hải",
+      "room_display": "C1 - 312",
+      "notes": null,
+      "raw_text": "AE5 | Mr. Hải | Room: C1 - 312",
+      "source_range": "N13:N13",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae5__mon_pm__d1"
+    },
+    {
+      "fixed_slot_id": "MON_PM",
+      "display_groups": [
+        "D2"
+      ],
+      "cohort_ids": [
+        "D2"
+      ],
+      "title": "BBA/BFA/BSE (D2): Business English 3_Class No.3_Mr. Được Room: LH - 325",
+      "teacher_display": "Mr. Được Room: LH - 325",
+      "room_display": "LH - 325",
+      "notes": null,
+      "raw_text": "BBA/BFA/BSE (D2): Business English 3_Class No.3_Mr. Được Room: LH - 325",
+      "source_range": "O13:O15",
+      "fill_color": "FFB4A7D6",
+      "color_key": "other",
+      "id": "bba_bfa_bse_d2_business_english_3_c__mon_pm__d2"
+    },
+    {
+      "fixed_slot_id": "MON_PM",
+      "display_groups": [
+        "D4"
+      ],
+      "cohort_ids": [
+        "D4"
+      ],
+      "title": "AE5",
+      "teacher_display": "Dr. Tiến",
+      "room_display": "LH - 316",
+      "notes": null,
+      "raw_text": "AE5 | Dr. Tiến | Room: LH - 316",
+      "source_range": "Q13:Q13",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae5__mon_pm__d4"
+    },
+    {
+      "fixed_slot_id": "MON_PM",
+      "display_groups": [
+        "D6"
+      ],
+      "cohort_ids": [
+        "D6"
+      ],
+      "title": "AE1",
+      "teacher_display": "Mr. Charles",
+      "room_display": "LH - 322",
+      "notes": null,
+      "raw_text": "AE1 | Mr. Charles | Room: LH - 322",
+      "source_range": "S13:S13",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae1__mon_pm__d6"
+    },
+    {
+      "fixed_slot_id": "MON_PM",
+      "display_groups": [
+        "D7"
+      ],
+      "cohort_ids": [
+        "D7"
+      ],
+      "title": "German 4",
+      "teacher_display": "Ms. Linh",
+      "room_display": "LH - 321",
+      "notes": null,
+      "raw_text": "German 4 | Ms. Linh | Room: LH - 321",
+      "source_range": "T13:T13",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_4__mon_pm__d7"
+    },
+    {
+      "fixed_slot_id": "MON_PM",
+      "display_groups": [
+        "D8"
+      ],
+      "cohort_ids": [
+        "D8"
+      ],
+      "title": "German 4",
+      "teacher_display": "Ms. Ngan",
+      "room_display": "LH - 323",
+      "notes": null,
+      "raw_text": "German 4 | Ms. Ngan | Room: LH - 323",
+      "source_range": "U13:U13",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_4__mon_pm__d8"
+    },
+    {
+      "fixed_slot_id": "MON_PM",
+      "display_groups": [
+        "D9"
+      ],
+      "cohort_ids": [
+        "D9"
+      ],
+      "title": "German 4",
+      "teacher_display": "Ms. Son",
+      "room_display": "LH - 303",
+      "notes": null,
+      "raw_text": "German 4 | Ms. Son | Room: LH - 303",
+      "source_range": "V13:V13",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_4__mon_pm__d9"
+    },
+    {
+      "fixed_slot_id": "MON_PM",
+      "display_groups": [
+        "D10"
+      ],
+      "cohort_ids": [
+        "D10"
+      ],
+      "title": "German 3",
+      "teacher_display": "Ms. Ha",
+      "room_display": "LH - 401",
+      "notes": null,
+      "raw_text": "German 3 | Ms. Ha | Room: LH - 401",
+      "source_range": "W13:W13",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_3__mon_pm__d10"
+    },
+    {
+      "fixed_slot_id": "MON_PM",
+      "display_groups": [
+        "D11"
+      ],
+      "cohort_ids": [
+        "D11"
+      ],
+      "title": "German 3",
+      "teacher_display": "Mr. Beck",
+      "room_display": "LH - 418",
+      "notes": null,
+      "raw_text": "German 3 | Mr. Beck | Room: LH - 418",
+      "source_range": "X13:X13",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_3__mon_pm__d11"
+    },
+    {
+      "fixed_slot_id": "MON_PM",
+      "display_groups": [
+        "D12"
+      ],
+      "cohort_ids": [
+        "D12"
+      ],
+      "title": "German 3",
+      "teacher_display": "Ms. Tuyen",
+      "room_display": "LH - 511",
+      "notes": null,
+      "raw_text": "German 3 | Ms. Tuyen | Room:LH - 511",
+      "source_range": "Y13:Y13",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_3__mon_pm__d12"
+    },
+    {
+      "fixed_slot_id": "MON_PM",
+      "display_groups": [
+        "D13"
+      ],
+      "cohort_ids": [
+        "D13"
+      ],
+      "title": "German 3",
+      "teacher_display": "Ms. Thu An",
+      "room_display": "LH - 518",
+      "notes": null,
+      "raw_text": "German 3 | Ms. Thu An | Room: LH - 518",
+      "source_range": "Z13:Z13",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_3__mon_pm__d13"
+    },
+    {
+      "fixed_slot_id": "MON_PM",
+      "display_groups": [
+        "B1",
+        "B2",
+        "C1",
+        "C2",
+        "C3",
+        "C5",
+        "C7",
+        "C8",
+        "C9",
+        "D1",
+        "D2"
+      ],
+      "cohort_ids": [
+        "B1",
+        "D2"
+      ],
+      "title": "ARC (B1+D2): Architectural Representation & Fabrication_  Ms. Vạn Lịch/ Ms. Bích Huệ   _Room: LH - 520",
+      "teacher_display": "Ms. Vạn Lịch/ Ms. Bích Huệ",
+      "room_display": "LH - 520",
+      "notes": null,
+      "raw_text": "ARC (B1+D2): Architectural Representation & Fabrication_ Ms. Vạn Lịch/ Ms. Bích Huệ _Room: LH - 520",
+      "source_range": "E16:O16",
+      "fill_color": "FFFFFF00",
+      "color_key": "shared_arc",
+      "id": "arc_b1_d2_architectural_representat__mon_pm__b1_d2"
+    },
+    {
+      "fixed_slot_id": "TUE_AM",
+      "display_groups": [
+        "C2"
+      ],
+      "cohort_ids": [
+        "C2"
+      ],
+      "title": "AE7",
+      "teacher_display": "Mr. Tuấn",
+      "room_display": "LH - 401",
+      "notes": null,
+      "raw_text": "AE7 | Mr. Tuấn | Room: LH - 401",
+      "source_range": "H19:H19",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae7__tue_am__c2"
+    },
+    {
+      "fixed_slot_id": "TUE_AM",
+      "display_groups": [
+        "C7"
+      ],
+      "cohort_ids": [
+        "C7"
+      ],
+      "title": "German 3",
+      "teacher_display": "Ms.Thao",
+      "room_display": "LH - 316",
+      "notes": null,
+      "raw_text": "German 3 | Ms.Thao | Room: LH - 316",
+      "source_range": "K19:K19",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_3__tue_am__c7"
+    },
+    {
+      "fixed_slot_id": "TUE_AM",
+      "display_groups": [
+        "C8"
+      ],
+      "cohort_ids": [
+        "C8"
+      ],
+      "title": "German 2",
+      "teacher_display": "Ms. Ha",
+      "room_display": "LH - 315",
+      "notes": null,
+      "raw_text": "German 2 | Ms. Ha | Room: LH - 315",
+      "source_range": "L19:L19",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_2__tue_am__c8"
+    },
+    {
+      "fixed_slot_id": "TUE_AM",
+      "display_groups": [
+        "D1"
+      ],
+      "cohort_ids": [
+        "D1"
+      ],
+      "title": "AE1",
+      "teacher_display": "Ms. Jan",
+      "room_display": "LH - 417",
+      "notes": null,
+      "raw_text": "AE1 | Ms. Jan | Room: LH - 417",
+      "source_range": "N19:N19",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae1__tue_am__d1"
+    },
+    {
+      "fixed_slot_id": "TUE_AM",
+      "display_groups": [
+        "D2"
+      ],
+      "cohort_ids": [
+        "D2"
+      ],
+      "title": "AE5",
+      "teacher_display": "Mr. Hải",
+      "room_display": "LH - 418",
+      "notes": null,
+      "raw_text": "AE5 | Mr. Hải | Room: LH - 418",
+      "source_range": "O19:O19",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae5__tue_am__d2"
+    },
+    {
+      "fixed_slot_id": "TUE_AM",
+      "display_groups": [
+        "D3"
+      ],
+      "cohort_ids": [
+        "D3"
+      ],
+      "title": "AE5",
+      "teacher_display": "Dr. Tiến",
+      "room_display": "LH - 420",
+      "notes": null,
+      "raw_text": "AE5 | Dr. Tiến | Room: LH - 420",
+      "source_range": "P19:P19",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae5__tue_am__d3"
+    },
+    {
+      "fixed_slot_id": "TUE_AM",
+      "display_groups": [
+        "D4"
+      ],
+      "cohort_ids": [
+        "C1",
+        "D4"
+      ],
+      "title": "BBA/BFA/BSE (D4): Business English 3_Class No.5_Mr. Được  Room: C1 - 312",
+      "teacher_display": "Mr. Được Room: C1 - 312",
+      "room_display": "C1 - 312",
+      "notes": null,
+      "raw_text": "BBA/BFA/BSE (D4): Business English 3_Class No.5_Mr. Được Room: C1 - 312",
+      "source_range": "Q19:Q22",
+      "fill_color": "FFB4A7D6",
+      "color_key": "other",
+      "id": "bba_bfa_bse_d4_business_english_3_c__tue_am__c1_d4"
+    },
+    {
+      "fixed_slot_id": "TUE_AM",
+      "display_groups": [
+        "A1",
+        "B1",
+        "B2",
+        "C1"
+      ],
+      "cohort_ids": [
+        "A1",
+        "C1"
+      ],
+      "title": "ARC (A1+C1): Architectural Representation & Fabrication_Ms. Vạn Lịch/ Ms. Bích Huệ_Room: LH - 520",
+      "teacher_display": "Ms. Vạn Lịch/ Ms. Bích Huệ",
+      "room_display": "LH - 520",
+      "notes": null,
+      "raw_text": "ARC (A1+C1): Architectural Representation & Fabrication_Ms. Vạn Lịch/ Ms. Bích Huệ_Room: LH - 520",
+      "source_range": "D23:G23",
+      "fill_color": "FFFFFF00",
+      "color_key": "shared_arc",
+      "id": "arc_a1_c1_architectural_representat__tue_am__a1_c1"
+    },
+    {
+      "fixed_slot_id": "TUE_AM",
+      "display_groups": [
+        "PRE-A",
+        "A1",
+        "B1",
+        "B2",
+        "C1"
+      ],
+      "cohort_ids": [
+        "PRE-A",
+        "A1",
+        "B1",
+        "C1"
+      ],
+      "title": "BBA/BFA/BSE (PRE-A+A1+B1): Business English 3_Class No.1_Dr. Duy Anh _Room: C1 - 318",
+      "teacher_display": "Dr. Duy Anh",
+      "room_display": "C1 - 318",
+      "notes": null,
+      "raw_text": "BBA/BFA/BSE (PRE-A+A1+B1): Business English 3_Class No.1_Dr. Duy Anh _Room: C1 - 318",
+      "source_range": "C24:G24",
+      "fill_color": "FFB4A7D6",
+      "color_key": "other",
+      "id": "bba_bfa_bse_pre_a_a1_b1_business_en__tue_am__pre_a_a1_b1"
+    },
+    {
+      "fixed_slot_id": "TUE_AM",
+      "display_groups": [
+        "A1",
+        "B1",
+        "B2",
+        "C1",
+        "C2",
+        "C3",
+        "C5",
+        "C7",
+        "C8",
+        "C9",
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+        "D6"
+      ],
+      "cohort_ids": [
+        "A1",
+        "B2",
+        "C3",
+        "D5",
+        "D6"
+      ],
+      "title": "BCE/SME/SPE (All groups): General Physics_Dr. Vân_Room: LH - 609",
+      "teacher_display": "Dr. Vân",
+      "room_display": "LH - 609",
+      "notes": null,
+      "raw_text": "BCE/SME/SPE (All groups): General Physics_Dr. Vân_Room: LH - 609",
+      "source_range": "D25:S25",
+      "fill_color": "FFA2C4C9",
+      "color_key": "shared_science",
+      "id": "bce_sme_spe_all_groups_general_phys__tue_am__a1_b2_c3"
+    },
+    {
+      "fixed_slot_id": "TUE_AM",
+      "display_groups": [
+        "PRE-A",
+        "A1",
+        "B1",
+        "B2",
+        "C1",
+        "C2",
+        "C3",
+        "C5",
+        "C7",
+        "C8",
+        "C9",
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+        "D6",
+        "D7",
+        "D8",
+        "D9",
+        "D10",
+        "D11",
+        "D12",
+        "D13"
+      ],
+      "cohort_ids": [
+        "PRE-A",
+        "A1",
+        "B2",
+        "C5",
+        "D10",
+        "D11",
+        "D12",
+        "D13"
+      ],
+      "title": "CSE (All groups): Business administration_Dr. Đại_Room: LH - 101",
+      "teacher_display": "Dr. Đại",
+      "room_display": "LH - 101",
+      "notes": null,
+      "raw_text": "CSE (All groups): Business administration_Dr. Đại_Room: LH - 101",
+      "source_range": "C26:Z26",
+      "fill_color": "FFE69138",
+      "color_key": "other",
+      "id": "cse_all_groups_business_administrat__tue_am__pre_a_a1_b2"
+    },
+    {
+      "fixed_slot_id": "TUE_PM",
+      "display_groups": [
+        "B1"
+      ],
+      "cohort_ids": [
+        "B1"
+      ],
+      "title": "IELTS 4",
+      "teacher_display": "Mr. Terry",
+      "room_display": null,
+      "notes": "self-study",
+      "raw_text": "IELTS 4 | self-study | Mr. Terry",
+      "source_range": "E28:E28",
+      "fill_color": "FF9FC5E8",
+      "color_key": "ielts",
+      "id": "ielts_4__tue_pm__b1"
+    },
+    {
+      "fixed_slot_id": "TUE_PM",
+      "display_groups": [
+        "C1"
+      ],
+      "cohort_ids": [
+        "C1"
+      ],
+      "title": "AE5",
+      "teacher_display": "Mr. Được",
+      "room_display": "LH - 316",
+      "notes": null,
+      "raw_text": "AE5 | Mr. Được | Room: LH - 316",
+      "source_range": "G28:G28",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae5__tue_pm__c1"
+    },
+    {
+      "fixed_slot_id": "TUE_PM",
+      "display_groups": [
+        "C2"
+      ],
+      "cohort_ids": [
+        "C2"
+      ],
+      "title": "AE5",
+      "teacher_display": "Mr. Hải",
+      "room_display": "LH - 401",
+      "notes": null,
+      "raw_text": "AE5 | Mr. Hải | Room: LH - 401",
+      "source_range": "H28:H28",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae5__tue_pm__c2"
+    },
+    {
+      "fixed_slot_id": "TUE_PM",
+      "display_groups": [
+        "D1"
+      ],
+      "cohort_ids": [
+        "A1",
+        "B1",
+        "C1",
+        "D1",
+        "D2"
+      ],
+      "title": "ARC:  Architectural Representation & Fabrication_  Ms. Vạn Lịch/ Ms. Bích Huệ        _Room: LH - 520",
+      "teacher_display": "Ms. Vạn Lịch/ Ms. Bích Huệ",
+      "room_display": "LH - 520",
+      "notes": null,
+      "raw_text": "ARC: Architectural Representation & Fabrication_ Ms. Vạn Lịch/ Ms. Bích Huệ _Room: LH - 520",
+      "source_range": "N28:N30",
+      "fill_color": "FFFFFF00",
+      "color_key": "shared_arc",
+      "id": "arc_architectural_representation_fa__tue_pm__a1_b1_c1"
+    },
+    {
+      "fixed_slot_id": "TUE_PM",
+      "display_groups": [
+        "D3"
+      ],
+      "cohort_ids": [
+        "C1",
+        "D3"
+      ],
+      "title": "BBA/BFA/BSE (D3): Business English 3_Class No.4_Dr. Duy Anh  Room: C1 - 318",
+      "teacher_display": "Dr. Duy Anh Room: C1 - 318",
+      "room_display": "C1 - 318",
+      "notes": null,
+      "raw_text": "BBA/BFA/BSE (D3): Business English 3_Class No.4_Dr. Duy Anh Room: C1 - 318",
+      "source_range": "P28:P30",
+      "fill_color": "FFB4A7D6",
+      "color_key": "other",
+      "id": "bba_bfa_bse_d3_business_english_3_c__tue_pm__c1_d3"
+    },
+    {
+      "fixed_slot_id": "TUE_PM",
+      "display_groups": [
+        "D4"
+      ],
+      "cohort_ids": [
+        "D4"
+      ],
+      "title": "AE1",
+      "teacher_display": "Ms. Jan",
+      "room_display": "C1 - 312",
+      "notes": null,
+      "raw_text": "AE1 | Ms. Jan | Room: C1 - 312",
+      "source_range": "Q28:Q28",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae1__tue_pm__d4"
+    },
+    {
+      "fixed_slot_id": "TUE_PM",
+      "display_groups": [
+        "A1",
+        "B1",
+        "B2",
+        "C1",
+        "C2",
+        "C3",
+        "C5",
+        "C7",
+        "C8",
+        "C9",
+        "D1",
+        "D2"
+      ],
+      "cohort_ids": [
+        "A1",
+        "B2",
+        "C3",
+        "D6"
+      ],
+      "title": "SPE (All groups): Basic Laboratory Practice_  Dr. Anh Tuấn & Ms. Hải Vy _Room: C2 - 325",
+      "teacher_display": "Dr. Anh Tuấn & Ms. Hải Vy",
+      "room_display": "C2 - 325",
+      "notes": null,
+      "raw_text": "SPE (All groups): Basic Laboratory Practice_ Dr. Anh Tuấn & Ms. Hải Vy _Room: C2 - 325",
+      "source_range": "D31:O31",
+      "fill_color": "FFBF9000",
+      "color_key": "shared_lab",
+      "id": "spe_all_groups_basic_laboratory_pra__tue_pm__a1_b2_c3"
+    },
+    {
+      "fixed_slot_id": "TUE_PM",
+      "display_groups": [
+        "PRE-A",
+        "A1",
+        "B1",
+        "B2",
+        "C1",
+        "C2",
+        "C3",
+        "C5",
+        "C7",
+        "C8",
+        "C9",
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+        "D6",
+        "D7",
+        "D8",
+        "D9",
+        "D10",
+        "D11",
+        "D12",
+        "D13"
+      ],
+      "cohort_ids": [
+        "PRE-A",
+        "A1",
+        "B2",
+        "C5",
+        "D10",
+        "D11",
+        "D12",
+        "D13"
+      ],
+      "title": "CSE (All groups): Business administration_Dr. Đại_Room: LH - 101",
+      "teacher_display": "Dr. Đại",
+      "room_display": "LH - 101",
+      "notes": null,
+      "raw_text": "CSE (All groups): Business administration_Dr. Đại_Room: LH - 101",
+      "source_range": "C32:Z32",
+      "fill_color": "FFE69138",
+      "color_key": "other",
+      "id": "cse_all_groups_business_administrat__tue_pm__pre_a_a1_b2"
+    },
+    {
+      "fixed_slot_id": "TUE_PM",
+      "display_groups": [
+        "A1",
+        "B1",
+        "B2",
+        "C1",
+        "C2",
+        "C3",
+        "C5",
+        "C7",
+        "C8",
+        "C9",
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+        "D6"
+      ],
+      "cohort_ids": [
+        "A1",
+        "B2",
+        "C3",
+        "D5"
+      ],
+      "title": "SME (All groups): Calculus 1_Dr. Vân_Room: LH - 618",
+      "teacher_display": "Dr. Vân",
+      "room_display": "LH - 618",
+      "notes": null,
+      "raw_text": "SME (All groups): Calculus 1_Dr. Vân_Room: LH - 618",
+      "source_range": "D33:S33",
+      "fill_color": "FFEA9999",
+      "color_key": "other",
+      "id": "sme_all_groups_calculus_1_dr_van_ro__tue_pm__a1_b2_c3"
+    },
+    {
+      "fixed_slot_id": "WED_AM",
+      "display_groups": [
+        "PRE-A"
+      ],
+      "cohort_ids": [
+        "PRE-A"
+      ],
+      "title": "IELTS 3",
+      "teacher_display": "Mr. Terry",
+      "room_display": "LH - 417",
+      "notes": null,
+      "raw_text": "IELTS 3 | Mr. Terry | Room: LH - 417",
+      "source_range": "C36:C36",
+      "fill_color": "FF9FC5E8",
+      "color_key": "ielts",
+      "id": "ielts_3__wed_am__pre_a"
+    },
+    {
+      "fixed_slot_id": "WED_AM",
+      "display_groups": [
+        "A1"
+      ],
+      "cohort_ids": [
+        "A1"
+      ],
+      "title": "IELTS 4 (Self study)",
+      "teacher_display": "Ms. Jan / Ms. Vạn Lịch/Mr. Tuấn Nghị",
+      "room_display": "",
+      "notes": "ARC (A1+C1): Architecture Foundation_Ms. Vạn Lịch/Mr. Tuấn Nghị_ Room: LH - 618",
+      "raw_text": "IELTS 4 (Self study) | Ms. Jan | Room: | ARC (A1+C1): Architecture Foundation_Ms. Vạn Lịch/Mr. Tuấn Nghị_ Room: LH - 618",
+      "source_range": "D36:D36",
+      "fill_color": "FF9FC5E8",
+      "color_key": "ielts",
+      "id": "ielts_4_self_study__wed_am__a1"
+    },
+    {
+      "fixed_slot_id": "WED_AM",
+      "display_groups": [
+        "B2"
+      ],
+      "cohort_ids": [
+        "B2"
+      ],
+      "title": "IELTS 4 Self-study",
+      "teacher_display": "Mr. Vinh",
+      "room_display": null,
+      "notes": null,
+      "raw_text": "IELTS 4 Self-study | Mr. Vinh | Room:",
+      "source_range": "F36:F36",
+      "fill_color": "FF9FC5E8",
+      "color_key": "ielts",
+      "id": "ielts_4_self_study__wed_am__b2"
+    },
+    {
+      "fixed_slot_id": "WED_AM",
+      "display_groups": [
+        "C7"
+      ],
+      "cohort_ids": [
+        "C7"
+      ],
+      "title": "German 3",
+      "teacher_display": "Ms. Linh",
+      "room_display": "LH - 316",
+      "notes": null,
+      "raw_text": "German 3 | Ms. Linh | Room: LH - 316",
+      "source_range": "K36:K36",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_3__wed_am__c7"
+    },
+    {
+      "fixed_slot_id": "WED_AM",
+      "display_groups": [
+        "C9"
+      ],
+      "cohort_ids": [
+        "C9"
+      ],
+      "title": "German 1",
+      "teacher_display": "Ms. Van Anh",
+      "room_display": "LH - 213",
+      "notes": null,
+      "raw_text": "German 1 | Ms. Van Anh | Room: LH - 213",
+      "source_range": "M36:M36",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_1__wed_am__c9"
+    },
+    {
+      "fixed_slot_id": "WED_AM",
+      "display_groups": [
+        "D2"
+      ],
+      "cohort_ids": [
+        "D2"
+      ],
+      "title": "AE1",
+      "teacher_display": "Mr. Charles",
+      "room_display": "LH - 401",
+      "notes": null,
+      "raw_text": "AE1 | Mr. Charles | Room: LH - 401",
+      "source_range": "O36:O36",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae1__wed_am__d2"
+    },
+    {
+      "fixed_slot_id": "WED_AM",
+      "display_groups": [
+        "D3"
+      ],
+      "cohort_ids": [
+        "D3"
+      ],
+      "title": "AE1",
+      "teacher_display": "Mr. Alex",
+      "room_display": "LH - 511",
+      "notes": null,
+      "raw_text": "AE1 | Mr. Alex | Room: LH - 511",
+      "source_range": "P36:P36",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae1__wed_am__d3"
+    },
+    {
+      "fixed_slot_id": "WED_AM",
+      "display_groups": [
+        "D5"
+      ],
+      "cohort_ids": [
+        "D5"
+      ],
+      "title": "AE5",
+      "teacher_display": "Dr. Tiến",
+      "room_display": "LH - 325",
+      "notes": null,
+      "raw_text": "AE5 | Dr. Tiến | Room: LH - 325",
+      "source_range": "R36:R36",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae5__wed_am__d5"
+    },
+    {
+      "fixed_slot_id": "WED_AM",
+      "display_groups": [
+        "D6"
+      ],
+      "cohort_ids": [
+        "D6"
+      ],
+      "title": "AE5",
+      "teacher_display": "Mr. Được",
+      "room_display": "LH - 420",
+      "notes": null,
+      "raw_text": "AE5 | Mr. Được | Room: LH - 420",
+      "source_range": "S36:S36",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae5__wed_am__d6"
+    },
+    {
+      "fixed_slot_id": "WED_AM",
+      "display_groups": [
+        "D7"
+      ],
+      "cohort_ids": [
+        "D7"
+      ],
+      "title": "German 4",
+      "teacher_display": "Ms. Nguyet An",
+      "room_display": "LH - 321",
+      "notes": null,
+      "raw_text": "German 4 | Ms. Nguyet An | Room: LH - 321",
+      "source_range": "T36:T36",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_4__wed_am__d7"
+    },
+    {
+      "fixed_slot_id": "WED_AM",
+      "display_groups": [
+        "D8"
+      ],
+      "cohort_ids": [
+        "D8"
+      ],
+      "title": "German 4",
+      "teacher_display": "Ms. Thao",
+      "room_display": "LH - 323",
+      "notes": null,
+      "raw_text": "German 4 | Ms. Thao | Room: LH - 323",
+      "source_range": "U36:U36",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_4__wed_am__d8"
+    },
+    {
+      "fixed_slot_id": "WED_AM",
+      "display_groups": [
+        "D9"
+      ],
+      "cohort_ids": [
+        "D9"
+      ],
+      "title": "German 4",
+      "teacher_display": "Ms. Son",
+      "room_display": "LH - 303",
+      "notes": null,
+      "raw_text": "German 4 | Ms. Son | Room: LH - 303",
+      "source_range": "V36:V36",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_4__wed_am__d9"
+    },
+    {
+      "fixed_slot_id": "WED_AM",
+      "display_groups": [
+        "D10"
+      ],
+      "cohort_ids": [
+        "D10"
+      ],
+      "title": "CSE (D10): English for Information and Communication Technology 2_Class No.3_Mr. Hải   Room: LH - 510",
+      "teacher_display": "Mr. Hải Room: LH - 510",
+      "room_display": "LH - 510",
+      "notes": null,
+      "raw_text": "CSE (D10): English for Information and Communication Technology 2_Class No.3_Mr. Hải Room: LH - 510",
+      "source_range": "W36:W39",
+      "fill_color": "FFC27BA0",
+      "color_key": "cse",
+      "id": "cse_d10_english_for_information_and__wed_am__d10"
+    },
+    {
+      "fixed_slot_id": "WED_AM",
+      "display_groups": [
+        "D12"
+      ],
+      "cohort_ids": [
+        "D12"
+      ],
+      "title": "AE2",
+      "teacher_display": "Mr. Michael",
+      "room_display": "LH - 311",
+      "notes": null,
+      "raw_text": "AE2 | Mr. Michael | Room: LH - 311",
+      "source_range": "Y36:Y36",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae2__wed_am__d12"
+    },
+    {
+      "fixed_slot_id": "WED_AM",
+      "display_groups": [
+        "A1",
+        "B1",
+        "B2",
+        "C1"
+      ],
+      "cohort_ids": [
+        "A1",
+        "C1"
+      ],
+      "title": "ARC (A1+C1): Architecture Foundation_Ms. Vạn Lịch/Mr. Tuấn Nghị_ Room: LH - 618",
+      "teacher_display": "Ms. Vạn Lịch/Mr. Tuấn Nghị",
+      "room_display": "LH - 618",
+      "notes": null,
+      "raw_text": "ARC (A1+C1): Architecture Foundation_Ms. Vạn Lịch/Mr. Tuấn Nghị_ Room: LH - 618",
+      "source_range": "D39:G39",
+      "fill_color": "FFFFFF00",
+      "color_key": "shared_arc",
+      "id": "arc_a1_c1_architecture_foundation_m__wed_am__a1_c1"
+    },
+    {
+      "fixed_slot_id": "WED_AM",
+      "display_groups": [
+        "C1",
+        "C2",
+        "C3",
+        "C5",
+        "C7",
+        "C8",
+        "C9",
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+        "D6",
+        "D7",
+        "D8",
+        "D9",
+        "D10",
+        "D11",
+        "D12",
+        "D13"
+      ],
+      "cohort_ids": [
+        "C1",
+        "C2",
+        "C3",
+        "C5",
+        "C7",
+        "C8",
+        "C9",
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+        "D6",
+        "D7",
+        "D8",
+        "D9",
+        "D10",
+        "D11",
+        "D12",
+        "D13"
+      ],
+      "title": "[Elective for registered students from groups C & D] AE8 - Leadership Skills_Class No.1_Dr. Duy Anh_Room:",
+      "teacher_display": "Dr. Duy Anh",
+      "room_display": null,
+      "notes": null,
+      "raw_text": "[Elective for registered students from groups C & D] AE8 - Leadership Skills_Class No.1_Dr. Duy Anh_Room:",
+      "source_range": "G40:Z40",
+      "fill_color": "FFB6D7A8",
+      "color_key": "elective_ae8",
+      "id": "elective_for_registered_students_fr__wed_am__c1_c2_c3"
+    },
+    {
+      "fixed_slot_id": "WED_PM",
+      "display_groups": [
+        "A1"
+      ],
+      "cohort_ids": [
+        "A1"
+      ],
+      "title": "AE4",
+      "teacher_display": "Mr. Vinh",
+      "room_display": "LH - 315",
+      "notes": null,
+      "raw_text": "AE4 | Mr. Vinh | Room: LH - 315",
+      "source_range": "D42:D42",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae4__wed_pm__a1"
+    },
+    {
+      "fixed_slot_id": "WED_PM",
+      "display_groups": [
+        "B1"
+      ],
+      "cohort_ids": [
+        "B1"
+      ],
+      "title": "IELTS 4",
+      "teacher_display": "Mr. Terry",
+      "room_display": "LH - 418",
+      "notes": null,
+      "raw_text": "IELTS 4 | Mr. Terry | Room: LH - 418",
+      "source_range": "E42:E42",
+      "fill_color": "FF9FC5E8",
+      "color_key": "ielts",
+      "id": "ielts_4__wed_pm__b1"
+    },
+    {
+      "fixed_slot_id": "WED_PM",
+      "display_groups": [
+        "C1",
+        "C2"
+      ],
+      "cohort_ids": [
+        "C1",
+        "C2"
+      ],
+      "title": "BBA/BFA/BSE (C1+C2): Business English 3_Class No.2_Mr. Được_ Room: C1 - 318",
+      "teacher_display": "Mr. Được",
+      "room_display": "C1 - 318",
+      "notes": null,
+      "raw_text": "BBA/BFA/BSE (C1+C2): Business English 3_Class No.2_Mr. Được_ Room: C1 - 318",
+      "source_range": "G42:H44",
+      "fill_color": "FFB4A7D6",
+      "color_key": "other",
+      "id": "bba_bfa_bse_c1_c2_business_english___wed_pm__c1_c2"
+    },
+    {
+      "fixed_slot_id": "WED_PM",
+      "display_groups": [
+        "C3"
+      ],
+      "cohort_ids": [
+        "C3"
+      ],
+      "title": "AE7",
+      "teacher_display": "Mr. Charles",
+      "room_display": "LH - 417",
+      "notes": null,
+      "raw_text": "AE7 | Mr. Charles | Room: LH - 417",
+      "source_range": "I42:I42",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae7__wed_pm__c3"
+    },
+    {
+      "fixed_slot_id": "WED_PM",
+      "display_groups": [
+        "D1"
+      ],
+      "cohort_ids": [
+        "D1"
+      ],
+      "title": "German 4",
+      "teacher_display": "Mr. Beck",
+      "room_display": "LH - 311",
+      "notes": null,
+      "raw_text": "German 4 | Mr. Beck | Room: LH - 311",
+      "source_range": "N42:N42",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_4__wed_pm__d1"
+    },
+    {
+      "fixed_slot_id": "WED_PM",
+      "display_groups": [
+        "D2"
+      ],
+      "cohort_ids": [
+        "D2"
+      ],
+      "title": "German 4",
+      "teacher_display": "Ms. Nguyet An",
+      "room_display": "LH - 325",
+      "notes": null,
+      "raw_text": "German 4 | Ms. Nguyet An | Room: LH - 325",
+      "source_range": "O42:O42",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_4__wed_pm__d2"
+    },
+    {
+      "fixed_slot_id": "WED_PM",
+      "display_groups": [
+        "D3"
+      ],
+      "cohort_ids": [
+        "D3"
+      ],
+      "title": "German 4",
+      "teacher_display": "Ms. Van Anh",
+      "room_display": "LH - 323",
+      "notes": null,
+      "raw_text": "German 4 | Ms. Van Anh | Room: LH - 323",
+      "source_range": "P42:P42",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_4__wed_pm__d3"
+    },
+    {
+      "fixed_slot_id": "WED_PM",
+      "display_groups": [
+        "D4"
+      ],
+      "cohort_ids": [
+        "D4"
+      ],
+      "title": "German 4",
+      "teacher_display": "Ms. Ha",
+      "room_display": "LH - 316",
+      "notes": null,
+      "raw_text": "German 4 | Ms. Ha | Room: LH - 316",
+      "source_range": "Q42:Q42",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_4__wed_pm__d4"
+    },
+    {
+      "fixed_slot_id": "WED_PM",
+      "display_groups": [
+        "D5"
+      ],
+      "cohort_ids": [
+        "D5"
+      ],
+      "title": "German 4",
+      "teacher_display": "Ms. Thao",
+      "room_display": "LH - 321",
+      "notes": null,
+      "raw_text": "German 4 | Ms. Thao | Room: LH - 321",
+      "source_range": "R42:R42",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_4__wed_pm__d5"
+    },
+    {
+      "fixed_slot_id": "WED_PM",
+      "display_groups": [
+        "D6"
+      ],
+      "cohort_ids": [
+        "D6"
+      ],
+      "title": "German 4",
+      "teacher_display": "Ms. Linh",
+      "room_display": "LH - 322",
+      "notes": null,
+      "raw_text": "German 4 | Ms. Linh | Room: LH - 322",
+      "source_range": "S42:S42",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_4__wed_pm__d6"
+    },
+    {
+      "fixed_slot_id": "WED_PM",
+      "display_groups": [
+        "D10"
+      ],
+      "cohort_ids": [
+        "D10"
+      ],
+      "title": "AE2",
+      "teacher_display": "Mr. Michael",
+      "room_display": "LH - 501",
+      "notes": null,
+      "raw_text": "AE2 | Mr. Michael | Room: LH - 501",
+      "source_range": "W42:W42",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae2__wed_pm__d10"
+    },
+    {
+      "fixed_slot_id": "WED_PM",
+      "display_groups": [
+        "D11"
+      ],
+      "cohort_ids": [
+        "D11"
+      ],
+      "title": "CSE (D11): English for Information and Communication Technology 2_Mr. Hải_Class No.4   Room: LH - 510",
+      "teacher_display": "Mr. Hải",
+      "room_display": "LH - 510",
+      "notes": null,
+      "raw_text": "CSE (D11): English for Information and Communication Technology 2_Mr. Hải_Class No.4 Room: LH - 510",
+      "source_range": "X42:X44",
+      "fill_color": "FFC27BA0",
+      "color_key": "cse",
+      "id": "cse_d11_english_for_information_and__wed_pm__d11"
+    },
+    {
+      "fixed_slot_id": "WED_PM",
+      "display_groups": [
+        "D13"
+      ],
+      "cohort_ids": [
+        "D13"
+      ],
+      "title": "AE7",
+      "teacher_display": "Mr. Alex",
+      "room_display": "LH - 213",
+      "notes": null,
+      "raw_text": "AE7 | Mr. Alex | Room: LH - 213",
+      "source_range": "Z42:Z42",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae7__wed_pm__d13"
+    },
+    {
+      "fixed_slot_id": "THU_AM",
+      "display_groups": [
+        "C8"
+      ],
+      "cohort_ids": [
+        "C8"
+      ],
+      "title": "German 2",
+      "teacher_display": "Ms. Thiep",
+      "room_display": "LH - 315",
+      "notes": null,
+      "raw_text": "German 2 | Ms. Thiep | Room: LH - 315",
+      "source_range": "L47:L47",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_2__thu_am__c8"
+    },
+    {
+      "fixed_slot_id": "THU_AM",
+      "display_groups": [
+        "D1"
+      ],
+      "cohort_ids": [
+        "D1"
+      ],
+      "title": "Sculpture for Architecture",
+      "teacher_display": "Mr. Song Hưng/Ms. Hương Lan/Ms. Bích Huệ",
+      "room_display": null,
+      "notes": null,
+      "raw_text": "Sculpture for Architecture | Mr. Song Hưng/Ms. Hương Lan/Ms. Bích Huệ | Room:",
+      "source_range": "N47:N47",
+      "fill_color": "FFFFFF00",
+      "color_key": "shared_arc",
+      "id": "sculpture_for_architecture__thu_am__d1"
+    },
+    {
+      "fixed_slot_id": "THU_AM",
+      "display_groups": [
+        "D10"
+      ],
+      "cohort_ids": [
+        "D10"
+      ],
+      "title": "German 3",
+      "teacher_display": "Ms. Thu An",
+      "room_display": "LH - 401",
+      "notes": null,
+      "raw_text": "German 3 | Ms. Thu An | Room: LH - 401",
+      "source_range": "W47:W47",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_3__thu_am__d10"
+    },
+    {
+      "fixed_slot_id": "THU_AM",
+      "display_groups": [
+        "D11"
+      ],
+      "cohort_ids": [
+        "D11"
+      ],
+      "title": "German 3",
+      "teacher_display": "Ms.Thao",
+      "room_display": "LH - 418",
+      "notes": null,
+      "raw_text": "German 3 | Ms.Thao | Room: LH - 418",
+      "source_range": "X47:X47",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_3__thu_am__d11"
+    },
+    {
+      "fixed_slot_id": "THU_AM",
+      "display_groups": [
+        "D12"
+      ],
+      "cohort_ids": [
+        "D12"
+      ],
+      "title": "German 3",
+      "teacher_display": "Ms. Tuyen",
+      "room_display": "LH - 511",
+      "notes": null,
+      "raw_text": "German 3 | Ms. Tuyen | Room: LH - 511",
+      "source_range": "Y47:Y47",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_3__thu_am__d12"
+    },
+    {
+      "fixed_slot_id": "THU_AM",
+      "display_groups": [
+        "D13"
+      ],
+      "cohort_ids": [
+        "D13"
+      ],
+      "title": "German 3",
+      "teacher_display": "Ms. Linh",
+      "room_display": "LH - 518",
+      "notes": null,
+      "raw_text": "German 3 | Ms. Linh | Room: LH - 518",
+      "source_range": "Z47:Z47",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_3__thu_am__d13"
+    },
+    {
+      "fixed_slot_id": "THU_AM",
+      "display_groups": [
+        "PRE-A",
+        "A1",
+        "B1",
+        "B2",
+        "C1",
+        "C2"
+      ],
+      "cohort_ids": [
+        "PRE-A",
+        "A1",
+        "B1",
+        "C1",
+        "C2"
+      ],
+      "title": "BBA/BFA/BSE (PRE-A+A1+B1+C1+C2): Business IT 2_Class No.1_Dr. Tân_Room:  LH - 611                     (69 seats)",
+      "teacher_display": "Dr. Tân",
+      "room_display": "LH - 611 (69 seats)",
+      "notes": null,
+      "raw_text": "BBA/BFA/BSE (PRE-A+A1+B1+C1+C2): Business IT 2_Class No.1_Dr. Tân_Room: LH - 611 (69 seats)",
+      "source_range": "C50:H50",
+      "fill_color": "FFFFD966",
+      "color_key": "business",
+      "id": "bba_bfa_bse_pre_a_a1_b1_c1_c2_busin__thu_am__pre_a_a1_b1"
+    },
+    {
+      "fixed_slot_id": "THU_AM",
+      "display_groups": [
+        "D2",
+        "D3",
+        "D4"
+      ],
+      "cohort_ids": [
+        "D2",
+        "D3",
+        "D4"
+      ],
+      "title": "BBA/BFA/BSE D2 + D3 + D4) : Introduction to Business Decision Making_Class No.2 - Dr. Viết Lý_Room:LH - 609",
+      "teacher_display": "Dr. Viết Lý",
+      "room_display": "LH - 609",
+      "notes": null,
+      "raw_text": "BBA/BFA/BSE D2 + D3 + D4) : Introduction to Business Decision Making_Class No.2 - Dr. Viết Lý_Room:LH - 609",
+      "source_range": "O50:Q50",
+      "fill_color": "FFDD7E6B",
+      "color_key": "other",
+      "id": "bba_bfa_bse_d2_d3_d4_introduction_t__thu_am__d2_d3_d4"
+    },
+    {
+      "fixed_slot_id": "THU_AM",
+      "display_groups": [
+        "B1",
+        "B2",
+        "C1",
+        "C2",
+        "C3",
+        "C5",
+        "C7",
+        "C8",
+        "C9",
+        "D1",
+        "D2"
+      ],
+      "cohort_ids": [
+        "B1",
+        "D2"
+      ],
+      "title": "ARC (B1+D2): Architecture Foundation_Ms. Vạn Lịch/Mr. Tuấn Nghị  _Room: LH - 618",
+      "teacher_display": "Ms. Vạn Lịch/Mr. Tuấn Nghị",
+      "room_display": "LH - 618",
+      "notes": null,
+      "raw_text": "ARC (B1+D2): Architecture Foundation_Ms. Vạn Lịch/Mr. Tuấn Nghị _Room: LH - 618",
+      "source_range": "E51:O51",
+      "fill_color": "FFFFFF00",
+      "color_key": "shared_arc",
+      "id": "arc_b1_d2_architecture_foundation_m__thu_am__b1_d2"
+    },
+    {
+      "fixed_slot_id": "THU_AM",
+      "display_groups": [
+        "C1",
+        "C2",
+        "C3",
+        "C5",
+        "C7",
+        "C8",
+        "C9",
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+        "D6",
+        "D7",
+        "D8",
+        "D9",
+        "D10",
+        "D11",
+        "D12",
+        "D13"
+      ],
+      "cohort_ids": [
+        "C1",
+        "C2",
+        "C3",
+        "C5",
+        "C7",
+        "C8",
+        "C9",
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+        "D6",
+        "D7",
+        "D8",
+        "D9",
+        "D10",
+        "D11",
+        "D12",
+        "D13"
+      ],
+      "title": "[Elective for registered students from groups C & D] AE8 - Leadership Skills_Class No.2_Dr. Lan_Room:",
+      "teacher_display": "Dr. Lan",
+      "room_display": null,
+      "notes": null,
+      "raw_text": "[Elective for registered students from groups C & D] AE8 - Leadership Skills_Class No.2_Dr. Lan_Room:",
+      "source_range": "G52:Z52",
+      "fill_color": "FFB6D7A8",
+      "color_key": "elective_ae8",
+      "id": "elective_for_registered_students_fr__thu_am__c1_c2_c3"
+    },
+    {
+      "fixed_slot_id": "THU_PM",
+      "display_groups": [
+        "D2",
+        "D3",
+        "D4"
+      ],
+      "cohort_ids": [
+        "D2",
+        "D3",
+        "D4"
+      ],
+      "title": "BBA/BFA/BSE (D2+D3+D4): Business IT 2_Class No.2_Dr. Tân _Room: LH - 611         (75 seats)",
+      "teacher_display": "Dr. Tân",
+      "room_display": "LH - 611 (75 seats)",
+      "notes": null,
+      "raw_text": "BBA/BFA/BSE (D2+D3+D4): Business IT 2_Class No.2_Dr. Tân _Room: LH - 611 (75 seats)",
+      "source_range": "O54:Q57",
+      "fill_color": "FFFFD966",
+      "color_key": "business",
+      "id": "bba_bfa_bse_d2_d3_d4_business_it_2___thu_pm__d2_d3_d4"
+    },
+    {
+      "fixed_slot_id": "THU_PM",
+      "display_groups": [
+        "D5"
+      ],
+      "cohort_ids": [
+        "D5"
+      ],
+      "title": "AE1",
+      "teacher_display": "Mr. Alex",
+      "room_display": "LH - 420",
+      "notes": null,
+      "raw_text": "AE1 | Mr. Alex | Room: LH - 420",
+      "source_range": "R54:R54",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae1__thu_pm__d5"
+    },
+    {
+      "fixed_slot_id": "THU_PM",
+      "display_groups": [
+        "D10"
+      ],
+      "cohort_ids": [
+        "D10"
+      ],
+      "title": "AE7",
+      "teacher_display": "Mr. Tuấn",
+      "room_display": "LH - 401",
+      "notes": null,
+      "raw_text": "AE7 | Mr. Tuấn | Room: LH - 401",
+      "source_range": "W54:W54",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae7__thu_pm__d10"
+    },
+    {
+      "fixed_slot_id": "THU_PM",
+      "display_groups": [
+        "D11"
+      ],
+      "cohort_ids": [
+        "D11"
+      ],
+      "title": "AE2",
+      "teacher_display": "Mr. Michael",
+      "room_display": "LH - 418",
+      "notes": null,
+      "raw_text": "AE2 | Mr. Michael | Room: LH - 418",
+      "source_range": "X54:X54",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae2__thu_pm__d11"
+    },
+    {
+      "fixed_slot_id": "THU_PM",
+      "display_groups": [
+        "A1",
+        "B1",
+        "B2",
+        "C1"
+      ],
+      "cohort_ids": [
+        "A1",
+        "C1"
+      ],
+      "title": "ARC (A1+C1): Sculpture for Architecture_ Mr. Song Hưng/ Ms. Hương Lan/ Ms. Bích Huệ _Room:",
+      "teacher_display": "Mr. Song Hưng/ Ms. Hương Lan/ Ms. Bích Huệ",
+      "room_display": null,
+      "notes": null,
+      "raw_text": "ARC (A1+C1): Sculpture for Architecture_ Mr. Song Hưng/ Ms. Hương Lan/ Ms. Bích Huệ _Room:",
+      "source_range": "D57:G57",
+      "fill_color": "FFFFFF00",
+      "color_key": "shared_arc",
+      "id": "arc_a1_c1_sculpture_for_architectur__thu_pm__a1_c1"
+    },
+    {
+      "fixed_slot_id": "THU_PM",
+      "display_groups": [
+        "PRE-A",
+        "A1",
+        "B1",
+        "B2",
+        "C1"
+      ],
+      "cohort_ids": [
+        "PRE-A",
+        "A1",
+        "B1",
+        "C1",
+        "C2"
+      ],
+      "title": "BBA/BFA/BSE (PRE-A+A1+B1+C1+C2) : Introduction to Business Decision Making_Class No.1 - Dr. Viết Lý_Room: LH - 609",
+      "teacher_display": "Dr. Viết Lý",
+      "room_display": "LH - 609",
+      "notes": null,
+      "raw_text": "BBA/BFA/BSE (PRE-A+A1+B1+C1+C2) : Introduction to Business Decision Making_Class No.1 - Dr. Viết Lý_Room: LH - 609",
+      "source_range": "C58:G58",
+      "fill_color": "FFDD7E6B",
+      "color_key": "other",
+      "id": "bba_bfa_bse_pre_a_a1_b1_c1_c2_intro__thu_pm__pre_a_a1_b1"
+    },
+    {
+      "fixed_slot_id": "THU_PM",
+      "display_groups": [
+        "A1",
+        "B1",
+        "B2",
+        "C1",
+        "C2",
+        "C3",
+        "C5",
+        "C7",
+        "C8",
+        "C9",
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+        "D6"
+      ],
+      "cohort_ids": [
+        "A1",
+        "B2",
+        "C3",
+        "D6"
+      ],
+      "title": "SPE (All groups): Basic Laboratory Practice_ Dr. Anh Tuấn & Ms. Hải Vy   _Room: C2 - 325",
+      "teacher_display": "Dr. Anh Tuấn & Ms. Hải Vy",
+      "room_display": "C2 - 325",
+      "notes": null,
+      "raw_text": "SPE (All groups): Basic Laboratory Practice_ Dr. Anh Tuấn & Ms. Hải Vy _Room: C2 - 325",
+      "source_range": "D59:S59",
+      "fill_color": "FFBF9000",
+      "color_key": "shared_lab",
+      "id": "spe_all_groups_basic_laboratory_pra__thu_pm__a1_b2_c3"
+    },
+    {
+      "fixed_slot_id": "FRI_AM",
+      "display_groups": [
+        "B2"
+      ],
+      "cohort_ids": [
+        "B2"
+      ],
+      "title": "IELTS 4",
+      "teacher_display": "Mr. Vinh",
+      "room_display": "LH - 419",
+      "notes": null,
+      "raw_text": "IELTS 4 | Mr. Vinh | Room: LH - 419",
+      "source_range": "F62:F62",
+      "fill_color": "FF9FC5E8",
+      "color_key": "ielts",
+      "id": "ielts_4__fri_am__b2"
+    },
+    {
+      "fixed_slot_id": "FRI_AM",
+      "display_groups": [
+        "C3"
+      ],
+      "cohort_ids": [
+        "C3"
+      ],
+      "title": "AE1",
+      "teacher_display": "Ms. Jan",
+      "room_display": "LH - 520",
+      "notes": null,
+      "raw_text": "AE1 | Ms. Jan | Room: LH - 520",
+      "source_range": "I62:I62",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae1__fri_am__c3"
+    },
+    {
+      "fixed_slot_id": "FRI_AM",
+      "display_groups": [
+        "C9"
+      ],
+      "cohort_ids": [
+        "C9"
+      ],
+      "title": "German 1",
+      "teacher_display": "Ms. Ngan",
+      "room_display": "LH - 213",
+      "notes": null,
+      "raw_text": "German 1 | Ms. Ngan | Room: LH - 213",
+      "source_range": "M62:M62",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_1__fri_am__c9"
+    },
+    {
+      "fixed_slot_id": "FRI_AM",
+      "display_groups": [
+        "D1"
+      ],
+      "cohort_ids": [
+        "D1"
+      ],
+      "title": "German 4",
+      "teacher_display": "Ms. Son",
+      "room_display": "LH - 311",
+      "notes": null,
+      "raw_text": "German 4 | Ms. Son | Room: LH - 311",
+      "source_range": "N62:N62",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_4__fri_am__d1"
+    },
+    {
+      "fixed_slot_id": "FRI_AM",
+      "display_groups": [
+        "D2"
+      ],
+      "cohort_ids": [
+        "D2"
+      ],
+      "title": "German 4",
+      "teacher_display": "Ms. Thiep",
+      "room_display": "LH - 325",
+      "notes": null,
+      "raw_text": "German 4 | Ms. Thiep | Room: LH - 325",
+      "source_range": "O62:O62",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_4__fri_am__d2"
+    },
+    {
+      "fixed_slot_id": "FRI_AM",
+      "display_groups": [
+        "D3"
+      ],
+      "cohort_ids": [
+        "D3"
+      ],
+      "title": "German 4",
+      "teacher_display": "Mr. Khanh",
+      "room_display": "LH - 323",
+      "notes": null,
+      "raw_text": "German 4 | Mr. Khanh | Room: LH - 323",
+      "source_range": "P62:P62",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_4__fri_am__d3"
+    },
+    {
+      "fixed_slot_id": "FRI_AM",
+      "display_groups": [
+        "D4"
+      ],
+      "cohort_ids": [
+        "D4"
+      ],
+      "title": "German 4",
+      "teacher_display": "Mr. Beck",
+      "room_display": "LH - 316",
+      "notes": null,
+      "raw_text": "German 4 | Mr. Beck | Room: LH - 316",
+      "source_range": "Q62:Q62",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_4__fri_am__d4"
+    },
+    {
+      "fixed_slot_id": "FRI_AM",
+      "display_groups": [
+        "D5"
+      ],
+      "cohort_ids": [
+        "D5"
+      ],
+      "title": "German 4",
+      "teacher_display": "Ms. Thu An",
+      "room_display": "LH - 321",
+      "notes": null,
+      "raw_text": "German 4 | Ms. Thu An | Room: LH - 321",
+      "source_range": "R62:R62",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_4__fri_am__d5"
+    },
+    {
+      "fixed_slot_id": "FRI_AM",
+      "display_groups": [
+        "D6"
+      ],
+      "cohort_ids": [
+        "D6"
+      ],
+      "title": "German 4",
+      "teacher_display": "Ms. Linh",
+      "room_display": "LH - 322",
+      "notes": null,
+      "raw_text": "German 4 | Ms. Linh | Room:LH - 322",
+      "source_range": "S62:S62",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_4__fri_am__d6"
+    },
+    {
+      "fixed_slot_id": "FRI_AM",
+      "display_groups": [
+        "D11"
+      ],
+      "cohort_ids": [
+        "D11"
+      ],
+      "title": "AE7",
+      "teacher_display": "Mr. Alex",
+      "room_display": "LH - 420",
+      "notes": null,
+      "raw_text": "AE7 | Mr. Alex | Room: LH - 420",
+      "source_range": "X62:X62",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae7__fri_am__d11"
+    },
+    {
+      "fixed_slot_id": "FRI_AM",
+      "display_groups": [
+        "D12"
+      ],
+      "cohort_ids": [
+        "D12"
+      ],
+      "title": "CSE (D12): English for Information and Communication Technology 2_Class No.5_Mr. Tuấn   Room: LH - 510",
+      "teacher_display": "Mr. Tuấn Room: LH - 510",
+      "room_display": "LH - 510",
+      "notes": null,
+      "raw_text": "CSE (D12): English for Information and Communication Technology 2_Class No.5_Mr. Tuấn Room: LH - 510",
+      "source_range": "Y62:Y65",
+      "fill_color": "FFC27BA0",
+      "color_key": "cse",
+      "id": "cse_d12_english_for_information_and__fri_am__d12"
+    },
+    {
+      "fixed_slot_id": "FRI_AM",
+      "display_groups": [
+        "D13"
+      ],
+      "cohort_ids": [
+        "D13"
+      ],
+      "title": "AE2",
+      "teacher_display": "Mr. Michael",
+      "room_display": "LH - 417",
+      "notes": null,
+      "raw_text": "AE2 | Mr. Michael | Room: LH - 417",
+      "source_range": "Z62:Z62",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae2__fri_am__d13"
+    },
+    {
+      "fixed_slot_id": "FRI_AM",
+      "display_groups": [
+        "PRE-A",
+        "A1",
+        "B1",
+        "B2",
+        "C1"
+      ],
+      "cohort_ids": [
+        "PRE-A",
+        "A1",
+        "B1",
+        "C1",
+        "C2"
+      ],
+      "title": "BBA/BFA/BSE (PRE-A+A1+B1+C1+C2) : Introduction to Business Decision Making_Class No.1 - Dr. Viết Lý_Room: LH - 609",
+      "teacher_display": "Dr. Viết Lý",
+      "room_display": "LH - 609",
+      "notes": null,
+      "raw_text": "BBA/BFA/BSE (PRE-A+A1+B1+C1+C2) : Introduction to Business Decision Making_Class No.1 - Dr. Viết Lý_Room: LH - 609",
+      "source_range": "C65:G65",
+      "fill_color": "FFDD7E6B",
+      "color_key": "other",
+      "id": "bba_bfa_bse_pre_a_a1_b1_c1_c2_intro__fri_am__pre_a_a1_b1"
+    },
+    {
+      "fixed_slot_id": "FRI_PM",
+      "display_groups": [
+        "PRE-A"
+      ],
+      "cohort_ids": [
+        "PRE-A"
+      ],
+      "title": "IELTS 3",
+      "teacher_display": "Mr. Terry",
+      "room_display": "LH - 417",
+      "notes": null,
+      "raw_text": "IELTS 3 | Mr. Terry | Room: LH - 417",
+      "source_range": "C67:C67",
+      "fill_color": "FF9FC5E8",
+      "color_key": "ielts",
+      "id": "ielts_3__fri_pm__pre_a"
+    },
+    {
+      "fixed_slot_id": "FRI_PM",
+      "display_groups": [
+        "A1"
+      ],
+      "cohort_ids": [
+        "A1"
+      ],
+      "title": "IELTS 4",
+      "teacher_display": "Ms. Jan",
+      "room_display": "LH - 420",
+      "notes": null,
+      "raw_text": "IELTS 4 | Ms. Jan | Room: LH - 420",
+      "source_range": "D67:D67",
+      "fill_color": "FF9FC5E8",
+      "color_key": "ielts",
+      "id": "ielts_4__fri_pm__a1"
+    },
+    {
+      "fixed_slot_id": "FRI_PM",
+      "display_groups": [
+        "B2"
+      ],
+      "cohort_ids": [
+        "B2"
+      ],
+      "title": "AE4",
+      "teacher_display": "Mr. Vinh",
+      "room_display": "LH - 419",
+      "notes": null,
+      "raw_text": "AE4 | Mr. Vinh | Room: LH - 419",
+      "source_range": "F67:F67",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae4__fri_pm__b2"
+    },
+    {
+      "fixed_slot_id": "FRI_PM",
+      "display_groups": [
+        "C1"
+      ],
+      "cohort_ids": [
+        "C1"
+      ],
+      "title": "AE1",
+      "teacher_display": "Mr. Charles",
+      "room_display": "LH - 418",
+      "notes": null,
+      "raw_text": "AE1 | Mr. Charles | Room: LH - 418",
+      "source_range": "G67:G67",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae1__fri_pm__c1"
+    },
+    {
+      "fixed_slot_id": "FRI_PM",
+      "display_groups": [
+        "C3"
+      ],
+      "cohort_ids": [
+        "C3"
+      ],
+      "title": "AE6",
+      "teacher_display": "Mr. Michael",
+      "room_display": "LH - 520",
+      "notes": null,
+      "raw_text": "AE6 | Mr. Michael | Room: LH - 520",
+      "source_range": "I67:I67",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae6__fri_pm__c3"
+    },
+    {
+      "fixed_slot_id": "FRI_PM",
+      "display_groups": [
+        "C7"
+      ],
+      "cohort_ids": [
+        "C7"
+      ],
+      "title": "German 3",
+      "teacher_display": "Ms. Linh",
+      "room_display": "LH - 316",
+      "notes": null,
+      "raw_text": "German 3 | Ms. Linh | Room: LH - 316",
+      "source_range": "K67:K67",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_3__fri_pm__c7"
+    },
+    {
+      "fixed_slot_id": "FRI_PM",
+      "display_groups": [
+        "C8"
+      ],
+      "cohort_ids": [
+        "C8"
+      ],
+      "title": "German 2",
+      "teacher_display": "Ms. Thiep",
+      "room_display": "LH - 315",
+      "notes": null,
+      "raw_text": "German 2 | Ms. Thiep | Room: LH - 315",
+      "source_range": "L67:L67",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_2__fri_pm__c8"
+    },
+    {
+      "fixed_slot_id": "FRI_PM",
+      "display_groups": [
+        "D1"
+      ],
+      "cohort_ids": [
+        "D1"
+      ],
+      "title": "D1: Architecture Foundation",
+      "teacher_display": "Ms. Vạn Lịch/Mr. Tuấn Nghị",
+      "room_display": "LH - 618",
+      "notes": null,
+      "raw_text": "D1: Architecture Foundation | Ms. Vạn Lịch/Mr. Tuấn Nghị | Room: LH - 618",
+      "source_range": "N67:N67",
+      "fill_color": "FFFFFF00",
+      "color_key": "shared_arc",
+      "id": "d1_architecture_foundation__fri_pm__d1"
+    },
+    {
+      "fixed_slot_id": "FRI_PM",
+      "display_groups": [
+        "D7"
+      ],
+      "cohort_ids": [
+        "D7"
+      ],
+      "title": "German 4",
+      "teacher_display": "Ms. Nguyet An",
+      "room_display": "LH - 321",
+      "notes": null,
+      "raw_text": "German 4 | Ms. Nguyet An | Room: LH - 321",
+      "source_range": "T67:T67",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_4__fri_pm__d7"
+    },
+    {
+      "fixed_slot_id": "FRI_PM",
+      "display_groups": [
+        "D8"
+      ],
+      "cohort_ids": [
+        "D8"
+      ],
+      "title": "German 4",
+      "teacher_display": "Ms. Ngan",
+      "room_display": "LH - 323",
+      "notes": null,
+      "raw_text": "German 4 | Ms. Ngan | Room: LH - 323",
+      "source_range": "U67:U67",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_4__fri_pm__d8"
+    },
+    {
+      "fixed_slot_id": "FRI_PM",
+      "display_groups": [
+        "D9"
+      ],
+      "cohort_ids": [
+        "D9"
+      ],
+      "title": "German 4",
+      "teacher_display": "Mr. Khanh",
+      "room_display": "LH - 303",
+      "notes": null,
+      "raw_text": "German 4 | Mr. Khanh | Room: LH - 303",
+      "source_range": "V67:V67",
+      "fill_color": "FFF9CB9C",
+      "color_key": "german",
+      "id": "german_4__fri_pm__d9"
+    },
+    {
+      "fixed_slot_id": "FRI_PM",
+      "display_groups": [
+        "D12"
+      ],
+      "cohort_ids": [
+        "D12"
+      ],
+      "title": "AE7",
+      "teacher_display": "Mr. Alex",
+      "room_display": "LH - 518",
+      "notes": null,
+      "raw_text": "AE7 | Mr. Alex | Room: LH - 518",
+      "source_range": "Y67:Y67",
+      "fill_color": "FFEAD1DC",
+      "color_key": "ae",
+      "id": "ae7__fri_pm__d12"
+    },
+    {
+      "fixed_slot_id": "FRI_PM",
+      "display_groups": [
+        "D13"
+      ],
+      "cohort_ids": [
+        "D13"
+      ],
+      "title": "CSE (D13): English for Information and Communication Technology 2_Class No.6_Mr. Tuấn   Room: LH - 510",
+      "teacher_display": "Mr. Tuấn Room: LH - 510",
+      "room_display": "LH - 510",
+      "notes": null,
+      "raw_text": "CSE (D13): English for Information and Communication Technology 2_Class No.6_Mr. Tuấn Room: LH - 510",
+      "source_range": "Z67:Z71",
+      "fill_color": "FFC27BA0",
+      "color_key": "cse",
+      "id": "cse_d13_english_for_information_and__fri_pm__d13"
+    },
+    {
+      "fixed_slot_id": "FRI_PM",
+      "display_groups": [
+        "D2",
+        "D3",
+        "D4"
+      ],
+      "cohort_ids": [
+        "D2",
+        "D3",
+        "D4"
+      ],
+      "title": "BBA/BFA/BSE D2 + D3 + D4) : Introduction to Business Decision Making_Class No.2 - Dr. Viết Lý_Room: LH - 609",
+      "teacher_display": "Dr. Viết Lý",
+      "room_display": "LH - 609",
+      "notes": null,
+      "raw_text": "BBA/BFA/BSE D2 + D3 + D4) : Introduction to Business Decision Making_Class No.2 - Dr. Viết Lý_Room: LH - 609",
+      "source_range": "O70:Q70",
+      "fill_color": "FFDD7E6B",
+      "color_key": "other",
+      "id": "bba_bfa_bse_d2_d3_d4_introduction_t__fri_pm__d2_d3_d4"
+    },
+    {
+      "fixed_slot_id": "FRI_PM",
+      "display_groups": [
+        "B1",
+        "B2",
+        "C1",
+        "C2",
+        "C3",
+        "C5",
+        "C7",
+        "C8",
+        "C9",
+        "D1",
+        "D2"
+      ],
+      "cohort_ids": [
+        "B1",
+        "D2"
+      ],
+      "title": "ARC (B1+D2): Sculpture for Architecture",
+      "teacher_display": "Mr. Song Hưng/ Ms. Hương Lan/ Ms. Bích Huệ",
+      "room_display": null,
+      "notes": "Room not specified in workbook cell",
+      "raw_text": "ARC (B1+D2): _Room: Sculpture for Architecture _Mr. Song Hưng/ Ms. Hương Lan/ Ms. Bích Huệ _Room:",
+      "source_range": "E71:O71",
+      "fill_color": "FFFFFF00",
+      "color_key": "shared_arc",
+      "id": "arc_b1_d2_sculpture_for_architec__fri_pm__b1_d2"
+    }
+  ]
+}
