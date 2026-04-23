@@ -11,7 +11,8 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 from .scheduler import build_timetable_payload, teacher_load_rows
-from .models import StudyProgram
+from .models import Group, GroupStudyProgram, StudyProgram
+import re
 
 FILL_MAP = {
     "ielts": "9FC5E8",
@@ -117,26 +118,47 @@ def _write_overlay_merge(
         ws.cell(row=row_idx, column=c).border = border
 
 
-def export_timetable_xlsx(db: Session, output_path: str | Path, timetable_id: Optional[int] = None, study_program_ids: Optional[List[int]] = None) -> Path:
-    output_path = Path(output_path)
-    payload = build_timetable_payload(db, timetable_id, study_program_ids=study_program_ids)
+def _sanitize_sheet_title(title: str, max_length: int = 31) -> str:
+    clean = re.sub(r"[\[\]\*:/\\\?']", "", title).strip()
+    if not clean:
+        return "Sheet"
+    return clean[:max_length]
 
-    selected_program_codes: List[str] = []
-    if study_program_ids is not None:
-        selected_program_codes = [str(prog.code) for prog in db.scalars(select(StudyProgram).where(StudyProgram.id.in_(study_program_ids))).all()]
 
-    wb = Workbook()
-    ws = cast(Worksheet, wb.active)
-    ws.title = "Phase4 Timetable"
+def _unique_sheet_titles(names: List[str]) -> List[str]:
+    seen: Dict[str, int] = {}
+    result: List[str] = []
+    for name in names:
+        title = _sanitize_sheet_title(name)
+        if not title:
+            title = "Sheet"
+        candidate = title
+        index = 1
+        while candidate in seen:
+            index += 1
+            candidate = _sanitize_sheet_title(f"{title}-{index}")
+            if len(candidate) > 31:
+                candidate = candidate[:31]
+        seen[candidate] = 1
+        result.append(candidate)
+    return result
+
+
+def _write_timetable_sheet(
+    db: Session,
+    ws: Worksheet,
+    payload: Dict[str, Any],
+    timetable_id: Optional[int],
+    study_program_ids: Optional[List[int]],
+    selected_program_codes: List[str],
+    title_fill: PatternFill,
+    header_fill: PatternFill,
+    lunch_fill: PatternFill,
+    blank_fill: PatternFill,
+    border: Border,
+) -> None:
     ws.freeze_panes = "C5"
     ws.sheet_view.showGridLines = False
-
-    title_fill = PatternFill("solid", fgColor="1F4E78")
-    header_fill = PatternFill("solid", fgColor="D9E2F3")
-    lunch_fill = PatternFill("solid", fgColor="F2F2F2")
-    blank_fill = PatternFill("solid", fgColor=BLANK_FILL)
-    thin_gray = Side(style="thin", color="444444")
-    border = Border(left=thin_gray, right=thin_gray, top=thin_gray, bottom=thin_gray)
 
     groups = payload["groups"]
     timeslots = payload["timeslots"]
@@ -169,8 +191,7 @@ def export_timetable_xlsx(db: Session, output_path: str | Path, timetable_id: Op
         cell.border = border
 
     for idx, group in enumerate(groups, start=3):
-        # Compose group name with study program codes in parentheses
-        program_codes = ', '.join([p['code'] for p in group.get('programs', [])])
+        program_codes = ", ".join([p["code"] for p in group.get("programs", [])])
         group_label = group["code"]
         if program_codes:
             group_label += f" ({program_codes})"
@@ -213,8 +234,6 @@ def export_timetable_xlsx(db: Session, output_path: str | Path, timetable_id: Op
             for overlay_row in overlay_rows:
                 ws.row_dimensions[overlay_row].height = OVERLAY_ROW_HEIGHT
 
-
-            # Merge horizontally for required blocks (required_all) if adjacent groups have the same required class
             col_idx = 3
             while col_idx <= total_cols:
                 group_index = col_idx - 3
@@ -247,7 +266,6 @@ def export_timetable_xlsx(db: Session, output_path: str | Path, timetable_id: Op
                     req_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
                     req_cell.font = Font(bold=True, size=10)
                     col_idx += 1
-            # Fill blanks for required blocks with no class
             for col_idx2, group in enumerate(groups, start=3):
                 items = slot_items.get(str(group["id"]), [])
                 req = _required_item(items)
@@ -262,9 +280,6 @@ def export_timetable_xlsx(db: Session, output_path: str | Path, timetable_id: Op
                     cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
                     cell.font = Font(bold=True, size=10)
 
-
-            # Improved overlay merging: align overlays by content, not index
-            # 1. Gather all overlays for this slot across all groups
             overlay_rows_content: List[List[Dict[str, Any]]] = []
             for group in groups:
                 items = _overlay_items(slot_items.get(str(group["id"]), []))
@@ -274,8 +289,6 @@ def export_timetable_xlsx(db: Session, output_path: str | Path, timetable_id: Op
                         deduped.append(item)
                 overlay_rows_content.append(deduped)
 
-            # 2. Find all unique overlays (by content) in this slot, in order of first appearance.
-            #    Merge study-program overlays that are connectable across columns by teacher/room/course.
             unique_overlays: List[Dict[str, Any]] = []
             for overlays in overlay_rows_content:
                 for item in overlays:
@@ -285,7 +298,6 @@ def export_timetable_xlsx(db: Session, output_path: str | Path, timetable_id: Op
                     elif not any(_same_overlay(item, uo) for uo in unique_overlays):
                         unique_overlays.append({**item, "program_codes": list(item.get("program_codes", []))})
 
-            # 3. For each unique overlay, place the overlay item on its aligned row and merge horizontally.
             for overlay_idx, overlay_item in enumerate(unique_overlays):
                 overlay_row = required_row + 1 + overlay_idx
                 row_has_overlay = [any(_same_overlay_connectable(item, overlay_item) for item in group_items) for group_items in overlay_rows_content]
@@ -310,7 +322,6 @@ def export_timetable_xlsx(db: Session, output_path: str | Path, timetable_id: Op
                         _write_overlay_merge(ws, overlay_row, col_idx, end_col, overlay_item, border)
                         col_idx = end_col + 1
 
-            # Fill blanks for any overlay cells that do not contain this overlay item
             for overlay_idx, overlay_item in enumerate(unique_overlays):
                 overlay_row = required_row + 1 + overlay_idx
                 for col_idx2, group in enumerate(groups, start=3):
@@ -325,7 +336,6 @@ def export_timetable_xlsx(db: Session, output_path: str | Path, timetable_id: Op
 
             row = slot_end_row + 1
 
-            # Lunch must be placed between the morning and afternoon slots.
             if slot_index == 0 and len(day_slots) > 1:
                 lunch_row = row
                 ws.merge_cells(start_row=lunch_row, start_column=2, end_row=lunch_row, end_column=total_cols)
@@ -347,8 +357,6 @@ def export_timetable_xlsx(db: Session, output_path: str | Path, timetable_id: Op
         for rr in range(day_start_row, day_end_row + 1):
             ws.cell(row=rr, column=1).border = border
 
-    # Clean up any cells after the last group column for all timetable rows
-    # Timetable rows are from row 5 to (row - 1) before teacher summary
     timetable_end_row = row - 1
     last_group_col = 2 + len(groups)
     max_col = ws.max_column
@@ -358,7 +366,7 @@ def export_timetable_xlsx(db: Session, output_path: str | Path, timetable_id: Op
             cell = _cell(ws, r, c)
             cell.value = None
             cell.fill = white_fill
-            cell.border = Border()  # Remove all borders
+            cell.border = Border()
 
     start_teacher = row + 2
     ws.cell(row=start_teacher, column=1, value="Teacher load summary").font = Font(bold=True, size=12)
@@ -370,5 +378,74 @@ def export_timetable_xlsx(db: Session, output_path: str | Path, timetable_id: Op
 
     ws.column_dimensions["A"].width = 10
     ws.column_dimensions["B"].width = 16
+
+
+def export_timetable_xlsx(db: Session, output_path: str | Path, timetable_id: Optional[int] = None, study_program_ids: Optional[List[int]] = None) -> Path:
+    output_path = Path(output_path)
+    title_fill = PatternFill("solid", fgColor="1F4E78")
+    header_fill = PatternFill("solid", fgColor="D9E2F3")
+    lunch_fill = PatternFill("solid", fgColor="F2F2F2")
+    blank_fill = PatternFill("solid", fgColor=BLANK_FILL)
+    thin_gray = Side(style="thin", color="444444")
+    border = Border(left=thin_gray, right=thin_gray, top=thin_gray, bottom=thin_gray)
+
+    selected_program_codes: List[str] = []
+    if study_program_ids is not None:
+        selected_program_codes = [str(prog.code) for prog in db.scalars(select(StudyProgram).where(StudyProgram.id.in_(study_program_ids))).all()]
+
+    wb = Workbook()
+    ws = cast(Worksheet, wb.active)
+    ws.title = "Phase4 Timetable"
+    payload = build_timetable_payload(db, timetable_id, study_program_ids=study_program_ids)
+    _write_timetable_sheet(
+        db,
+        ws,
+        payload,
+        timetable_id,
+        study_program_ids,
+        selected_program_codes,
+        title_fill,
+        header_fill,
+        lunch_fill,
+        blank_fill,
+        border,
+    )
+
+    program_sheets: List[StudyProgram] = []
+    if study_program_ids is None:
+        program_sheets = list(
+            db.scalars(
+                select(StudyProgram)
+                .join(GroupStudyProgram)
+                .join(Group)
+                .where(Group.timetable_id == timetable_id)
+                .distinct()
+            ).all()
+        ) if timetable_id is not None else list(db.scalars(select(StudyProgram)).all())
+    elif len(study_program_ids) > 1:
+        program_sheets = list(db.scalars(select(StudyProgram).where(StudyProgram.id.in_(study_program_ids))).all())
+
+    if program_sheets:
+        sheet_titles = _unique_sheet_titles([str(prog.code) for prog in program_sheets])
+        for prog, sheet_title in zip(program_sheets, sheet_titles):
+            if sheet_title == ws.title:
+                sheet_title = _sanitize_sheet_title(f"{sheet_title}-1")
+            program_ws = wb.create_sheet(title=sheet_title)
+            prog_id = cast(int, prog.id)
+            prog_payload = build_timetable_payload(db, timetable_id, study_program_ids=[prog_id])
+            _write_timetable_sheet(
+                db,
+                program_ws,
+                prog_payload,
+                timetable_id,
+                [prog_id],
+                [str(prog.code)],
+                title_fill,
+                header_fill,
+                lunch_fill,
+                blank_fill,
+                border,
+            )
+
     wb.save(output_path)
     return output_path
