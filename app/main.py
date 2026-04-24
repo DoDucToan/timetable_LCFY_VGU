@@ -1061,10 +1061,19 @@ def update_class(class_id: int, payload: ClassCreateIn, db: Session = Depends(ge
             ScheduledClass.deploy.is_(True),
             ScheduledClass.study_program_id.isnot(None),
         ).all()
+    elif getattr(row, 'shared_key', None) is not None:
+        candidate_rows = db.query(ScheduledClass).filter(
+            ScheduledClass.shared_key == row.shared_key,
+            ScheduledClass.deploy.is_(True),
+        ).all()
 
     target_group_ids = [cast(int, row.group_id)]
     rows = [row]
-    is_program_edit = mode == MODE_PROGRAM and getattr(row, 'study_program_id', None) is not None
+    is_multi_class_edit = (
+        mode == MODE_PROGRAM and getattr(row, 'study_program_id', None) is not None
+    ) or (
+        mode == MODE_ELECTIVE and getattr(row, 'shared_key', None) is not None
+    )
     old_teacher_id = row.teacher_id
     old_room_id = row.room_id
     changing_teacher = payload.teacher_id is not None and payload.teacher_id != old_teacher_id
@@ -1073,25 +1082,25 @@ def update_class(class_id: int, payload: ClassCreateIn, db: Session = Depends(ge
     if mode == MODE_REQUIRED and len(target_group_ids) > 1:
         raise HTTPException(status_code=400, detail="Require-all-students classes must be edited one group at a time.")
 
-    if is_program_edit and changing_teacher and changing_room:
+    if is_multi_class_edit and changing_teacher and changing_room:
         raise HTTPException(
             status_code=400,
-            detail="For program classes, change only teacher or room in one edit command, not both."
+            detail="For multi-group or multi-program classes, change only teacher or room in one edit command, not both."
         )
 
     custom_bulk_update = False
-    if is_program_edit and len(candidate_rows) > 1 and (changing_teacher or changing_room):
+    if is_multi_class_edit and len(candidate_rows) > 1 and (changing_teacher or changing_room):
         if changing_teacher:
             if any(r.room_id != old_room_id for r in candidate_rows):
                 raise HTTPException(
                     status_code=400,
-                    detail="Cannot bulk update teacher because other same-course program classes use a different room in this timeslot. Change only the teacher or update individually."
+                    detail="Cannot bulk update teacher because other same-course classes use a different room in this timeslot. Change only the teacher or update individually."
                 )
         if changing_room:
             if any(r.teacher_id != old_teacher_id for r in candidate_rows):
                 raise HTTPException(
                     status_code=400,
-                    detail="Cannot bulk update room because other same-course program classes use a different teacher in this timeslot. Change only the room or update individually."
+                    detail="Cannot bulk update room because other same-course classes use a different teacher in this timeslot. Change only the room or update individually."
                 )
 
         rows = candidate_rows
@@ -1188,10 +1197,17 @@ def delete_class(class_id: int, db: Session = Depends(get_db)):
             return int(getattr(val, 'value'))
         return int(str(val))
     timetable_id = get_int(row.group.timetable_id)
-    from typing import cast
-    shared_key = cast(Optional[str], row.shared_key)
+    shared_key = getattr(row, 'shared_key', None)
     if shared_key is not None:
         db.query(ScheduledClass).filter(ScheduledClass.shared_key == shared_key).delete(synchronize_session=False)
+    elif getattr(row, 'study_program_id', None) is not None:
+        db.query(ScheduledClass).filter(
+            ScheduledClass.timeslot_id == row.timeslot_id,
+            ScheduledClass.course_id == row.course_id,
+            ScheduledClass.teacher_id == row.teacher_id,
+            ScheduledClass.room_id == row.room_id,
+            ScheduledClass.study_program_id == row.study_program_id,
+        ).delete(synchronize_session=False)
     else:
         db.delete(row)
     db.commit()

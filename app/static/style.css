@@ -492,6 +492,13 @@ body {
   margin-top: 2px;
 }
 
+.strip .strip-groups {
+  display: block;
+  font-size: 10px;
+  color: #1f2937;
+  margin-top: 2px;
+}
+
 .strip .strip-note {
   display: block;
   font-size: 11px;
@@ -507,6 +514,24 @@ body {
 
 .strip.filled.required {
   min-height: 26px;
+}
+
+.strip.filled {
+  cursor: grab;
+}
+
+.strip.filled:active {
+  cursor: grabbing;
+}
+
+.strip.dragging {
+  opacity: 0.65;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.16);
+}
+
+.timetable-cell.drag-over {
+  outline: 3px dashed var(--primary);
+  outline-offset: -4px;
 }
 
 .strip strong {

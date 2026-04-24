@@ -275,6 +275,12 @@ function cacheEls() {
     'roomSelect',
     'programSelectionBox',
     'classProgramOptions',
+    'groupSelectionBox',
+    'classGroupOptions',
+    'selectAllClassProgramsBtn',
+    'clearClassProgramsBtn',
+    'selectAllClassGroupsBtn',
+    'clearClassGroupsBtn',
     'classErrors',
     'cycleSelect',
     'timetableSelect',
@@ -494,6 +500,30 @@ function bindGlobalActions() {
     });
   } else {
     console.warn('Missing element: classForm');
+  }
+  if (els.selectAllClassProgramsBtn) {
+    els.selectAllClassProgramsBtn.addEventListener('click', () => {
+      els.classProgramOptions?.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
+      syncClassFormVisibility();
+    });
+  }
+  if (els.clearClassProgramsBtn) {
+    els.clearClassProgramsBtn.addEventListener('click', () => {
+      els.classProgramOptions?.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+      syncClassFormVisibility();
+    });
+  }
+  if (els.selectAllClassGroupsBtn) {
+    els.selectAllClassGroupsBtn.addEventListener('click', () => {
+      els.classGroupOptions?.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        if (!cb.disabled) cb.checked = true;
+      });
+    });
+  }
+  if (els.clearClassGroupsBtn) {
+    els.clearClassGroupsBtn.addEventListener('click', () => {
+      els.classGroupOptions?.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+    });
   }
   if (els.entityForm) {
     els.entityForm.addEventListener('submit', submitEntityForm);
@@ -725,6 +755,9 @@ function renderTeacherLoad() {
 }
 
 function itemRowKey(item) {
+  if (item.kind === 'required') {
+    return item.kind;
+  }
   return [
     item.kind,
     item.course_name,
@@ -873,6 +906,13 @@ function renderBoard() {
         map[key] = item;
       });
       groupItemsByKey[String(group.id)] = map;
+    });
+    rowKeys.sort((a, b) => {
+      const rank = { required: 0, program: 1, elective: 2 };
+      const [akey] = a.split('||');
+      const [bkey] = b.split('||');
+      const delta = (rank[akey] ?? 3) - (rank[bkey] ?? 3);
+      return delta !== 0 ? delta : a.localeCompare(b);
     });
     slotRowMap[String(slot.id)] = { keys: rowKeys, groupItemsByKey };
   });
@@ -1042,6 +1082,7 @@ async function saveGroupPrograms() {
 function renderStrip(item) {
   const courseHtml = `<div class="strip-title">${escapeHtml(item.course_name)}</div>`;
   const programHtml = item.program_codes.length ? `<div class="strip-programs">${escapeHtml(item.program_codes.join(', '))}</div>` : '';
+  const groupHtml = item.group_codes?.length ? `<div class="strip-groups">${escapeHtml(item.group_codes.join(', '))}</div>` : '';
   const teacherHtml = item.teacher_name ? `<span class="strip-meta">${escapeHtml(item.teacher_name)}</span>` : '';
   const roomHtml = item.room_name ? `<span class="strip-meta">${escapeHtml(item.room_name)}</span>` : '';
   const mergedNote = item.kind === 'program' && item.class_ids?.length > 1
@@ -1053,7 +1094,7 @@ function renderStrip(item) {
 
   return `
     <div class="strip-top">
-      <div class="strip-main">${courseHtml}${programHtml}${mergedNote}</div>
+      <div class="strip-main">${courseHtml}${programHtml}${groupHtml}${mergedNote}</div>
       <div class="strip-side">${teacherHtml}${roomHtml}</div>
     </div>
     ${buttonHtml}
@@ -1545,6 +1586,9 @@ async function openClassModal(classId = null) {
     }
   }
   els.classProgramOptions.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.addEventListener('change', syncClassFormVisibility));
+  renderGroupCheckboxes(els.classGroupOptions, state.data.groups || [], 'classGroups');
+  const preselectedGroupIds = editingClass ? [editingClass.group_id] : selected.map(item => item.groupId);
+  precheckGroups(els.classGroupOptions, preselectedGroupIds);
   syncClassFormVisibility();
   fillSelect(
     els.roomSelect,
@@ -1578,8 +1622,8 @@ function syncClassFormVisibility() {
   let courses = state.data.courses || [];
   let filteredByProgram = false;
 
+  const selectedProgramIds = collectCheckedValues(els.classProgramOptions);
   if (mode === 'program') {
-    const selectedProgramIds = collectCheckedValues(els.classProgramOptions);
     if (selectedProgramIds.length > 0) {
       filteredByProgram = true;
       const programCourseIds = new Set();
@@ -1595,8 +1639,8 @@ function syncClassFormVisibility() {
     }
   }
 
-  if (!filteredByProgram && state.selected && state.selected.length > 0) {
-    // Only show courses required by the selected group(s)
+  if (!filteredByProgram && state.selected && state.selected.length > 0 && mode !== 'elective') {
+    // Only show courses required by the selected group(s) for non-elective modes.
     const requiredCourseIds = new Set();
     state.selected.forEach(sel => {
       const group = (state.data.groups || []).find(g => g.id === sel.groupId);
@@ -1616,13 +1660,17 @@ function syncClassFormVisibility() {
     return course.elective;
   });
 
-  const selectedProgramIds = collectCheckedValues(els.classProgramOptions);
   const allowProgramMode = selectedProgramIds.length > 0;
   fillSelect(els.courseSelect, courses.map(c => ({ value: c.id, label: c.name })), true);
 
-  els.programSelectionBox.classList.toggle('hidden', mode !== 'program');
+  const showProgramSelection = mode !== 'required_all';
+  els.programSelectionBox.classList.toggle('hidden', !showProgramSelection);
   els.programClassHint.classList.toggle('hidden', !(mode === 'program' && !allowProgramMode));
   els.courseSelect.disabled = mode === 'program' && !allowProgramMode;
+  els.groupSelectionBox.classList.toggle('hidden', mode === 'required_all');
+  if (mode !== 'required_all') {
+    updateClassGroupOptions();
+  }
   els.classForm.querySelectorAll('input[name="mode"]').forEach(radio => {
     if (radio.value === 'program') {
       radio.disabled = false;
@@ -1634,11 +1682,23 @@ function syncClassFormVisibility() {
 
 function validateClassModeSelection() {
   const mode = els.classForm.querySelector('input[name="mode"]:checked').value;
-  if (mode !== 'program') return true;
   const selectedProgramIds = collectCheckedValues(els.classProgramOptions);
-  if (!selectedProgramIds.length) {
-    alert('Check at least one study program to configure a Study program class.');
-    return false;
+  const selectedGroupIds = getClassGroupIds();
+  if (mode === 'program') {
+    if (!selectedProgramIds.length) {
+      alert('Check at least one study program to configure a Study program class.');
+      return false;
+    }
+    if (!selectedGroupIds.length && (!state.selected || !state.selected.length)) {
+      alert('Select at least one group or choose groups in the form for a Study program class.');
+      return false;
+    }
+  }
+  if (mode === 'elective') {
+    if (!selectedGroupIds.length && !selectedProgramIds.length && (!state.selected || !state.selected.length)) {
+      alert('Select at least one group or program for this elective class.');
+      return false;
+    }
   }
   return true;
 }
@@ -1675,14 +1735,26 @@ async function submitClassForm(event) {
       slotLabel: editingClass.timeslot_label || ''
     }];
   }
+  const selectedGroupIds = getClassGroupIds();
+  const selectedProgramIds = collectCheckedValues(els.classProgramOptions);
+  let targetGroupIds = selectedGroupIds.length ? selectedGroupIds.slice() : selected.map(item => item.groupId);
+  if (mode === 'elective' && selectedProgramIds.length > 0) {
+    const programGroupIds = (state.data.groups || [])
+      .filter(group => selectedProgramIds.some(pid => group.programs.some(p => p.id === pid)))
+      .map(group => group.id);
+    targetGroupIds = Array.from(new Set([...targetGroupIds, ...programGroupIds]));
+  }
+  if ((mode === 'program' || mode === 'elective') && !targetGroupIds.length) {
+    targetGroupIds = selected.map(item => item.groupId);
+  }
   const payload = {
     timeslot_id: selected[0].timeslotId,
-    target_group_ids: selected.map(item => item.groupId),
+    target_group_ids: targetGroupIds,
     mode,
     course_id: Number(formData.get('course_id')),
     teacher_id: toNullableNumber(formData.get('teacher_id')),
     room_id: toNullableNumber(formData.get('room_id')),
-    study_program_ids: mode === 'program' ? collectCheckedValues(els.classProgramOptions) : [],
+    study_program_ids: mode === 'program' ? selectedProgramIds : [],
     expected_size: toNullableNumber(formData.get('expected_size')),
     notes: formData.get('notes') || null,
   };
@@ -1737,12 +1809,61 @@ function renderProgramCheckboxes(container, items, groupName, labelKey = 'code')
   });
 }
 
+function renderGroupCheckboxes(container, groups, groupName, disabledGroupIds = new Set()) {
+  if (!container) return;
+  container.innerHTML = '';
+  groups.forEach(group => {
+    const disabled = disabledGroupIds.has(group.id);
+    const label = document.createElement('label');
+    label.className = 'checkbox-card';
+    label.innerHTML = `<input type="checkbox" name="${groupName}" value="${group.id}" ${disabled ? 'disabled' : ''} /><span>${escapeHtml(group.code + (group.name ? ` — ${group.name}` : ''))}</span>`;
+    container.appendChild(label);
+  });
+}
+
 function precheckPrograms(container, ids) {
   if (!container) return;
   const set = new Set(ids);
   [...container.querySelectorAll('input[type="checkbox"]')].forEach(input => {
     input.checked = set.has(Number(input.value));
   });
+}
+
+function precheckGroups(container, ids) {
+  if (!container) return;
+  const set = new Set(ids);
+  [...container.querySelectorAll('input[type="checkbox"]')].forEach(input => {
+    input.checked = set.has(Number(input.value));
+  });
+}
+
+function getClassGroupIds() {
+  if (!els.classGroupOptions) return [];
+  return [...els.classGroupOptions.querySelectorAll('input[type="checkbox"]:checked')].map(input => Number(input.value));
+}
+
+function allGroupsForPrograms(programIds) {
+  if (!programIds.length) return [];
+  return (state.data.groups || [])
+    .filter(group => programIds.every(pid => group.programs.some(p => p.id === pid)))
+    .map(group => group.id);
+}
+
+function updateClassGroupOptions() {
+  if (!els.classGroupOptions || !els.classForm) return;
+  const mode = els.classForm.querySelector('input[name="mode"]:checked')?.value;
+  const selectedProgramIds = collectCheckedValues(els.classProgramOptions);
+  const disabledGroupIds = new Set(
+    (state.data.groups || [])
+      .filter(group => mode === 'program' && selectedProgramIds.length > 0 && !selectedProgramIds.every(pid => group.programs.some(p => p.id === pid)))
+      .map(group => group.id)
+  );
+  const currentlyChecked = getClassGroupIds();
+  renderGroupCheckboxes(els.classGroupOptions, (state.data.groups || []), 'classGroups', disabledGroupIds);
+  const selectedGroupIds = currentlyChecked.length
+    ? currentlyChecked.filter(id => !disabledGroupIds.has(id))
+    : state.selected.map(item => item.groupId).filter(id => !disabledGroupIds.has(id));
+  precheckGroups(els.classGroupOptions, selectedGroupIds);
 }
 
 function fillSelect(selectEl, options, includePlaceholder = false) {

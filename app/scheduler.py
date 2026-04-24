@@ -285,6 +285,7 @@ def build_timetable_payload(db: Session, timetable_id: Optional[int] = None, stu
     if study_program_ids is not None:
         group_query = group_query.join(GroupStudyProgram).where(GroupStudyProgram.study_program_id.in_(study_program_ids)).distinct()
     groups = db.execute(group_query.order_by(Group.sort_order)).unique().scalars().all()
+    group_map = {g.id: g for g in groups}
     timeslots = db.scalars(select(Timeslot).order_by(Timeslot.sort_order)).all()
     class_ids_filter: Optional[List[int]] = None
     if study_program_ids is not None:
@@ -301,11 +302,11 @@ def build_timetable_payload(db: Session, timetable_id: Optional[int] = None, stu
     if timetable_id is not None:
         class_query = class_query.join(Group).where(Group.timetable_id == timetable_id)
     if class_ids_filter is not None:
-        class_query = class_query.where(
+        class_query = class_query.join(Course, ScheduledClass.course).where(
             ScheduledClass.group_id.in_(class_ids_filter),
             or_(
-                ScheduledClass.course.has(Course.require_all_student_in_group.is_(True)),
-                ScheduledClass.course.has(Course.elective.is_(True)),
+                Course.require_all_student_in_group.is_(True),
+                Course.elective.is_(True),
                 ScheduledClass.study_program_id.in_(study_program_ids),
             ),
         )
@@ -351,6 +352,7 @@ def build_timetable_payload(db: Session, timetable_id: Optional[int] = None, stu
             "teacher_name": first.teacher.name if first.teacher else "",
             "room_name": first.room.code if first.room else "",
             "program_codes": programs,
+            "group_codes": [group_map[group_id].code] if group_id in group_map else [],
             "notes": first.notes or "",
             "kind": kind,
             "color_key": color_key,

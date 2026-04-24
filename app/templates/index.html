@@ -339,11 +339,23 @@
 
           <fieldset class="full-span hidden" id="programSelectionBox">
             <legend>Study programs for this class</legend>
+            <div class="form-actions between-actions">
+              <button type="button" class="ghost-btn small" id="selectAllClassProgramsBtn">All programs</button>
+              <button type="button" class="ghost-btn small" id="clearClassProgramsBtn">Clear programs</button>
+            </div>
             <div id="classProgramOptions" class="checkbox-grid"></div>
           </fieldset>
           <div class="full-span info-box hidden" id="programClassHint">
             Select one or more study programs first to configure a Study program class.
           </div>
+          <fieldset class="full-span hidden" id="groupSelectionBox">
+            <legend>Groups for this class</legend>
+            <div class="form-actions between-actions">
+              <button type="button" class="ghost-btn small" id="selectAllClassGroupsBtn">All groups</button>
+              <button type="button" class="ghost-btn small" id="clearClassGroupsBtn">Clear groups</button>
+            </div>
+            <div id="classGroupOptions" class="checkbox-grid"></div>
+          </fieldset>
           <label class="full-span">
             <span>Course</span>
             <select name="course_id" id="courseSelect" required></select>

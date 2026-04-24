@@ -43,7 +43,13 @@ OVERLAY_ROW_HEIGHT = 26
 
 
 def _format_item(item: Dict[str, Any]) -> str:
-    parts = [item["course_name"]]
+    course_name = str(item["course_name"])
+    parts: List[str] = []
+    if item.get("kind") == "elective":
+        parts.append("(Elective)")
+    parts.append(course_name)
+    if item.get("group_codes"):
+        parts.append(f"({', '.join(item['group_codes'])})")
     if item["program_codes"]:
         parts.append(f"[{', '.join(item['program_codes'])}]")
     if item["notes"]:
@@ -215,11 +221,27 @@ def _write_timetable_sheet(
 
         for slot_index, slot in enumerate(day_slots):
             slot_items = cell_map.get(str(slot["id"]), {})
-            overlay_depth = 0
+            overlay_rows_content: List[List[Dict[str, Any]]] = []
             for group in groups:
-                items = slot_items.get(str(group["id"]), [])
-                overlay_depth = max(overlay_depth, len(_overlay_items(items)))
+                items = _overlay_items(slot_items.get(str(group["id"]), []))
+                deduped: List[Dict[str, Any]] = []
+                for item in items:
+                    if not any(_same_overlay(item, d) for d in deduped):
+                        deduped.append(item)
+                overlay_rows_content.append(deduped)
 
+            unique_overlays: List[Dict[str, Any]] = []
+            for overlays in overlay_rows_content:
+                for item in overlays:
+                    found = next((uo for uo in unique_overlays if _same_overlay_connectable(item, uo)), None)
+                    if found:
+                        found["program_codes"] = sorted(set(found.get("program_codes", []) + item.get("program_codes", [])))
+                    elif not any(_same_overlay(item, uo) for uo in unique_overlays):
+                        unique_overlays.append({**item, "program_codes": list(item.get("program_codes", []))})
+
+            kind_order = {"required": 0, "program": 1, "elective": 2}
+            unique_overlays.sort(key=lambda item: (kind_order.get(item.get("kind"), 3), item.get("course_name", ""), item.get("teacher_name", ""), item.get("room_name", "")))
+            overlay_depth = len(unique_overlays)
             slot_start_row = row
             required_row = row
             overlay_rows = [required_row + i + 1 for i in range(overlay_depth)]
@@ -280,27 +302,9 @@ def _write_timetable_sheet(
                     cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
                     cell.font = Font(bold=True, size=10)
 
-            overlay_rows_content: List[List[Dict[str, Any]]] = []
-            for group in groups:
-                items = _overlay_items(slot_items.get(str(group["id"]), []))
-                deduped: List[Dict[str, Any]] = []
-                for item in items:
-                    if not any(_same_overlay(item, d) for d in deduped):
-                        deduped.append(item)
-                overlay_rows_content.append(deduped)
-
-            unique_overlays: List[Dict[str, Any]] = []
-            for overlays in overlay_rows_content:
-                for item in overlays:
-                    found = next((uo for uo in unique_overlays if _same_overlay_connectable(item, uo)), None)
-                    if found:
-                        found["program_codes"] = sorted(set(found.get("program_codes", []) + item.get("program_codes", [])))
-                    elif not any(_same_overlay(item, uo) for uo in unique_overlays):
-                        unique_overlays.append({**item, "program_codes": list(item.get("program_codes", []))})
-
             for overlay_idx, overlay_item in enumerate(unique_overlays):
                 overlay_row = required_row + 1 + overlay_idx
-                row_has_overlay = [any(_same_overlay_connectable(item, overlay_item) for item in group_items) for group_items in overlay_rows_content]
+                row_has_overlay = [any(_same_overlay(item, overlay_item) for item in group_items) for group_items in overlay_rows_content]
                 present_cols = [3 + idx for idx, has in enumerate(row_has_overlay) if has]
                 if overlay_item.get("kind") == "program" and len(present_cols) > 1:
                     start_col = min(present_cols)
@@ -326,7 +330,7 @@ def _write_timetable_sheet(
                 overlay_row = required_row + 1 + overlay_idx
                 for col_idx2, group in enumerate(groups, start=3):
                     group_items = overlay_rows_content[col_idx2 - 3]
-                    if not any(_same_overlay_connectable(item, overlay_item) for item in group_items):
+                    if not any(_same_overlay(item, overlay_item) for item in group_items):
                         cell = _cell(ws, overlay_row, col_idx2)
                         cell.fill = blank_fill
                         cell.border = border
@@ -422,7 +426,7 @@ def export_timetable_xlsx(db: Session, output_path: str | Path, timetable_id: Op
                 .distinct()
             ).all()
         ) if timetable_id is not None else list(db.scalars(select(StudyProgram)).all())
-    elif len(study_program_ids) > 1:
+    elif study_program_ids:
         program_sheets = list(db.scalars(select(StudyProgram).where(StudyProgram.id.in_(study_program_ids))).all())
 
     if program_sheets:
