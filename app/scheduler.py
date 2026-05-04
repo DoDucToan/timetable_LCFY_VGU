@@ -275,13 +275,37 @@ PROGRAM_FILL_VARIANTS = [
 ]
 
 
-def build_timetable_payload(db: Session, timetable_id: Optional[int] = None, study_program_ids: Optional[List[int]] = None) -> Dict[str, Any]:
+def build_timetable_payload(
+    db: Session,
+    timetable_id: Optional[int] = None,
+    study_program_ids: Optional[List[int]] = None,
+    group_ids: Optional[List[int]] = None,
+    teacher_ids: Optional[List[int]] = None,
+) -> Dict[str, Any]:
     group_query = select(Group).options(
         joinedload(Group.group_tag),
         joinedload(Group.study_program_links).joinedload(GroupStudyProgram.study_program),
     )
     if timetable_id is not None:
         group_query = group_query.where(Group.timetable_id == timetable_id)
+    if group_ids is not None:
+        group_query = group_query.where(Group.id.in_(group_ids))
+    elif teacher_ids is not None and timetable_id is not None:
+        group_ids = [
+            int(gid)
+            for gid in db.scalars(
+                select(Group.id)
+                .join(ScheduledClass, ScheduledClass.group_id == Group.id)
+                .where(
+                    Group.timetable_id == timetable_id,
+                    ScheduledClass.deploy.is_(True),
+                    ScheduledClass.teacher_id.in_(teacher_ids),
+                )
+                .distinct()
+            ).all()
+        ]
+        if group_ids:
+            group_query = group_query.where(Group.id.in_(group_ids))
     if study_program_ids is not None:
         group_query = group_query.join(GroupStudyProgram).where(GroupStudyProgram.study_program_id.in_(study_program_ids)).distinct()
     groups = db.execute(group_query.order_by(Group.sort_order)).unique().scalars().all()
@@ -301,6 +325,8 @@ def build_timetable_payload(db: Session, timetable_id: Optional[int] = None, stu
     ).where(ScheduledClass.deploy.is_(True))
     if timetable_id is not None:
         class_query = class_query.join(Group).where(Group.timetable_id == timetable_id)
+    if teacher_ids is not None:
+        class_query = class_query.where(ScheduledClass.teacher_id.in_(teacher_ids))
     if class_ids_filter is not None:
         class_query = class_query.join(Course, ScheduledClass.course).where(
             ScheduledClass.group_id.in_(class_ids_filter),
@@ -399,7 +425,13 @@ def build_timetable_payload(db: Session, timetable_id: Optional[int] = None, stu
     }
 
 
-def teacher_load_rows(db: Session, timetable_id: Optional[int] = None, study_program_ids: Optional[List[int]] = None) -> List[Dict[str, Any]]:
+def teacher_load_rows(
+    db: Session,
+    timetable_id: Optional[int] = None,
+    study_program_ids: Optional[List[int]] = None,
+    group_ids: Optional[List[int]] = None,
+    teacher_ids: Optional[List[int]] = None,
+) -> List[Dict[str, Any]]:
     query = select(
         ScheduledClass.teacher_id,
         func.count(func.distinct(ScheduledClass.timeslot_id)).label("timeslot_count"),
@@ -409,6 +441,10 @@ def teacher_load_rows(db: Session, timetable_id: Optional[int] = None, study_pro
     )
     if timetable_id is not None:
         query = query.join(Group).where(Group.timetable_id == timetable_id)
+    if group_ids is not None:
+        query = query.where(ScheduledClass.group_id.in_(group_ids))
+    if teacher_ids is not None:
+        query = query.where(ScheduledClass.teacher_id.in_(teacher_ids))
     if study_program_ids is not None:
         query = query.join(GroupStudyProgram, GroupStudyProgram.group_id == ScheduledClass.group_id).where(
             GroupStudyProgram.study_program_id.in_(study_program_ids),

@@ -156,6 +156,8 @@ def _write_timetable_sheet(
     payload: Dict[str, Any],
     timetable_id: Optional[int],
     study_program_ids: Optional[List[int]],
+    group_ids: Optional[List[int]],
+    teacher_ids: Optional[List[int]],
     selected_program_codes: List[str],
     title_fill: PatternFill,
     header_fill: PatternFill,
@@ -240,7 +242,14 @@ def _write_timetable_sheet(
                         unique_overlays.append({**item, "program_codes": list(item.get("program_codes", []))})
 
             kind_order = {"required": 0, "program": 1, "elective": 2}
-            unique_overlays.sort(key=lambda item: (kind_order.get(item.get("kind"), 3), item.get("course_name", ""), item.get("teacher_name", ""), item.get("room_name", "")))
+            unique_overlays.sort(
+                key=lambda item: (
+                    kind_order.get(str(item.get("kind") or ""), 3),
+                    item.get("course_name", ""),
+                    item.get("teacher_name", ""),
+                    item.get("room_name", ""),
+                )
+            )
             overlay_depth = len(unique_overlays)
             slot_start_row = row
             required_row = row
@@ -376,7 +385,7 @@ def _write_timetable_sheet(
     ws.cell(row=start_teacher, column=1, value="Teacher load summary").font = Font(bold=True, size=12)
     ws.cell(row=start_teacher + 1, column=1, value="Teacher").font = Font(bold=True)
     ws.cell(row=start_teacher + 1, column=2, value="Taught timeslots").font = Font(bold=True)
-    for idx, item in enumerate(teacher_load_rows(db, timetable_id, study_program_ids), start=start_teacher + 2):
+    for idx, item in enumerate(teacher_load_rows(db, timetable_id, study_program_ids, group_ids=group_ids, teacher_ids=teacher_ids), start=start_teacher + 2):
         ws.cell(row=idx, column=1, value=item["teacher"])
         ws.cell(row=idx, column=2, value=item["timeslot_count"])
 
@@ -384,7 +393,14 @@ def _write_timetable_sheet(
     ws.column_dimensions["B"].width = 16
 
 
-def export_timetable_xlsx(db: Session, output_path: str | Path, timetable_id: Optional[int] = None, study_program_ids: Optional[List[int]] = None) -> Path:
+def export_timetable_xlsx(
+    db: Session,
+    output_path: str | Path,
+    timetable_id: Optional[int] = None,
+    study_program_ids: Optional[List[int]] = None,
+    group_ids: Optional[List[int]] = None,
+    teacher_ids: Optional[List[int]] = None,
+) -> Path:
     output_path = Path(output_path)
     title_fill = PatternFill("solid", fgColor="1F4E78")
     header_fill = PatternFill("solid", fgColor="D9E2F3")
@@ -400,13 +416,21 @@ def export_timetable_xlsx(db: Session, output_path: str | Path, timetable_id: Op
     wb = Workbook()
     ws = cast(Worksheet, wb.active)
     ws.title = "Phase4 Timetable"
-    payload = build_timetable_payload(db, timetable_id, study_program_ids=study_program_ids)
+    payload = build_timetable_payload(
+        db,
+        timetable_id,
+        study_program_ids=study_program_ids,
+        group_ids=group_ids,
+        teacher_ids=teacher_ids,
+    )
     _write_timetable_sheet(
         db,
         ws,
         payload,
         timetable_id,
         study_program_ids,
+        group_ids,
+        teacher_ids,
         selected_program_codes,
         title_fill,
         header_fill,
@@ -415,8 +439,9 @@ def export_timetable_xlsx(db: Session, output_path: str | Path, timetable_id: Op
         border,
     )
 
+    filtered_export = study_program_ids is not None or group_ids is not None or teacher_ids is not None
     program_sheets: List[StudyProgram] = []
-    if study_program_ids is None:
+    if not filtered_export:
         program_sheets = list(
             db.scalars(
                 select(StudyProgram)
@@ -426,8 +451,6 @@ def export_timetable_xlsx(db: Session, output_path: str | Path, timetable_id: Op
                 .distinct()
             ).all()
         ) if timetable_id is not None else list(db.scalars(select(StudyProgram)).all())
-    elif study_program_ids:
-        program_sheets = list(db.scalars(select(StudyProgram).where(StudyProgram.id.in_(study_program_ids))).all())
 
     if program_sheets:
         sheet_titles = _unique_sheet_titles([str(prog.code) for prog in program_sheets])
@@ -443,6 +466,8 @@ def export_timetable_xlsx(db: Session, output_path: str | Path, timetable_id: Op
                 prog_payload,
                 timetable_id,
                 [prog_id],
+                None,
+                None,
                 [str(prog.code)],
                 title_fill,
                 header_fill,

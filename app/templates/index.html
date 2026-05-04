@@ -19,6 +19,8 @@
       <div class="header-actions">
         <a class="primary-btn" id="exportBtn" href="/export.xlsx" download="timetable.xlsx">Export Excel</a>
         <button type="button" class="ghost-btn" id="exportProgramBtn">Export by program</button>
+        <button type="button" class="ghost-btn" id="exportGroupBtn">Export by group</button>
+        <button type="button" class="ghost-btn" id="exportTeacherBtn">Export by teacher</button>
         <div class="toolbar-menu">
           <button type="button" class="ghost-btn small" id="manageMenuBtn">Manage</button>
           <div class="menu-dropdown hidden" id="manageMenuDropdown">
@@ -59,10 +61,6 @@
           <label>Timetable</label>
           <div class="inline controls-row">
             <select id="timetableSelect"></select>
-            <button class="ghost-btn" data-open-entity="timetable">+ Add</button>
-            <button class="ghost-btn" id="editTimetableBtn">Edit</button>
-            <button class="ghost-btn" id="deployTimetableBtn">Deploy</button>
-            <button class="danger-btn" id="deleteTimetableBtn">Delete</button>
           </div>
         </div>
       </div>
@@ -261,6 +259,44 @@
           </div>
           <div class="full-span form-actions between-actions">
             <button type="button" class="ghost-btn" data-close="exportProgramModal">Cancel</button>
+            <button type="submit" class="primary-btn">Export</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal hidden" id="exportGroupModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2>Export groups</h2>
+          <button class="icon-btn" data-close="exportGroupModal">×</button>
+        </div>
+        <form id="exportGroupForm" class="form-grid">
+          <div class="full-span">
+            <span>Select groups</span>
+            <div id="exportGroupOptions" class="checkbox-grid"></div>
+          </div>
+          <div class="full-span form-actions between-actions">
+            <button type="button" class="ghost-btn" data-close="exportGroupModal">Cancel</button>
+            <button type="submit" class="primary-btn">Export</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal hidden" id="exportTeacherModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2>Export teachers</h2>
+          <button class="icon-btn" data-close="exportTeacherModal">×</button>
+        </div>
+        <form id="exportTeacherForm" class="form-grid">
+          <div class="full-span">
+            <span>Select teachers</span>
+            <div id="exportTeacherOptions" class="checkbox-grid"></div>
+          </div>
+          <div class="full-span form-actions between-actions">
+            <button type="button" class="ghost-btn" data-close="exportTeacherModal">Cancel</button>
             <button type="submit" class="primary-btn">Export</button>
           </div>
         </form>

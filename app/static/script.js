@@ -291,9 +291,17 @@ function cacheEls() {
     'deployTimetableBtn',
     'exportBtn',
     'exportProgramBtn',
+    'exportGroupBtn',
+    'exportTeacherBtn',
     'exportProgramModal',
     'exportProgramForm',
     'exportProgramOptions',
+    'exportGroupModal',
+    'exportGroupForm',
+    'exportGroupOptions',
+    'exportTeacherModal',
+    'exportTeacherForm',
+    'exportTeacherOptions',
     'groupTagList',
     'courseTagList',
     'programList',
@@ -325,6 +333,7 @@ function cacheEls() {
   ].forEach(id => {
     els[id] = document.getElementById(id);
   });
+  els.addTimetableBtn = document.querySelector('[data-open-entity="timetable"]');
   els.requirementRowTemplate = document.getElementById('requirementRowTemplate');
   els.addRequirementModal = document.getElementById('addRequirementModal');
   els.addRequirementForm = document.getElementById('addRequirementForm');
@@ -425,8 +434,20 @@ function bindGlobalActions() {
   if (els.exportProgramBtn) {
     els.exportProgramBtn.addEventListener('click', openExportProgramModal);
   }
+  if (els.exportGroupBtn) {
+    els.exportGroupBtn.addEventListener('click', openExportGroupModal);
+  }
+  if (els.exportTeacherBtn) {
+    els.exportTeacherBtn.addEventListener('click', openExportTeacherModal);
+  }
   if (els.exportProgramForm) {
     els.exportProgramForm.addEventListener('submit', submitExportProgramForm);
+  }
+  if (els.exportGroupForm) {
+    els.exportGroupForm.addEventListener('submit', submitExportGroupForm);
+  }
+  if (els.exportTeacherForm) {
+    els.exportTeacherForm.addEventListener('submit', submitExportTeacherForm);
   }
   if (els.addRequirementRowBtn) {
     els.addRequirementRowBtn.addEventListener('click', () => addRequirementRow());
@@ -640,9 +661,24 @@ function renderContextSelectors() {
   if (els.exportProgramBtn) {
     els.exportProgramBtn.disabled = !state.timetableId || !(state.data.programs || []).length;
   }
-  els.deployTimetableBtn.disabled = !state.timetableId;
-  els.editTimetableBtn.disabled = !state.timetableId;
-  els.deleteTimetableBtn.disabled = !state.timetableId;
+  if (els.exportGroupBtn) {
+    els.exportGroupBtn.disabled = !state.timetableId || !(state.data.groups || []).length;
+  }
+  if (els.exportTeacherBtn) {
+    els.exportTeacherBtn.disabled = !state.timetableId || !(state.data.teachers || []).length;
+  }
+  if (els.deployTimetableBtn) {
+    els.deployTimetableBtn.disabled = !state.timetableId;
+  }
+  if (els.editTimetableBtn) {
+    els.editTimetableBtn.disabled = !state.timetableId;
+  }
+  if (els.deleteTimetableBtn) {
+    els.deleteTimetableBtn.disabled = !state.timetableId;
+  }
+  if (els.addTimetableBtn) {
+    els.addTimetableBtn.disabled = Boolean(selectedCycleId && timetableOptions.length);
+  }
   els.openAddClassBtn.disabled = !state.selected.length;
 }
 
@@ -1218,7 +1254,14 @@ function openEntityModal(type, id = null) {
   } else {
     if (type === 'timetable') {
       const cycleId = toNullableNumber(els.cycleSelect.value);
-      if (cycleId) els.entityCycleSelect.value = String(cycleId);
+      if (cycleId) {
+        const existing = (state.data.timetables || []).some(item => item.cycle_id === cycleId);
+        if (existing) {
+          alert('A timetable already exists for this cycle. Only one timetable per cycle is supported.');
+          return;
+        }
+        els.entityCycleSelect.value = String(cycleId);
+      }
     }
     if (type === 'group_tag') {
       addEntityRequirementRow();
@@ -1250,7 +1293,7 @@ function toggleEntityFields(type) {
   show('entityCapacityWrap', type === 'room');
   show('entityCycleWrap', type === 'timetable');
   show('entityCourseTagWrap', type === 'course');
-  show('entityInActionWrap', type === 'timetable');
+  show('entityInActionWrap', false);
   show('entityTeacherTagsWrap', type === 'teacher');
   show('entityCourseProgramsWrap', false);
   show('entityCourseFlagsWrap', type === 'course');
@@ -1598,6 +1641,7 @@ async function openClassModal(classId = null) {
   // Pre-fill form if editing
   if (editingClass) {
     els.courseSelect.value = editingClass.course_id;
+    updateTeacherOptions();
     els.teacherSelect.value = editingClass.teacher_id || '';
     els.roomSelect.value = editingClass.room_id || '';
     els.classForm.elements['expected_size'].value = editingClass.expected_size || '';
@@ -1814,10 +1858,104 @@ function renderGroupCheckboxes(container, groups, groupName, disabledGroupIds = 
   container.innerHTML = '';
   groups.forEach(group => {
     const disabled = disabledGroupIds.has(group.id);
+    const tagText = group.group_tag ? `${group.group_tag.code || ''}${group.group_tag.name ? ` — ${group.group_tag.name}` : ''}` : '';
     const label = document.createElement('label');
     label.className = 'checkbox-card';
-    label.innerHTML = `<input type="checkbox" name="${groupName}" value="${group.id}" ${disabled ? 'disabled' : ''} /><span>${escapeHtml(group.code + (group.name ? ` — ${group.name}` : ''))}</span>`;
+    label.innerHTML = `
+      <input type="checkbox" name="${groupName}" value="${group.id}" ${disabled ? 'disabled' : ''} />
+      <span>${escapeHtml(group.code + (group.name ? ` — ${group.name}` : ''))}</span>
+      ${tagText ? `<small>Group tag: ${escapeHtml(tagText)}</small>` : ''}
+    `;
     container.appendChild(label);
+  });
+}
+
+function renderTeacherCheckboxes(container, teachers, groupName) {
+  if (!container) return;
+  container.innerHTML = '';
+  const tagMap = new Map((state.data.course_tags || []).map(tag => [tag.id, tag.name]));
+  teachers.forEach(teacher => {
+    const courseTags = (teacher.course_tag_ids || []).map(id => tagMap.get(id)).filter(Boolean);
+    const label = document.createElement('label');
+    label.className = 'checkbox-card';
+    label.innerHTML = `
+      <input type="checkbox" name="${groupName}" value="${teacher.id}" />
+      <span>${escapeHtml(teacher.name)}</span>
+      ${courseTags.length ? `<small>Course tags: ${escapeHtml(courseTags.join(', '))}</small>` : ''}
+    `;
+    container.appendChild(label);
+  });
+}
+
+function renderGroupCheckboxesByTag(container, groups, groupName) {
+  if (!container) return;
+  container.innerHTML = '';
+  const groupsByTag = new Map();
+  groups.forEach(group => {
+    const tagName = group.group_tag ? `${group.group_tag.code || ''}${group.group_tag.name ? ` — ${group.group_tag.name}` : ''}`.trim() : 'No group tag';
+    if (!groupsByTag.has(tagName)) {
+      groupsByTag.set(tagName, []);
+    }
+    groupsByTag.get(tagName).push(group);
+  });
+
+  groupsByTag.forEach((tagGroups, tagName) => {
+    const section = document.createElement('section');
+    section.className = 'checkbox-section';
+    section.innerHTML = `<h4>${escapeHtml(tagName)}</h4>`;
+    const sectionGrid = document.createElement('div');
+    sectionGrid.className = 'checkbox-grid';
+    tagGroups.forEach(group => {
+      const label = document.createElement('label');
+      label.className = 'checkbox-card';
+      label.innerHTML = `
+        <input type="checkbox" name="${groupName}" value="${group.id}" />
+        <span>${escapeHtml(group.code + (group.name ? ` — ${group.name}` : ''))}</span>
+      `;
+      sectionGrid.appendChild(label);
+    });
+    section.appendChild(sectionGrid);
+    container.appendChild(section);
+  });
+}
+
+function renderTeacherCheckboxesByCourseTag(container, teachers, groupName) {
+  if (!container) return;
+  container.innerHTML = '';
+  const tagMap = new Map((state.data.course_tags || []).map(tag => [tag.id, tag.name]));
+  const teachersByTag = new Map();
+
+  teachers.forEach(teacher => {
+    const tagIds = teacher.course_tag_ids || [];
+    if (!tagIds.length) {
+      if (!teachersByTag.has('No course tag')) teachersByTag.set('No course tag', []);
+      teachersByTag.get('No course tag').push(teacher);
+      return;
+    }
+    tagIds.forEach(tagId => {
+      const tagName = tagMap.get(tagId) || 'Unknown tag';
+      if (!teachersByTag.has(tagName)) teachersByTag.set(tagName, []);
+      teachersByTag.get(tagName).push(teacher);
+    });
+  });
+
+  teachersByTag.forEach((tagTeachers, tagName) => {
+    const section = document.createElement('section');
+    section.className = 'checkbox-section';
+    section.innerHTML = `<h4>${escapeHtml(tagName)}</h4>`;
+    const sectionGrid = document.createElement('div');
+    sectionGrid.className = 'checkbox-grid';
+    tagTeachers.forEach(teacher => {
+      const label = document.createElement('label');
+      label.className = 'checkbox-card';
+      label.innerHTML = `
+        <input type="checkbox" name="${groupName}" value="${teacher.id}" />
+        <span>${escapeHtml(teacher.name)}</span>
+      `;
+      sectionGrid.appendChild(label);
+    });
+    section.appendChild(sectionGrid);
+    container.appendChild(section);
   });
 }
 
@@ -1942,6 +2080,26 @@ function openExportProgramModal() {
   openModal('exportProgramModal');
 }
 
+function openExportGroupModal() {
+  if (!els.exportGroupModal || !els.exportGroupOptions) return;
+  if (!(state.data.groups || []).length) {
+    alert('No groups available to export.');
+    return;
+  }
+  renderGroupCheckboxesByTag(els.exportGroupOptions, state.data.groups || [], 'exportGroups');
+  openModal('exportGroupModal');
+}
+
+function openExportTeacherModal() {
+  if (!els.exportTeacherModal || !els.exportTeacherOptions) return;
+  if (!(state.data.teachers || []).length) {
+    alert('No teachers available to export.');
+    return;
+  }
+  renderTeacherCheckboxesByCourseTag(els.exportTeacherOptions, state.data.teachers || [], 'exportTeachers');
+  openModal('exportTeacherModal');
+}
+
 async function submitExportProgramForm(e) {
   e.preventDefault();
   if (!state.timetableId) {
@@ -1957,6 +2115,41 @@ async function submitExportProgramForm(e) {
   const url = `/export.xlsx?timetable_id=${state.timetableId}&${params}`;
   closeModal('exportProgramModal');
   await downloadExcel(url, 'Exporting program...');
+}
+
+async function submitExportGroupForm(e) {
+  e.preventDefault();
+  if (!state.timetableId) {
+    alert('Select a timetable first.');
+    return;
+  }
+  const groupIds = collectCheckedValues(els.exportGroupOptions);
+  if (!groupIds.length) {
+    alert('Select at least one group.');
+    return;
+  }
+  const params = groupIds.map(id => `group_ids=${id}`).join('&');
+  const url = `/export.xlsx?timetable_id=${state.timetableId}&${params}`;
+  closeModal('exportGroupModal');
+  await downloadExcel(url, 'Exporting groups...');
+}
+
+async function submitExportTeacherForm(e) {
+  e.preventDefault();
+  if (!state.timetableId) {
+    alert('Select a timetable first.');
+    return;
+  }
+  let teacherIds = collectCheckedValues(els.exportTeacherOptions);
+  if (!teacherIds.length) {
+    alert('Select at least one teacher.');
+    return;
+  }
+  teacherIds = [...new Set(teacherIds)];
+  const params = teacherIds.map(id => `teacher_ids=${id}`).join('&');
+  const url = `/export.xlsx?timetable_id=${state.timetableId}&${params}`;
+  closeModal('exportTeacherModal');
+  await downloadExcel(url, 'Exporting teachers...');
 }
 
 async function downloadExcel(url, busyText = 'Exporting...') {

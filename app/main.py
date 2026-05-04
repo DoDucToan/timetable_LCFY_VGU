@@ -128,6 +128,48 @@ def _current_timetable_id(db: Session, timetable_id: Optional[int] = None) -> Op
     return getattr(timetable, 'id', None)
 
 
+def _upsert_group_tag_requirement(db: Session, timetable_id: int, group_tag_id: int, course_id: int, sessions_required: int) -> None:
+    req = db.scalar(
+        select(CourseForGroupTag)
+        .where(
+            CourseForGroupTag.group_tag_id == group_tag_id,
+            CourseForGroupTag.course_id == course_id,
+            CourseForGroupTag.timetable_id == timetable_id,
+        )
+        .limit(1)
+    )
+    if req:
+        req.sessions_required = sessions_required
+    else:
+        db.add(CourseForGroupTag(
+            group_tag_id=group_tag_id,
+            course_id=course_id,
+            sessions_required=sessions_required,
+            timetable_id=timetable_id,
+        ))
+
+
+def _upsert_program_requirement(db: Session, timetable_id: int, program_id: int, course_id: int, sessions_required: int) -> None:
+    req = db.scalar(
+        select(StudyProgramCourse)
+        .where(
+            StudyProgramCourse.study_program_id == program_id,
+            StudyProgramCourse.course_id == course_id,
+            StudyProgramCourse.timetable_id == timetable_id,
+        )
+        .limit(1)
+    )
+    if req:
+        req.sessions_required = sessions_required
+    else:
+        db.add(StudyProgramCourse(
+            study_program_id=program_id,
+            course_id=course_id,
+            sessions_required=sessions_required,
+            timetable_id=timetable_id,
+        ))
+
+
 def _serialize_group_requirements(group_tag_id: int, db: Session, timetable_id: Optional[int] = None) -> List[Dict[str, Any]]:
     query = select(CourseForGroupTag).options(joinedload(CourseForGroupTag.course)).where(CourseForGroupTag.group_tag_id == group_tag_id)
     if timetable_id is not None:
@@ -568,13 +610,14 @@ def delete_cycle(cycle_id: int, db: Session = Depends(get_db)):
 def create_timetable(payload: TimetableIn, db: Session = Depends(get_db)):
     if not db.get(Cycle, payload.cycle_id):
         raise HTTPException(status_code=404, detail="Cycle not found.")
+    if db.scalar(select(Timetable.id).where(Timetable.cycle_id == payload.cycle_id).limit(1)):
+        raise HTTPException(status_code=400, detail="A timetable already exists for this cycle.")
     if payload.in_action:
         db.query(Timetable).update({Timetable.in_action: False})
     row = Timetable(cycle_id=payload.cycle_id, in_action=payload.in_action)
     db.add(row)
     db.commit()
     db.refresh(row)  # Ensure row.id is populated with the actual int value
-    # row.id should be an int after db.refresh(row)
     timetable_id = getattr(row, 'id', None)
     if timetable_id is None or not isinstance(timetable_id, int):
         db.refresh(row)
@@ -589,6 +632,10 @@ def update_timetable(timetable_id: int, payload: TimetableIn, db: Session = Depe
         raise HTTPException(status_code=404, detail="Timetable not found.")
     if not db.get(Cycle, payload.cycle_id):
         raise HTTPException(status_code=404, detail="Cycle not found.")
+    old_cycle_id = row.cycle_id
+    if payload.cycle_id != old_cycle_id:
+        if db.scalar(select(Timetable.id).where(Timetable.cycle_id == payload.cycle_id, Timetable.id != timetable_id).limit(1)):
+            raise HTTPException(status_code=400, detail="A timetable already exists for this cycle.")
     if payload.in_action:
         db.query(Timetable).update({Timetable.in_action: False})
     row.cycle_id = payload.cycle_id  # type: ignore
@@ -638,13 +685,11 @@ def create_group_tag(payload: GroupTagIn, db: Session = Depends(get_db)):
     timetable_id = _current_timetable_id(db)
     if timetable_id is None and payload.requirements:
         raise HTTPException(status_code=400, detail="No timetable selected for group tag requirements.")
-    for req in payload.requirements:
-        db.add(CourseForGroupTag(
-            group_tag_id=row.id,
-            course_id=req.course_id,
-            sessions_required=req.sessions_required,
-            timetable_id=timetable_id,
-        ))
+    if timetable_id is not None:
+        selected_timetable_id = int(timetable_id)
+        selected_group_tag_id = int(getattr(row, 'id'))
+        for req in payload.requirements:
+            _upsert_group_tag_requirement(db, selected_timetable_id, selected_group_tag_id, req.course_id, req.sessions_required)
     db.commit()
     return bootstrap_payload(db)
 
@@ -657,13 +702,6 @@ def update_group_tag(group_tag_id: int, payload: GroupTagIn, db: Session = Depen
     row.code = payload.code.strip().upper()  # type: ignore
     row.name = payload.name.strip()  # type: ignore
     timetable_id = _current_timetable_id(db)
-    existing = db.scalars(
-        select(CourseForGroupTag)
-        .where(
-            CourseForGroupTag.group_tag_id == group_tag_id,
-            CourseForGroupTag.timetable_id == timetable_id,
-        )
-    ).all()
     if timetable_id is None and payload.requirements:
         raise HTTPException(status_code=400, detail="No timetable selected for group tag requirements.")
     def get_int(val: Any) -> int:
@@ -672,26 +710,26 @@ def update_group_tag(group_tag_id: int, payload: GroupTagIn, db: Session = Depen
         if hasattr(val, 'value'):
             return int(val.value)
         return int(str(val))
-    existing_by_course = {get_int(x.course_id): x for x in existing}
     seen: set[int] = set()
+    selected_timetable_id: Optional[int] = None
+    if timetable_id is not None:
+        selected_timetable_id = int(timetable_id)
     for req in payload.requirements:
         cid = get_int(req.course_id)
         if not db.get(Course, cid):
-            seen.add(cid)
-            link = existing_by_course.get(cid)
-            if link:
-                link.sessions_required = req.sessions_required  # type: ignore
-            else:
-                db.add(CourseForGroupTag(
-                    group_tag_id=group_tag_id,
-                    course_id=cid,
-                    sessions_required=req.sessions_required,
-                    timetable_id=timetable_id,
-                ))
-    for link in existing:
-        cid = get_int(link.course_id)
-        if cid not in seen:
-            db.delete(link)
+            raise HTTPException(status_code=404, detail=f"Course {cid} not found.")
+        if selected_timetable_id is None:
+            raise HTTPException(status_code=400, detail="No timetable selected for group tag requirements.")
+        _upsert_group_tag_requirement(db, selected_timetable_id, group_tag_id, cid, req.sessions_required)
+        seen.add(cid)
+    if selected_timetable_id is not None:
+        query = db.query(CourseForGroupTag).filter(
+            CourseForGroupTag.group_tag_id == group_tag_id,
+            CourseForGroupTag.timetable_id == selected_timetable_id,
+        )
+        if seen:
+            query = query.filter(CourseForGroupTag.course_id.notin_(seen))
+        query.delete(synchronize_session=False)
     db.commit()
     return bootstrap_payload(db)
 
@@ -1278,16 +1316,47 @@ def export_file(
     timetable_id: Optional[int] = Query(default=None),
     program_id: Optional[int] = Query(default=None),
     program_ids: Optional[List[int]] = Query(default=None),
+    group_ids: Optional[List[int]] = Query(default=None),
+    teacher_ids: Optional[List[int]] = Query(default=None),
     db: Session = Depends(get_db),
 ):
+    if (group_ids or teacher_ids) and (program_id is not None or program_ids is not None):
+        raise HTTPException(status_code=400, detail="Cannot combine study program and group/teacher export filters.")
+
     timetable = _selected_timetable(db, timetable_id)
     if not timetable:
         raise HTTPException(status_code=404, detail="No timetable found.")
 
     selected_group_ids: Optional[List[int]] = None
+    selected_teacher_ids: Optional[List[int]] = None
     selected_program = None
     selected_programs: Optional[List[StudyProgram]] = None
-    if program_ids is not None:
+    if group_ids is not None:
+        selected_group_ids = group_ids
+        groups_query = select(Group.id).where(Group.timetable_id == timetable.id, Group.id.in_(group_ids))
+        found_group_ids = [int(gid) for gid in db.scalars(groups_query).all()]
+        if not found_group_ids:
+            raise HTTPException(status_code=404, detail="No matching groups found for this timetable.")
+        selected_group_ids = found_group_ids
+    elif teacher_ids is not None:
+        selected_teacher_ids = teacher_ids
+        found_group_ids = [
+            int(gid)
+            for gid in db.scalars(
+                select(Group.id)
+                .join(ScheduledClass, ScheduledClass.group_id == Group.id)
+                .where(
+                    Group.timetable_id == timetable.id,
+                    ScheduledClass.deploy.is_(True),
+                    ScheduledClass.teacher_id.in_(teacher_ids),
+                )
+                .distinct()
+            ).all()
+        ]
+        if not found_group_ids:
+            raise HTTPException(status_code=404, detail="No deployed groups found for the selected teacher(s) in this timetable.")
+        selected_group_ids = found_group_ids
+    elif program_ids is not None:
         selected_programs = list(db.scalars(select(StudyProgram).where(StudyProgram.id.in_(program_ids))).all())
         if not selected_programs:
             raise HTTPException(status_code=404, detail="Selected study programs not found.")
@@ -1311,7 +1380,6 @@ def export_file(
         if not selected_group_ids:
             raise HTTPException(status_code=404, detail="No groups found for the selected study program in this timetable.")
 
-    # Check requirements are fully deployed for exported groups
     groups = db.execute(
         select(Group)
         .where(Group.timetable_id == timetable.id)
@@ -1320,100 +1388,157 @@ def export_file(
     if selected_group_ids is not None:
         groups = [group for group in groups if group.id in selected_group_ids]
 
-    for group in groups:
-        requirements = db.scalars(
-            select(CourseForGroupTag).where(
-                CourseForGroupTag.group_tag_id == group.group_tag_id,
-                CourseForGroupTag.timetable_id == timetable.id,
-            )
-        ).all()
-        for req in requirements:
-            deployed_count = db.scalar(
-                select(func.count()).select_from(ScheduledClass)
-                .where(
-                    ScheduledClass.group_id == group.id,
-                    ScheduledClass.course_id == req.course_id,
-                    ScheduledClass.deploy.is_(True),
-                )
-            )
-            sessions_required = int(getattr(req, "sessions_required", 0))
-            if deployed_count is None or deployed_count < sessions_required:
-                course = db.get(Course, req.course_id)
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Group {group.code} is missing deployed class(es) for required course {course.name if course else req.course_id} (has {deployed_count}, needs {sessions_required})"
-                )
-        group_specific_requirements = db.scalars(
-            select(CourseForGroup).where(CourseForGroup.group_id == group.id)
-        ).all()
-        for req in group_specific_requirements:
-            deployed_count = db.scalar(
-                select(func.count()).select_from(ScheduledClass)
-                .where(
-                    ScheduledClass.group_id == group.id,
-                    ScheduledClass.course_id == req.course_id,
-                    ScheduledClass.deploy.is_(True),
-                )
-            )
-            sessions_required = int(getattr(req, "sessions_required", 0))
-            if deployed_count is None or deployed_count < sessions_required:
-                course = db.get(Course, req.course_id)
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Group {group.code} is missing deployed class(es) for individual required course {course.name if course else req.course_id} (has {deployed_count}, needs {sessions_required})"
-                )
+    class_count_query = select(func.count()).select_from(ScheduledClass).join(Group).where(
+        ScheduledClass.deploy.is_(True),
+        Group.timetable_id == timetable.id,
+    )
+    if selected_group_ids is not None:
+        class_count_query = class_count_query.where(ScheduledClass.group_id.in_(selected_group_ids))
+    if selected_teacher_ids is not None:
+        class_count_query = class_count_query.where(ScheduledClass.teacher_id.in_(selected_teacher_ids))
+    existing_class_count = db.scalar(class_count_query)
+    if not existing_class_count:
+        raise HTTPException(status_code=400, detail="No deployed classes found for selected timetable.")
 
-    programs = []
+    selected_program_export_ids = None
     if program_ids is not None:
-        programs = selected_programs or []
+        selected_program_export_ids = program_ids
     elif selected_program is not None:
-        programs = [selected_program]
-    else:
-        programs = db.scalars(select(StudyProgram)).all()
-    for program in programs:
-        reqs = db.query(StudyProgramCourse).filter(
-            StudyProgramCourse.study_program_id == program.id,
-            StudyProgramCourse.timetable_id == timetable.id
-        ).all()
-        if not reqs:
-            continue
-        if program_ids is not None:
-            group_ids = [int(gid) for gid in db.scalars(
-                select(GroupStudyProgram.group_id).join(Group).where(
-                    GroupStudyProgram.study_program_id == program.id,
-                    Group.timetable_id == timetable.id
+        selected_program_export_ids = [cast(int, getattr(selected_program, 'id'))]
+
+    class_count_query = select(func.count()).select_from(ScheduledClass).join(Group).where(
+        ScheduledClass.deploy.is_(True),
+        Group.timetable_id == timetable.id,
+    )
+    if selected_group_ids is not None:
+        class_count_query = class_count_query.where(ScheduledClass.group_id.in_(selected_group_ids))
+    if selected_teacher_ids is not None:
+        class_count_query = class_count_query.where(ScheduledClass.teacher_id.in_(selected_teacher_ids))
+    if selected_program_export_ids is not None:
+        class_count_query = class_count_query.where(ScheduledClass.study_program_id.in_(selected_program_export_ids))
+    existing_class_count = db.scalar(class_count_query)
+    if not existing_class_count:
+        raise HTTPException(status_code=400, detail="No deployed classes found for selected timetable.")
+
+    missing_assignment_query = select(func.count()).select_from(ScheduledClass).join(Group).where(
+        ScheduledClass.deploy.is_(True),
+        Group.timetable_id == timetable.id,
+        (ScheduledClass.teacher_id.is_(None) | ScheduledClass.room_id.is_(None)),
+    )
+    if selected_group_ids is not None:
+        missing_assignment_query = missing_assignment_query.where(ScheduledClass.group_id.in_(selected_group_ids))
+    if selected_teacher_ids is not None:
+        missing_assignment_query = missing_assignment_query.where(ScheduledClass.teacher_id.in_(selected_teacher_ids))
+    if selected_program_export_ids is not None:
+        missing_assignment_query = missing_assignment_query.where(ScheduledClass.study_program_id.in_(selected_program_export_ids))
+    if db.scalar(missing_assignment_query):
+        raise HTTPException(status_code=400, detail="Cannot export: some deployed classes are missing teacher or room assignment.")
+
+    if selected_teacher_ids is None:
+        for group in groups:
+            requirements = db.scalars(
+                select(CourseForGroupTag).where(
+                    CourseForGroupTag.group_tag_id == group.group_tag_id,
+                    CourseForGroupTag.timetable_id == timetable.id,
                 )
-            ).all()]
-        else:
-            group_ids = selected_group_ids if selected_group_ids is not None else [int(gid) for gid in db.scalars(
-                select(GroupStudyProgram.group_id).join(Group).where(
-                    GroupStudyProgram.study_program_id == program.id,
-                    Group.timetable_id == timetable.id
-                )
-            ).all()]
-        for req in reqs:
-            for group_id in group_ids:
+            ).all()
+            for req in requirements:
                 deployed_count = db.scalar(
                     select(func.count()).select_from(ScheduledClass)
                     .where(
-                        ScheduledClass.group_id == group_id,
+                        ScheduledClass.group_id == group.id,
                         ScheduledClass.course_id == req.course_id,
-                        ScheduledClass.study_program_id == program.id,
                         ScheduledClass.deploy.is_(True),
                     )
                 )
-                sessions_required = int(getattr(req, "sessions_required", 1))
+                sessions_required = int(getattr(req, "sessions_required", 0))
                 if deployed_count is None or deployed_count < sessions_required:
                     course = db.get(Course, req.course_id)
-                    group = db.get(Group, group_id)
                     raise HTTPException(
                         status_code=400,
-                        detail=f"Study program {program.code} group {group.code if group else group_id} missing deployed class for required course {course.name if course else req.course_id}"
+                        detail=f"Group {group.code} is missing deployed class(es) for required course {course.name if course else req.course_id} (has {deployed_count}, needs {sessions_required})"
+                    )
+            group_specific_requirements = db.scalars(
+                select(CourseForGroup).where(CourseForGroup.group_id == group.id)
+            ).all()
+            for req in group_specific_requirements:
+                deployed_count = db.scalar(
+                    select(func.count()).select_from(ScheduledClass)
+                    .where(
+                        ScheduledClass.group_id == group.id,
+                        ScheduledClass.course_id == req.course_id,
+                        ScheduledClass.deploy.is_(True),
+                    )
+                )
+                sessions_required = int(getattr(req, "sessions_required", 0))
+                if deployed_count is None or deployed_count < sessions_required:
+                    course = db.get(Course, req.course_id)
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Group {group.code} is missing deployed class(es) for individual required course {course.name if course else req.course_id} (has {deployed_count}, needs {sessions_required})"
                     )
 
-    # Get cycle info for filename
+        programs = []
+        if program_ids is not None:
+            programs = selected_programs or []
+        elif selected_program is not None:
+            programs = [selected_program]
+        elif selected_group_ids is not None:
+            programs = list(db.scalars(
+                select(StudyProgram)
+                .join(GroupStudyProgram)
+                .where(GroupStudyProgram.group_id.in_(selected_group_ids))
+                .distinct()
+            ).all())
+        else:
+            programs = db.scalars(select(StudyProgram)).all()
+        for program in programs:
+            reqs = db.query(StudyProgramCourse).filter(
+                StudyProgramCourse.study_program_id == program.id,
+                StudyProgramCourse.timetable_id == timetable.id
+            ).all()
+            if not reqs:
+                continue
+            if selected_group_ids is not None:
+                group_ids_for_program = [int(gid) for gid in db.scalars(
+                    select(GroupStudyProgram.group_id)
+                    .where(
+                        GroupStudyProgram.study_program_id == program.id,
+                        GroupStudyProgram.group_id.in_(selected_group_ids),
+                    )
+                ).all()]
+            else:
+                group_ids_for_program = [int(gid) for gid in db.scalars(
+                    select(GroupStudyProgram.group_id)
+                    .join(Group)
+                    .where(
+                        GroupStudyProgram.study_program_id == program.id,
+                        Group.timetable_id == timetable.id
+                    )
+                ).all()]
+            if not group_ids_for_program:
+                continue
+            for req in reqs:
+                for group_id in group_ids_for_program:
+                    deployed_count = db.scalar(
+                        select(func.count()).select_from(ScheduledClass)
+                        .where(
+                            ScheduledClass.group_id == group_id,
+                            ScheduledClass.course_id == req.course_id,
+                            ScheduledClass.study_program_id == program.id,
+                            ScheduledClass.deploy.is_(True),
+                        )
+                    )
+                    sessions_required = int(getattr(req, "sessions_required", 1))
+                    if deployed_count is None or deployed_count < sessions_required:
+                        course = db.get(Course, req.course_id)
+                        group = db.get(Group, group_id)
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Study program {program.code} group {group.code if group else group_id} missing deployed class for required course {course.name if course else req.course_id}"
+                        )
+
     cycle = timetable.cycle if hasattr(timetable, 'cycle') else db.get(Cycle, timetable.cycle_id)
-    # Sanitize cycle name for filename (remove / and other invalid chars)
     import re
     def sanitize_filename(s: str) -> str:
         return re.sub(r'[^\w\-_\. ]', '_', s)
@@ -1422,7 +1547,17 @@ def export_file(
     timetable_id = getattr(timetable, 'id', None)
     if timetable_id is None:
         raise HTTPException(status_code=500, detail="Timetable id is unavailable.")
-    if program_ids is not None and selected_programs:
+    if group_ids is not None:
+        suffix_codes = '_'.join(sanitize_filename(str(group.code or group.id)) for group in groups)
+        program_suffix = f"_groups-{suffix_codes}"
+    elif teacher_ids is not None:
+        teacher_names = [
+            str(t.name)
+            for t in db.scalars(select(Teacher).where(Teacher.id.in_(selected_teacher_ids or []))).all()
+        ]
+        suffix_codes = '_'.join(sanitize_filename(name) for name in teacher_names)
+        program_suffix = f"_teachers-{suffix_codes}"
+    elif program_ids is not None and selected_programs:
         suffix_codes = '_'.join(sanitize_filename(str(prog.code)) for prog in selected_programs)
         program_suffix = f"_programs-{suffix_codes}"
     elif selected_program is not None:
@@ -1437,7 +1572,14 @@ def export_file(
         if program_ids is not None
         else ([cast(int, getattr(selected_program, 'id'))] if selected_program is not None else None)
     )
-    export_timetable_xlsx(db, out_path, timetable_id=timetable_id, study_program_ids=selected_program_ids)
+    export_timetable_xlsx(
+        db,
+        out_path,
+        timetable_id=timetable_id,
+        study_program_ids=selected_program_ids,
+        group_ids=selected_group_ids,
+        teacher_ids=selected_teacher_ids,
+    )
     return FileResponse(
         out_path,
         filename=out_path.name,
@@ -1447,28 +1589,26 @@ def export_file(
 @app.delete("/api/group-tags/{group_tag_id}/requirements/{course_id}")
 def delete_group_tag_requirement(group_tag_id: int, course_id: int, db: Session = Depends(get_db)):
     timetable_id = _current_timetable_id(db)
-    row = db.query(CourseForGroupTag).filter(
+    if timetable_id is None:
+        raise HTTPException(status_code=400, detail="No timetable selected or available.")
+    db.query(CourseForGroupTag).filter(
         CourseForGroupTag.group_tag_id == group_tag_id,
         CourseForGroupTag.course_id == course_id,
-        CourseForGroupTag.timetable_id == timetable_id,
-    ).first()
-    if not row:
-        raise HTTPException(status_code=404, detail="Requirement not found.")
-    db.delete(row)
+        CourseForGroupTag.timetable_id == int(timetable_id),
+    ).delete(synchronize_session=False)
     db.commit()
     return bootstrap_payload(db)
 
 @app.delete("/api/study-programs/{program_id}/requirements/{course_id}")
 def delete_study_program_requirement(program_id: int, course_id: int, db: Session = Depends(get_db)):
     timetable_id = _current_timetable_id(db)
-    row = db.query(StudyProgramCourse).filter(
+    if timetable_id is None:
+        raise HTTPException(status_code=400, detail="No timetable selected or available.")
+    db.query(StudyProgramCourse).filter(
         StudyProgramCourse.study_program_id == program_id,
         StudyProgramCourse.course_id == course_id,
-        StudyProgramCourse.timetable_id == timetable_id,
-    ).first()
-    if not row:
-        raise HTTPException(status_code=404, detail="Requirement not found.")
-    db.delete(row)
+        StudyProgramCourse.timetable_id == int(timetable_id),
+    ).delete(synchronize_session=False)
     db.commit()
     return bootstrap_payload(db)
 
@@ -1495,15 +1635,7 @@ def add_group_tag_requirement(group_tag_id: int, payload: Dict[str, Any] = Body(
         raise HTTPException(status_code=404, detail="Group tag not found.")
     if not db.get(Course, course_id):
         raise HTTPException(status_code=404, detail="Course not found.")
-    req = db.query(CourseForGroupTag).filter(
-        CourseForGroupTag.group_tag_id == group_tag_id,
-        CourseForGroupTag.course_id == course_id,
-        CourseForGroupTag.timetable_id == timetable_id
-    ).first()
-    if req:
-        req.sessions_required = sessions_required
-    else:
-        db.add(CourseForGroupTag(group_tag_id=group_tag_id, course_id=course_id, sessions_required=sessions_required, timetable_id=timetable_id))
+    _upsert_group_tag_requirement(db, int(timetable_id), group_tag_id, course_id, sessions_required)
     db.commit()
     return bootstrap_payload(db)
 
@@ -1534,15 +1666,7 @@ def add_group_tag_requirements(payload: Dict[str, Any] = Body(...), db: Session 
     for group_tag_id in group_tag_ids:
         if not db.get(GroupTag, group_tag_id):
             raise HTTPException(status_code=404, detail=f"Group tag {group_tag_id} not found.")
-        req = db.query(CourseForGroupTag).filter(
-            CourseForGroupTag.group_tag_id == group_tag_id,
-            CourseForGroupTag.course_id == course_id,
-            CourseForGroupTag.timetable_id == timetable_id
-        ).first()
-        if req:
-            req.sessions_required = sessions_required
-        else:
-            db.add(CourseForGroupTag(group_tag_id=group_tag_id, course_id=course_id, sessions_required=sessions_required, timetable_id=timetable_id))
+        _upsert_group_tag_requirement(db, int(timetable_id), group_tag_id, course_id, sessions_required)
     db.commit()
     return bootstrap_payload(db)
 
@@ -1569,20 +1693,7 @@ def add_study_program_requirement(program_id: int, payload: Dict[str, Any] = Bod
         raise HTTPException(status_code=404, detail="Study program not found.")
     if not db.get(Course, course_id):
         raise HTTPException(status_code=404, detail="Course not found.")
-    req = db.query(StudyProgramCourse).filter(
-        StudyProgramCourse.study_program_id == program_id,
-        StudyProgramCourse.course_id == course_id,
-        StudyProgramCourse.timetable_id == timetable_id
-    ).first()
-    if req:
-        req.sessions_required = sessions_required
-    else:
-        db.add(StudyProgramCourse(
-            study_program_id=program_id,
-            course_id=course_id,
-            timetable_id=timetable_id,
-            sessions_required=sessions_required,
-        ))
+    _upsert_program_requirement(db, int(timetable_id), program_id, course_id, sessions_required)
     db.commit()
     return bootstrap_payload(db)
 
@@ -1613,19 +1724,6 @@ def add_study_program_requirements(payload: Dict[str, Any] = Body(...), db: Sess
     for study_program_id in study_program_ids:
         if not db.get(StudyProgram, study_program_id):
             raise HTTPException(status_code=404, detail=f"Study program {study_program_id} not found.")
-        req = db.query(StudyProgramCourse).filter(
-            StudyProgramCourse.study_program_id == study_program_id,
-            StudyProgramCourse.course_id == course_id,
-            StudyProgramCourse.timetable_id == timetable_id
-        ).first()
-        if req:
-            req.sessions_required = sessions_required
-        else:
-            db.add(StudyProgramCourse(
-                study_program_id=study_program_id,
-                course_id=course_id,
-                timetable_id=timetable_id,
-                sessions_required=sessions_required,
-            ))
+        _upsert_program_requirement(db, int(timetable_id), study_program_id, course_id, sessions_required)
     db.commit()
     return bootstrap_payload(db)

@@ -65,6 +65,76 @@ def _migrate_course_for_group_table() -> None:
     conn.close()
 
 
+def _is_index_matching_columns(conn: sqlite3.Connection, table: str, expected_columns: list[str]) -> bool:
+    cur = conn.cursor()
+    cur.execute("PRAGMA index_list(%s)" % repr(table))
+    for _, name, _, unique, _ in cur.fetchall():
+        if unique != 1:
+            continue
+        cur.execute("PRAGMA index_info(%s)" % repr(name))
+        columns = [row[2] for row in cur.fetchall()]
+        if columns == expected_columns:
+            return True
+    return False
+
+
+def _rebuild_table_with_unique_constraint(conn: sqlite3.Connection, table_name: str, create_sql: str) -> None:
+    cur = conn.cursor()
+    cur.execute('PRAGMA foreign_keys=OFF')
+    conn.commit()
+    cur.execute(f'ALTER TABLE {table_name} RENAME TO {table_name}_old')
+    conn.commit()
+    cur.execute(create_sql)
+    conn.commit()
+    cur.execute(
+        f'INSERT INTO {table_name} SELECT * FROM {table_name}_old'
+    )
+    conn.commit()
+    cur.execute(f'DROP TABLE {table_name}_old')
+    conn.commit()
+    cur.execute('PRAGMA foreign_keys=ON')
+    conn.commit()
+
+
+def _ensure_requirement_unique_constraints() -> None:
+    conn = sqlite3.connect(str(DB_PATH))
+    try:
+        if not _is_index_matching_columns(conn, 'course_for_group_tag', ['group_tag_id', 'course_id', 'timetable_id']):
+            _rebuild_table_with_unique_constraint(
+                conn,
+                'course_for_group_tag',
+                '''CREATE TABLE course_for_group_tag (
+                    id INTEGER NOT NULL PRIMARY KEY,
+                    group_tag_id INTEGER NOT NULL,
+                    course_id INTEGER NOT NULL,
+                    timetable_id INTEGER NOT NULL,
+                    sessions_required INTEGER NOT NULL,
+                    FOREIGN KEY(group_tag_id) REFERENCES group_tag (id),
+                    FOREIGN KEY(course_id) REFERENCES course (id),
+                    FOREIGN KEY(timetable_id) REFERENCES timetable (id),
+                    UNIQUE(group_tag_id, course_id, timetable_id)
+                )''',
+            )
+        if not _is_index_matching_columns(conn, 'study_program_has_course', ['study_program_id', 'course_id', 'timetable_id']):
+            _rebuild_table_with_unique_constraint(
+                conn,
+                'study_program_has_course',
+                '''CREATE TABLE study_program_has_course (
+                    id INTEGER NOT NULL PRIMARY KEY,
+                    study_program_id INTEGER NOT NULL,
+                    course_id INTEGER NOT NULL,
+                    timetable_id INTEGER NOT NULL,
+                    sessions_required INTEGER NOT NULL,
+                    FOREIGN KEY(study_program_id) REFERENCES study_program (id),
+                    FOREIGN KEY(course_id) REFERENCES course (id),
+                    FOREIGN KEY(timetable_id) REFERENCES timetable (id),
+                    UNIQUE(study_program_id, course_id, timetable_id)
+                )''',
+            )
+    finally:
+        conn.close()
+
+
 def _ensure_group_sort_order_column() -> None:
     conn = sqlite3.connect(str(DB_PATH))
     cur = conn.cursor()
@@ -86,6 +156,7 @@ def _ensure_group_sort_order_column() -> None:
 def ensure_database() -> None:
     _migrate_course_for_group_table()
     _ensure_group_sort_order_column()
+    _ensure_requirement_unique_constraints()
     Base.metadata.create_all(bind=engine)
 
 
