@@ -19,11 +19,18 @@ function addEntityRequirementRow(courseId = null, sessionsRequired = 1) {
 // ...existing code...
 
 // Fetches the latest data and updates the UI
-async function refreshData(timetableId = null) {
+async function refreshData(timetableId = null, cycleId = null) {
   try {
     let url = '/api/bootstrap';
-    if (timetableId) {
-      url += `?timetable_id=${timetableId}`;
+    const params = [];
+    if (timetableId != null) {
+      params.push(`timetable_id=${timetableId}`);
+    }
+    if (cycleId != null) {
+      params.push(`cycle_id=${cycleId}`);
+    }
+    if (params.length) {
+      url += `?${params.join('&')}`;
     }
     const res = await fetch(url);
     if (!res.ok) {
@@ -33,10 +40,17 @@ async function refreshData(timetableId = null) {
     }
     const data = await res.json();
     state.data = data;
-    if (data.selected_timetable_id) {
+    if (state.selectedCycleId == null && typeof data.selected_cycle_id !== 'undefined') {
+      state.selectedCycleId = data.selected_cycle_id;
+    }
+    if (timetableId == null && data.selected_timetable_id) {
       state.timetableId = data.selected_timetable_id;
     }
     state.selected = [];
+    state.selectedGroupIds.clear();
+    if (els.deleteSelectedGroupsBtn) {
+      els.deleteSelectedGroupsBtn.disabled = true;
+    }
     renderContextSelectors();
     renderEntityLists();
     renderBoard();
@@ -78,69 +92,137 @@ function renderRequirementsSection() {
     });
   });
 
-  if (groupOnlyRequirements.length) {
-    groupOnlyRequirements.forEach(({ group, req }) => {
-      const row = document.createElement('div');
-      row.className = 'requirement-row';
-      row.innerHTML = `<span><strong>Group:</strong> ${escapeHtml(group.code)} — ${escapeHtml(group.name)}</span><span>Course: ${escapeHtml(req.course_name || req.course_id)}</span><span>Sessions: ${req.sessions_required || 1}</span>`;
-      const editBtn = document.createElement('button');
-      editBtn.className = 'ghost-btn small';
-      editBtn.textContent = 'Edit';
-      editBtn.onclick = () => openEditGroupOnlyRequirementModal(req);
-      const delBtn = document.createElement('button');
-      delBtn.className = 'danger-btn small';
-      delBtn.textContent = 'Delete';
-      delBtn.onclick = () => deleteGroupOnlyRequirement(req.id);
-      row.appendChild(editBtn);
-      row.appendChild(delBtn);
-      root.appendChild(row);
+  const summary = document.createElement('div');
+  summary.className = 'requirement-summary';
+  summary.innerHTML = `
+    <div class="summary-item">
+      <button type="button" class="ghost-btn" data-view-requirements="group_only">Group-only requirements (${groupOnlyRequirements.length})</button>
+    </div>
+    <div class="summary-item">
+      <button type="button" class="ghost-btn" data-view-requirements="group_tag">Group tag requirements (${groupTagRequirements.length})</button>
+    </div>
+    <div class="summary-item">
+      <button type="button" class="ghost-btn" data-view-requirements="program">Study program requirements (${programRequirements.length})</button>
+    </div>
+  `;
+  root.appendChild(summary);
+}
+
+function openViewRequirementsModal(type) {
+  if (!els.viewRequirementsModal) return;
+  const titleMap = {
+    group_only: 'Group-only requirements',
+    group_tag: 'Group tag requirements',
+    program: 'Study program requirements',
+  };
+  const title = titleMap[type] || 'Requirements';
+  const titleEl = document.getElementById('viewRequirementsModalTitle');
+  if (titleEl) titleEl.textContent = title;
+  renderRequirementsModal(type);
+  openModal('viewRequirementsModal');
+}
+
+function renderRequirementsModal(type) {
+  if (!els.viewRequirementsContent) return;
+  const root = els.viewRequirementsContent;
+  root.innerHTML = '';
+
+  const formatCourseName = req => req.course_name || req.course_id || 'Unknown course';
+  const table = document.createElement('table');
+  table.className = 'requirements-modal-table';
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th>Item</th>
+        <th>Requirement</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  `;
+  const tbody = table.querySelector('tbody');
+
+  const addGroupSection = (label, items) => {
+    const headerRow = document.createElement('tr');
+    headerRow.className = 'requirements-table-group';
+    const headerCell = document.createElement('td');
+    headerCell.colSpan = 3;
+    headerCell.textContent = label;
+    headerRow.appendChild(headerCell);
+    tbody.appendChild(headerRow);
+
+    items.forEach(item => {
+      const row = document.createElement('tr');
+      row.className = 'requirements-table-item-row';
+      const labelCell = document.createElement('td');
+      labelCell.textContent = '';
+      const detailCell = document.createElement('td');
+      detailCell.textContent = item.detail;
+      const actionCell = document.createElement('td');
+      actionCell.className = 'requirements-table-action-cell';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'danger-btn small';
+      btn.textContent = 'Delete';
+      btn.addEventListener('click', item.deleteHandler);
+      actionCell.appendChild(btn);
+      row.appendChild(labelCell);
+      row.appendChild(detailCell);
+      row.appendChild(actionCell);
+      tbody.appendChild(row);
     });
+  };
+
+  let added = false;
+  if (type === 'group_only') {
+    (state.data.groups || []).forEach(group => {
+      const items = (group.group_requirements || []).map(req => ({
+        detail: `${formatCourseName(req)} · ${req.sessions_required || 1} session(s)`,
+        deleteHandler: () => deleteGroupOnlyRequirement(req.id),
+      }));
+      if (items.length) {
+        addGroupSection(`${group.code} — ${group.name}`, items);
+        added = true;
+      }
+    });
+    if (!added) root.innerHTML = '<div class="muted">No group-only requirements.</div>';
+    else root.appendChild(table);
+    return;
   }
 
-  if (groupTagRequirements.length) {
-    groupTagRequirements.forEach(({ tag, req }) => {
-      const row = document.createElement('div');
-      row.className = 'requirement-row';
-      row.innerHTML = `<span><strong>Group Tag:</strong> ${escapeHtml(tag.code)} — ${escapeHtml(tag.name)}</span><span>Course: ${escapeHtml(req.course_name || req.course_id)}</span><span>Sessions: ${req.sessions_required || 1}</span>`;
-      const editBtn = document.createElement('button');
-      editBtn.className = 'ghost-btn small';
-      editBtn.textContent = 'Edit';
-      editBtn.onclick = () => openEditRequirementModal('group_tag', tag.id, req.course_id, req.sessions_required);
-      const delBtn = document.createElement('button');
-      delBtn.className = 'danger-btn small';
-      delBtn.textContent = 'Delete';
-      delBtn.onclick = () => deleteRequirement('group_tag', tag.id, req.course_id);
-      row.appendChild(editBtn);
-      row.appendChild(delBtn);
-      root.appendChild(row);
+  if (type === 'group_tag') {
+    (state.data.group_tags || []).forEach(tag => {
+      const items = (tag.requirements || []).map(req => ({
+        detail: `${formatCourseName(req)} · ${req.sessions_required || 1} session(s)`,
+        deleteHandler: () => deleteRequirement('group_tag', tag.id, req.course_id),
+      }));
+      if (items.length) {
+        addGroupSection(`${tag.code} — ${tag.name}`, items);
+        added = true;
+      }
     });
+    if (!added) root.innerHTML = '<div class="muted">No group tag requirements.</div>';
+    else root.appendChild(table);
+    return;
   }
 
-  if (programRequirements.length) {
-    programRequirements.forEach(({ prog, req }) => {
-      const row = document.createElement('div');
-      row.className = 'requirement-row';
-      row.innerHTML = `<span><strong>Program:</strong> ${escapeHtml(prog.code)} — ${escapeHtml(prog.name)}</span><span>Course: ${escapeHtml(req.course_name || req.course_id)}</span>`;
-      const editBtn = document.createElement('button');
-      editBtn.className = 'ghost-btn small';
-      editBtn.textContent = 'Edit';
-      editBtn.onclick = () => openEditRequirementModal('program', prog.id, req.course_id, null);
-      const delBtn = document.createElement('button');
-      delBtn.className = 'danger-btn small';
-      delBtn.textContent = 'Delete';
-      delBtn.onclick = () => deleteRequirement('program', prog.id, req.course_id);
-      row.appendChild(editBtn);
-      row.appendChild(delBtn);
-      root.appendChild(row);
+  if (type === 'program') {
+    (state.data.programs || []).forEach(prog => {
+      const items = (prog.requirements || []).map(req => ({
+        detail: `${formatCourseName(req)} · ${req.sessions_required || 1} session(s)`,
+        deleteHandler: () => deleteRequirement('program', prog.id, req.course_id),
+      }));
+      if (items.length) {
+        addGroupSection(`${prog.code} — ${prog.name}`, items);
+        added = true;
+      }
     });
+    if (!added) root.innerHTML = '<div class="muted">No study program requirements.</div>';
+    else root.appendChild(table);
+    return;
   }
 
-  if (!groupOnlyRequirements.length && !groupTagRequirements.length && !programRequirements.length) {
-    const emptyRow = document.createElement('div');
-    emptyRow.className = 'requirement-row';
-    emptyRow.textContent = 'No requirements defined yet.';
-    root.appendChild(emptyRow);
-  }
+  root.innerHTML = '<div class="muted">No requirements available.</div>';
 }
 
 function checkExportAllowed() {
@@ -181,13 +263,16 @@ function getUnmetRequirements() {
 const state = {
   data: null,
   timetableId: null,
+  selectedCycleId: null,
   selected: [],
+  selectedGroupIds: new Set(),
   editingGroupId: null,
   openMenuGroupId: null,
   selectedProgramGroupId: null,
   editingEntity: { type: null, id: null },
 };
 
+let currentImportEntity = null;
 const els = {};
 const CRUD = {
   cycle: '/api/cycles',
@@ -204,7 +289,13 @@ window.addEventListener('DOMContentLoaded', () => {
   cacheEls();
   bindGlobalActions();
   bindExportWarning();
-  refreshData();
+  const pathMatch = window.location.pathname.match(/^\/cycle\/(\d+)\/?$/);
+  if (pathMatch) {
+    state.selectedCycleId = Number(pathMatch[1]);
+    refreshData(null, state.selectedCycleId);
+  } else {
+    refreshData();
+  }
 });
 
 function bindExportWarning() {
@@ -250,7 +341,6 @@ function cacheEls() {
   [
     'timetableBoard',
     'selectionText',
-    'openAddClassBtn',
     'clearSelectionBtn',
     'refreshBtn',
     'teacherLoadList',
@@ -288,7 +378,7 @@ function cacheEls() {
     'deleteCycleBtn',
     'editTimetableBtn',
     'deleteTimetableBtn',
-    'deployTimetableBtn',
+    'deleteSelectedGroupsBtn',
     'exportBtn',
     'exportProgramBtn',
     'exportGroupBtn',
@@ -316,6 +406,8 @@ function cacheEls() {
     'groupProgramPanelMessage',
     'entityModal',
     'entityForm',
+    'entityUploadInput',
+    'entityUploadMessage',
     'entityModalTitle',
     'entityDeleteBtn',
     'entityErrors',
@@ -324,6 +416,8 @@ function cacheEls() {
     'entityTeacherTags',
     'entityCoursePrograms',
     'entityRequirementRows',
+    'viewRequirementsModal',
+    'viewRequirementsContent',
     'addEntityRequirementBtn',
     'addGroupTagRequirementPanelBtn',
     'addStudyProgramRequirementPanelBtn',
@@ -418,18 +512,9 @@ function bindGlobalActions() {
   }
   if (els.clearSelectionBtn) {
     els.clearSelectionBtn.addEventListener('click', clearSelection);
-  } else {
-    console.warn('Missing element: clearSelectionBtn');
-  }
-  if (els.openAddClassBtn) {
-    els.openAddClassBtn.addEventListener('click', openClassModal);
-  } else {
-    console.warn('Missing element: openAddClassBtn');
   }
   if (els.refreshBtn) {
     els.refreshBtn.addEventListener('click', refreshData);
-  } else {
-    console.warn('Missing element: refreshBtn');
   }
   if (els.exportProgramBtn) {
     els.exportProgramBtn.addEventListener('click', openExportProgramModal);
@@ -449,6 +534,59 @@ function bindGlobalActions() {
   if (els.exportTeacherForm) {
     els.exportTeacherForm.addEventListener('submit', submitExportTeacherForm);
   }
+
+  const importButtons = {
+    teachers: {
+      download: document.getElementById('downloadTeacherTemplateBtn'),
+      upload: document.getElementById('uploadTeacherTemplateBtn'),
+    },
+    'study-programs': {
+      download: document.getElementById('downloadProgramTemplateBtn'),
+      upload: document.getElementById('uploadProgramTemplateBtn'),
+    },
+    'course-tags': {
+      download: document.getElementById('downloadCourseTagTemplateBtn'),
+      upload: document.getElementById('uploadCourseTagTemplateBtn'),
+    },
+    rooms: {
+      download: document.getElementById('downloadRoomTemplateBtn'),
+      upload: document.getElementById('uploadRoomTemplateBtn'),
+    },
+    courses: {
+      download: document.getElementById('downloadCourseTemplateBtn'),
+      upload: document.getElementById('uploadCourseTemplateBtn'),
+    },
+    'group-tags': {
+      download: document.getElementById('downloadGroupTagTemplateBtn'),
+      upload: document.getElementById('uploadGroupTagTemplateBtn'),
+    },
+    groups: {
+      download: document.getElementById('downloadGroupTemplateBtn'),
+      upload: document.getElementById('uploadGroupTemplateBtn'),
+    },
+    requirements: {
+      download: document.getElementById('downloadRequirementTemplateBtn'),
+      upload: document.getElementById('uploadRequirementTemplateBtn'),
+    },
+  };
+
+  Object.entries(importButtons).forEach(([entity, buttons]) => {
+    if (buttons.download) {
+      buttons.download.addEventListener('click', () => downloadTemplate(entity));
+    }
+    if (buttons.upload) {
+      buttons.upload.addEventListener('click', () => openUploadDialog(entity));
+    }
+  });
+
+  if (els.entityUploadInput) {
+    els.entityUploadInput.addEventListener('change', handleEntityUpload);
+  }
+
+  if (els.deleteSelectedGroupsBtn) {
+    els.deleteSelectedGroupsBtn.addEventListener('click', deleteSelectedGroups);
+  }
+
   if (els.addRequirementRowBtn) {
     els.addRequirementRowBtn.addEventListener('click', () => addRequirementRow());
   } else {
@@ -479,7 +617,28 @@ function bindGlobalActions() {
   });
 
   document.querySelectorAll('[data-open-entity]').forEach(btn => {
-    btn.addEventListener('click', () => openEntityModal(btn.dataset.openEntity));
+    const type = btn.dataset.openEntity;
+    if (type) {
+      btn.addEventListener('click', () => openEntityModal(type));
+    }
+  });
+
+  document.body.addEventListener('click', event => {
+    const openEntityTarget = event.target.closest('[data-open-entity]');
+    if (openEntityTarget) {
+      const type = openEntityTarget.dataset.openEntity;
+      if (type) {
+        event.preventDefault();
+        openEntityModal(type);
+        return;
+      }
+    }
+    const viewReqTarget = event.target.closest('[data-view-requirements]');
+    if (viewReqTarget) {
+      event.preventDefault();
+      openViewRequirementsModal(viewReqTarget.dataset.viewRequirements);
+      return;
+    }
   });
 
   document.querySelectorAll('[data-jump]').forEach(btn => {
@@ -521,6 +680,16 @@ function bindGlobalActions() {
     });
   } else {
     console.warn('Missing element: classForm');
+  }
+  if (els.courseSelect) {
+    els.courseSelect.addEventListener('change', () => {
+      window.clearTimeout(state.courseSelectTimer);
+      state.courseSelectTimer = window.setTimeout(() => {
+        const courseId = Number(els.courseSelect.value) || null;
+        updateTeacherOptions(null, null, courseId);
+        updateRoomOptions(null, null, courseId);
+      }, 100);
+    });
   }
   if (els.selectAllClassProgramsBtn) {
     els.selectAllClassProgramsBtn.addEventListener('click', () => {
@@ -598,11 +767,6 @@ function bindGlobalActions() {
   } else {
     console.warn('Missing element: deleteTimetableBtn');
   }
-  if (els.deployTimetableBtn) {
-    els.deployTimetableBtn.addEventListener('click', deployCurrentTimetable);
-  } else {
-    console.warn('Missing element: deployTimetableBtn');
-  }
 }
     
 function showError(msg) {
@@ -626,8 +790,8 @@ function renderContextSelectors() {
     (state.data.cycles || []).map(item => ({ value: item.id, label: `${item.name} (${item.year_starting})` })),
     true
   );
-  let selectedCycleId = state.data.selected_cycle_id || null;
-  if (!selectedCycleId && state.data.cycles?.length) {
+  let selectedCycleId = state.selectedCycleId ?? null;
+  if (selectedCycleId == null && state.data.cycles?.length) {
     selectedCycleId = state.data.cycles[0].id;
   }
   if (selectedCycleId) {
@@ -639,7 +803,7 @@ function renderContextSelectors() {
     .filter(item => !selectedCycleId || item.cycle_id === Number(selectedCycleId))
     .map(item => ({
       value: item.id,
-      label: `Timetable #${item.id}${item.in_action ? ' • current' : ''}`,
+      label: `Timetable #${item.id}`,
     }));
   fillSelect(els.timetableSelect, timetableOptions, true);
   if (state.timetableId && timetableOptions.some(item => Number(item.value) === Number(state.timetableId))) {
@@ -654,6 +818,9 @@ function renderContextSelectors() {
   console.log('renderContextSelectors: cycleSelect.innerHTML', els.cycleSelect.innerHTML);
   console.log('renderContextSelectors: timetableSelect.innerHTML', els.timetableSelect.innerHTML);
   els.exportBtn.href = state.timetableId ? `/export.xlsx?timetable_id=${state.timetableId}` : '/export.xlsx';
+  if (els.deleteSelectedGroupsBtn) {
+    els.deleteSelectedGroupsBtn.disabled = state.selectedGroupIds.size === 0;
+  }
   if (els.exportProgramOptions) {
     els.exportProgramOptions.innerHTML = '';
     renderProgramCheckboxes(els.exportProgramOptions, state.data.programs || [], 'exportPrograms', 'code');
@@ -667,9 +834,6 @@ function renderContextSelectors() {
   if (els.exportTeacherBtn) {
     els.exportTeacherBtn.disabled = !state.timetableId || !(state.data.teachers || []).length;
   }
-  if (els.deployTimetableBtn) {
-    els.deployTimetableBtn.disabled = !state.timetableId;
-  }
   if (els.editTimetableBtn) {
     els.editTimetableBtn.disabled = !state.timetableId;
   }
@@ -679,14 +843,12 @@ function renderContextSelectors() {
   if (els.addTimetableBtn) {
     els.addTimetableBtn.disabled = Boolean(selectedCycleId && timetableOptions.length);
   }
-  els.openAddClassBtn.disabled = !state.selected.length;
 }
 
 async function handleCycleChange() {
   const cycleId = toNullableNumber(els.cycleSelect.value);
-  const timetableOptions = (state.data.timetables || []).filter(item => !cycleId || item.cycle_id === cycleId);
-  state.timetableId = timetableOptions.length ? timetableOptions[0].id : null;
-  await refreshData(state.timetableId);
+  if (!cycleId) return;
+  window.location.href = `/cycle/${cycleId}`;
 }
 
 async function handleTimetableChange() {
@@ -694,24 +856,6 @@ async function handleTimetableChange() {
   await refreshData(state.timetableId);
 }
 
-async function deployCurrentTimetable() {
-  if (!state.timetableId) {
-    alert('Select a timetable first.');
-    return;
-  }
-  const res = await fetch(`/api/timetables/${state.timetableId}/deploy`, { method: 'POST' });
-  const data = await safeJson(res);
-  if (!res.ok) {
-    alert(formatError(data));
-    return;
-  }
-  state.data = data;
-  state.timetableId = state.data.selected_timetable_id || state.timetableId;
-  renderContextSelectors();
-  renderEntityLists();
-  renderBoard();
-  renderTeacherLoad();
-}
 
 function renderEntityLists() {
   renderEntityList('groupTagList', state.data.group_tags || [], 'group_tag', item => `${item.code} — ${item.name}`);
@@ -830,8 +974,12 @@ function renderBoard() {
     th.dataset.groupId = group.id;
     th.dataset.idx = idx;
     const isOpen = state.openMenuGroupId === group.id;
+    const checked = state.selectedGroupIds.has(group.id) ? 'checked' : '';
     th.innerHTML = `
-      <div class="group-header-top">
+      <div class="group-header-top" style="display:flex;align-items:center;gap:8px;">
+        <label class="group-select-label" style="display:flex;align-items:center;">
+          <input type="checkbox" class="group-select-checkbox" data-group-id="${group.id}" ${checked} />
+        </label>
         <div class="group-title-wrap">
           <div class="group-code">${escapeHtml(group.code)}</div>
           <small>${escapeHtml(group.programs.map(p => p.code).join('/'))}</small>
@@ -870,6 +1018,11 @@ function renderBoard() {
         reorderGroups(fromIdx, toIdx);
       }
     });
+    const checkbox = th.querySelector('.group-select-checkbox');
+    if (checkbox) {
+      checkbox.addEventListener('click', event => event.stopPropagation());
+      checkbox.addEventListener('change', () => toggleGroupSelection(group.id, checkbox.checked));
+    }
     hrow.appendChild(th);
   });
   const addTh = document.createElement('th');
@@ -1043,6 +1196,36 @@ function renderBoard() {
   renderGroupProgramPanel();
 }
 
+function toggleGroupSelection(groupId, checked) {
+  if (checked) {
+    state.selectedGroupIds.add(groupId);
+  } else {
+    state.selectedGroupIds.delete(groupId);
+  }
+  if (els.deleteSelectedGroupsBtn) {
+    els.deleteSelectedGroupsBtn.disabled = state.selectedGroupIds.size === 0;
+  }
+}
+
+async function deleteSelectedGroups() {
+  const ids = Array.from(state.selectedGroupIds);
+  if (!ids.length) return;
+  if (!confirm(`Delete ${ids.length} selected group${ids.length === 1 ? '' : 's'}? This will also remove all classes for those groups.`)) return;
+  for (const groupId of ids) {
+    const res = await fetch(`/api/groups/${groupId}`, { method: 'DELETE' });
+    const data = await safeJson(res);
+    if (!res.ok) {
+      alert(formatError(data));
+      return;
+    }
+  }
+  state.selectedGroupIds.clear();
+  if (els.deleteSelectedGroupsBtn) {
+    els.deleteSelectedGroupsBtn.disabled = true;
+  }
+  await refreshData(state.timetableId, state.selectedCycleId);
+}
+
 function openGroupProgramPanel(groupId) {
   state.selectedProgramGroupId = groupId;
   renderGroupProgramPanel();
@@ -1163,12 +1346,10 @@ function handleCellClick(event, groupId, groupCode, timeslotId, slot) {
 function updateSelectionUI() {
   if (!state.selected.length) {
     els.selectionText.textContent = 'No cells selected.';
-    els.openAddClassBtn.disabled = true;
     return;
   }
   const codes = state.selected.map(item => item.groupCode).join(', ');
   els.selectionText.textContent = `${state.selected[0].slotLabel} → ${codes}`;
-  els.openAddClassBtn.disabled = false;
 }
 
 function clearSelection(shouldRender = true) {
@@ -1226,7 +1407,6 @@ function openEntityModal(type, id = null) {
       els.entityForm.elements.year_starting.value = item.year_starting;
     } else if (type === 'timetable') {
       els.entityCycleSelect.value = String(item.cycle_id);
-      els.entityForm.elements.in_action.checked = !!item.in_action;
     } else if (type === 'group_tag') {
       els.entityForm.elements.code.value = item.code;
       els.entityForm.elements.name.value = item.name;
@@ -1286,7 +1466,11 @@ function getEntityById(type, id) {
 }
 
 function toggleEntityFields(type) {
-  const show = (id, visible) => document.getElementById(id).classList.toggle('hidden', !visible);
+  const show = (id, visible) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.toggle('hidden', !visible);
+  };
   show('entityNameWrap', ['cycle', 'group_tag', 'course_tag', 'program', 'room', 'teacher', 'course'].includes(type));
   show('entityCodeWrap', ['group_tag', 'program', 'room', 'course'].includes(type));
   show('entityYearWrap', type === 'cycle');
@@ -1350,7 +1534,6 @@ function buildEntityPayload(type) {
   if (type === 'timetable') {
     return {
       cycle_id: Number(els.entityCycleSelect.value),
-      in_action: !!f.in_action.checked,
     };
   }
   if (type === 'group_tag') {
@@ -1567,16 +1750,10 @@ async function deleteGroupById(groupId) {
     alert(formatError(data));
     return;
   }
-  state.data = data;
-  state.timetableId = state.data.selected_timetable_id || state.timetableId;
   state.editingGroupId = null;
   closeModal('groupModal');
-  clearSelection(false);
-  renderContextSelectors();
-  renderEntityLists();
-  renderBoard();
-  renderTeacherLoad();
-  populateStaticInputs();
+  state.selectedGroupIds.delete(groupId);
+  await refreshData(state.timetableId, state.selectedCycleId);
 }
 
 async function openClassModal(classId = null) {
@@ -1612,6 +1789,11 @@ async function openClassModal(classId = null) {
   } else {
     els.classModalTitle.textContent = 'Add class';
     els.classSubmitBtn.textContent = 'Create class';
+    const defaultRadio = els.classForm.querySelector('input[name="mode"][value="required_all"]');
+    if (defaultRadio) defaultRadio.checked = true;
+    if (els.classProgramOptions) {
+      els.classProgramOptions.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+    }
   }
   els.classUpdateWarning?.classList.add('hidden');
   if (editingClass && editingClass.study_program_ids?.length) {
@@ -1632,16 +1814,14 @@ async function openClassModal(classId = null) {
   renderGroupCheckboxes(els.classGroupOptions, state.data.groups || [], 'classGroups');
   const preselectedGroupIds = editingClass ? [editingClass.group_id] : selected.map(item => item.groupId);
   precheckGroups(els.classGroupOptions, preselectedGroupIds);
+  const selectedTimeslotId = selected[0].timeslotId;
   syncClassFormVisibility();
-  fillSelect(
-    els.roomSelect,
-    [{ value: '', label: 'No room' }, ...(state.data.rooms || []).map(r => ({ value: r.id, label: `${r.code} (${r.capacity})` }))],
-    false
-  );
+  updateRoomOptions(editingClass ? editingClass.room_id : null, selectedTimeslotId, editingClass ? editingClass.course_id : null);
+
   // Pre-fill form if editing
   if (editingClass) {
-    els.courseSelect.value = editingClass.course_id;
-    updateTeacherOptions();
+    els.courseSelect.value = editingClass.course_id || '';
+    updateTeacherOptions(editingClass.teacher_id, selectedTimeslotId, editingClass.course_id);
     els.teacherSelect.value = editingClass.teacher_id || '';
     els.roomSelect.value = editingClass.room_id || '';
     els.classForm.elements['expected_size'].value = editingClass.expected_size || '';
@@ -1683,13 +1863,17 @@ function syncClassFormVisibility() {
     }
   }
 
+  let requiredCourseIds = null;
   if (!filteredByProgram && state.selected && state.selected.length > 0 && mode !== 'elective') {
     // Only show courses required by the selected group(s) for non-elective modes.
-    const requiredCourseIds = new Set();
+    requiredCourseIds = new Set();
     state.selected.forEach(sel => {
       const group = (state.data.groups || []).find(g => g.id === sel.groupId);
       if (group && group.requirements) {
         group.requirements.forEach(req => requiredCourseIds.add(req.course_id));
+      }
+      if (group && group.group_requirements) {
+        group.group_requirements.forEach(req => requiredCourseIds.add(req.course_id));
       }
     });
     if (requiredCourseIds.size > 0) {
@@ -1697,10 +1881,18 @@ function syncClassFormVisibility() {
     }
   }
 
-  // Filter by mode as before
+  // Filter by mode as before, but preserve required course selection for required_all mode.
   courses = courses.filter(course => {
-    if (mode === 'required_all') return course.require_all;
-    if (mode === 'program') return !course.require_all && !course.elective;
+    if (mode === 'required_all') {
+      const isRequired = course.require_all;
+      if (requiredCourseIds && requiredCourseIds.size > 0) {
+        return isRequired && requiredCourseIds.has(course.id);
+      }
+      return isRequired;
+    }
+    if (mode === 'program') {
+      return !course.require_all && !course.elective;
+    }
     return course.elective;
   });
 
@@ -1712,16 +1904,20 @@ function syncClassFormVisibility() {
   els.programClassHint.classList.toggle('hidden', !(mode === 'program' && !allowProgramMode));
   els.courseSelect.disabled = mode === 'program' && !allowProgramMode;
   els.groupSelectionBox.classList.toggle('hidden', mode === 'required_all');
-  if (mode !== 'required_all') {
-    updateClassGroupOptions();
-  }
+  updateClassGroupOptions();
   els.classForm.querySelectorAll('input[name="mode"]').forEach(radio => {
     if (radio.value === 'program') {
       radio.disabled = false;
     }
   });
-  updateTeacherOptions();
-  els.courseSelect.onchange = updateTeacherOptions;
+  const courseId = Number(els.courseSelect.value) || null;
+  updateTeacherOptions(null, null, courseId);
+  updateRoomOptions(null, null, courseId);
+  els.courseSelect.onchange = () => {
+    const selectedCourseId = Number(els.courseSelect.value) || null;
+    updateTeacherOptions(null, null, selectedCourseId);
+    updateRoomOptions(null, null, selectedCourseId);
+  };
 }
 
 function validateClassModeSelection() {
@@ -1747,8 +1943,42 @@ function validateClassModeSelection() {
   return true;
 }
 
-function updateTeacherOptions() {
-  const courseId = Number(els.courseSelect.value);
+function getTimeslotOccupancy(timeslotId, ignoreCourseId = null) {
+  const occupiedTeacherIds = new Set();
+  const occupiedRoomIds = new Set();
+  const cells = state.data.cells || {};
+  const slotMap = cells[String(timeslotId)] || {};
+  const ignoreCourseKey = ignoreCourseId != null ? String(ignoreCourseId) : null;
+  Object.values(slotMap).forEach(items => {
+    items.forEach(item => {
+      if (ignoreCourseKey && String(item.course_id) === ignoreCourseKey) return;
+      if (item.teacher_id) occupiedTeacherIds.add(item.teacher_id);
+      if (item.room_id) occupiedRoomIds.add(item.room_id);
+    });
+  });
+  return { occupiedTeacherIds, occupiedRoomIds };
+}
+
+function updateRoomOptions(currentRoomId = null, timeslotId = null, courseId = null) {
+  if (!els.roomSelect) return;
+  if (timeslotId == null && state.selected && state.selected.length) {
+    timeslotId = state.selected[0].timeslotId;
+  }
+  const { occupiedRoomIds } = getTimeslotOccupancy(timeslotId, courseId);
+  fillSelect(
+    els.roomSelect,
+    [
+      { value: '', label: 'No room' },
+      ...(state.data.rooms || [])
+        .filter(r => !occupiedRoomIds.has(r.id) || r.id === currentRoomId)
+        .map(r => ({ value: r.id, label: `${r.code} (${r.capacity})` })),
+    ],
+    false
+  );
+}
+
+function updateTeacherOptions(currentTeacherId = null, timeslotId = null, explicitCourseId = null) {
+  const courseId = explicitCourseId != null ? explicitCourseId : Number(els.courseSelect.value);
   const course = (state.data.courses || []).find(c => c.id === courseId);
   let teachers = state.data.teachers || [];
   if (course) {
@@ -1756,6 +1986,13 @@ function updateTeacherOptions() {
     if (allowedIds.length) {
       teachers = teachers.filter(t => allowedIds.includes(t.id));
     }
+  }
+  if (timeslotId == null && state.selected && state.selected.length) {
+    timeslotId = state.selected[0].timeslotId;
+  }
+  if (timeslotId != null) {
+    const { occupiedTeacherIds } = getTimeslotOccupancy(timeslotId, courseId);
+    teachers = teachers.filter(t => !occupiedTeacherIds.has(t.id) || t.id === currentTeacherId);
   }
   fillSelect(
     els.teacherSelect,
@@ -1803,9 +2040,9 @@ async function submitClassForm(event) {
     notes: formData.get('notes') || null,
   };
   if (!validateClassModeSelection()) return;
-  // For study program class, allow same teacher in same slot for different groups
+  // Allow teacher conflict for program classes and for require-all classes when the same teacher+room is used
   let allowTeacherConflict = false;
-  if (payload.mode === 'program') {
+  if (payload.mode === 'program' || payload.mode === 'required_all') {
     allowTeacherConflict = true;
   }
   let url = '/api/classes';
@@ -1991,16 +2228,18 @@ function updateClassGroupOptions() {
   if (!els.classGroupOptions || !els.classForm) return;
   const mode = els.classForm.querySelector('input[name="mode"]:checked')?.value;
   const selectedProgramIds = collectCheckedValues(els.classProgramOptions);
-  const disabledGroupIds = new Set(
-    (state.data.groups || [])
-      .filter(group => mode === 'program' && selectedProgramIds.length > 0 && !selectedProgramIds.every(pid => group.programs.some(p => p.id === pid)))
-      .map(group => group.id)
-  );
+
+  let visibleGroups = state.data.groups || [];
+  if (mode === 'program' && selectedProgramIds.length > 0) {
+    visibleGroups = visibleGroups.filter(group => selectedProgramIds.every(pid => group.programs.some(p => p.id === pid)));
+  }
+
   const currentlyChecked = getClassGroupIds();
-  renderGroupCheckboxes(els.classGroupOptions, (state.data.groups || []), 'classGroups', disabledGroupIds);
+  renderGroupCheckboxes(els.classGroupOptions, visibleGroups, 'classGroups');
+
   const selectedGroupIds = currentlyChecked.length
-    ? currentlyChecked.filter(id => !disabledGroupIds.has(id))
-    : state.selected.map(item => item.groupId).filter(id => !disabledGroupIds.has(id));
+    ? currentlyChecked.filter(id => visibleGroups.some(group => group.id === id))
+    : state.selected.map(item => item.groupId).filter(id => visibleGroups.some(group => group.id === id));
   precheckGroups(els.classGroupOptions, selectedGroupIds);
 }
 
@@ -2198,6 +2437,56 @@ async function downloadExcel(url, busyText = 'Exporting...') {
   }
 }
 
+function downloadTemplate(entity) {
+  if (!entity) return;
+  downloadExcel(`/template/${entity}.xlsx`, `Downloading ${entity.replace('-', ' ')} template...`);
+}
+
+function openUploadDialog(entity) {
+  if (!entity || !els.entityUploadInput) return;
+  currentImportEntity = entity;
+  els.entityUploadInput.value = '';
+  els.entityUploadInput.click();
+}
+
+async function handleEntityUpload(event) {
+  if (!currentImportEntity) return;
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const formData = new FormData();
+  formData.append('file', file);
+  if (els.entityUploadMessage) {
+    els.entityUploadMessage.textContent = `Uploading ${currentImportEntity.replace('-', ' ')}...`;
+  }
+  const params = [];
+  if (state.timetableId != null) {
+    params.push(`timetable_id=${state.timetableId}`);
+  } else if (state.selectedCycleId != null) {
+    params.push(`cycle_id=${state.selectedCycleId}`);
+  }
+  const url = `/api/import/${currentImportEntity}${params.length ? `?${params.join('&')}` : ''}`;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      body: formData,
+    });
+    const data = await safeJson(res);
+    if (!res.ok) {
+      alert('Import failed: ' + formatError(data));
+      return;
+    }
+    if (els.entityUploadMessage) {
+      els.entityUploadMessage.textContent = `Imported ${currentImportEntity.replace('-', ' ')} successfully.`;
+    }
+    await refreshData(state.timetableId, state.selectedCycleId);
+  } finally {
+    currentImportEntity = null;
+    if (els.entityUploadInput) {
+      els.entityUploadInput.value = '';
+    }
+  }
+}
+
 function openGroupOnlyRequirementModal() {
   if (!els.groupOnlyRequirementModal) return;
   if (!els.groupOnlyRequirementGroupSelect || !els.groupOnlyRequirementCourseSelect) return;
@@ -2368,6 +2657,9 @@ async function deleteRequirement(type, tagOrProgId, courseId) {
     url = `/api/study-programs/${tagOrProgId}/requirements/${courseId}`;
   }
   if (!confirm('Delete this requirement?')) return;
+  if (state.timetableId) {
+    url += `?timetable_id=${state.timetableId}`;
+  }
   const res = await fetch(url, { method: 'DELETE' });
   if (!res.ok) {
     alert('Failed to delete requirement');

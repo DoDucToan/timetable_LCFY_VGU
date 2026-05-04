@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Timetable Builder</title>
+  <link rel="icon" type="image/png" href="/static/favicon.png" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="page">
+    <header class="topbar">
+      <div>
+        <h1>Timetable Builder</h1>
+        <p class="muted">Choose a cycle first, then interact with that timetable on its own page.</p>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="card">
+        <div class="subheader-row">
+          <h2>Available cycles</h2>
+        </div>
+        <div class="entity-list">
+          {% for cycle in cycles %}
+          <div class="entity-row">
+            <div class="entity-text">
+              <strong>{{ cycle.name }}</strong>
+              <div class="muted">Year starting: {{ cycle.year_starting }}</div>
+            </div>
+            <div>
+              <a class="primary-btn" href="/cycle/{{ cycle.id }}">Open</a>
+            </div>
+          </div>
+          {% else %}
+          <div class="entity-row">
+            <div class="entity-text">No cycles created yet.</div>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

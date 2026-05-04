@@ -15,7 +15,6 @@ class CycleIn(BaseModel):
 
 class TimetableIn(BaseModel):
     cycle_id: int
-    in_action: bool = True
 
 
 class GroupTagIn(BaseModel):

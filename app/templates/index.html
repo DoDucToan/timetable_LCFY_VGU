@@ -14,7 +14,7 @@
     <header class="topbar">
       <div>
         <h1>Timetable Builder</h1>
-        <p class="muted">Workflow: create cycle, choose cycle, create timetable, deploy timetable, then add groups and classes inside that timetable.</p>
+        <p class="muted">Workflow: choose a cycle page first, then manage the selected timetable there.</p>
       </div>
       <div class="header-actions">
         <a class="primary-btn" id="exportBtn" href="/export.xlsx" download="timetable.xlsx">Export Excel</a>
@@ -30,7 +30,6 @@
             <button type="button" class="menu-item" data-jump="#roomsSection">Rooms</button>
             <button type="button" class="menu-item" data-jump="#teachersSection">Teachers</button>
             <button type="button" class="menu-item" data-jump="#coursesSection">Courses</button>
-            <button type="button" class="menu-item" data-jump="#groupProgramPanel">Group programs</button>
             <button type="button" class="menu-item" data-jump="#teacherLoadList">Teacher load</button>
           </div>
         </div>
@@ -71,29 +70,16 @@
           <span id="selectionText">No cells selected.</span>
         </div>
         <div class="selection-actions">
-          <button id="clearSelectionBtn" class="ghost-btn">Clear</button>
-          <button id="refreshBtn" class="ghost-btn">Refresh</button>
-          <button id="openAddClassBtn" class="primary-btn" disabled>Add class</button>
+          <button id="deleteSelectedGroupsBtn" class="danger-btn">Delete selected groups</button>
         </div>
       </div>
     </section>
 
     <main class="layout">
-      <section class="board-panel card" id="boardPanel">
+      <section class="board-panel card full-width" id="boardPanel">
         <div class="board-wrap">
           <table id="timetableBoard"></table>
         </div>
-      </section>
-
-      <!-- Requirements section below timetable -->
-      <section id="requirementsSection" class="card">
-        <h2>Requirements</h2>
-        <div style="margin-bottom: 10px;">
-          <button type="button" class="primary-btn" id="addGroupTagRequirementPanelBtn">+ Add Group Tag Requirement</button>
-          <button type="button" class="primary-btn" id="addStudyProgramRequirementPanelBtn">+ Add Study Program Requirement</button>
-          <button type="button" class="primary-btn" id="addGroupOnlyRequirementPanelBtn">+ Add Group-only Requirement</button>
-        </div>
-        <div id="requirementsList"></div>
       </section>
 
       <aside class="side-panel">
@@ -137,6 +123,53 @@
           <div id="teacherList" class="entity-list"></div>
         </section>
 
+        <section class="card side-block" id="bulkImportSection">
+          <div class="subheader-row">
+            <h2>Bulk import</h2>
+          </div>
+          <div class="import-row">
+            <span>Teachers</span>
+            <button class="ghost-btn small" id="downloadTeacherTemplateBtn">Download template</button>
+            <button class="ghost-btn small" id="uploadTeacherTemplateBtn">Upload</button>
+          </div>
+          <div class="import-row">
+            <span>Study programs</span>
+            <button class="ghost-btn small" id="downloadProgramTemplateBtn">Download template</button>
+            <button class="ghost-btn small" id="uploadProgramTemplateBtn">Upload</button>
+          </div>
+          <div class="import-row">
+            <span>Course tags</span>
+            <button class="ghost-btn small" id="downloadCourseTagTemplateBtn">Download template</button>
+            <button class="ghost-btn small" id="uploadCourseTagTemplateBtn">Upload</button>
+          </div>
+          <div class="import-row">
+            <span>Rooms</span>
+            <button class="ghost-btn small" id="downloadRoomTemplateBtn">Download template</button>
+            <button class="ghost-btn small" id="uploadRoomTemplateBtn">Upload</button>
+          </div>
+          <div class="import-row">
+            <span>Courses</span>
+            <button class="ghost-btn small" id="downloadCourseTemplateBtn">Download template</button>
+            <button class="ghost-btn small" id="uploadCourseTemplateBtn">Upload</button>
+          </div>
+          <div class="import-row">
+            <span>Group tags</span>
+            <button class="ghost-btn small" id="downloadGroupTagTemplateBtn">Download template</button>
+            <button class="ghost-btn small" id="uploadGroupTagTemplateBtn">Upload</button>
+          </div>
+          <div class="import-row">
+            <span>Groups</span>
+            <button class="ghost-btn small" id="downloadGroupTemplateBtn">Download template</button>
+            <button class="ghost-btn small" id="uploadGroupTemplateBtn">Upload</button>
+          </div>
+          <div class="import-row">
+            <span>Requirements</span>
+            <button class="ghost-btn small" id="downloadRequirementTemplateBtn">Download template</button>
+            <button class="ghost-btn small" id="uploadRequirementTemplateBtn">Upload</button>
+          </div>
+          <div id="entityUploadMessage" class="muted" style="margin-top:8px;font-size:.9rem;"></div>
+        </section>
+
         <section class="card side-block" id="coursesSection">
           <div class="subheader-row">
             <h2>Courses</h2>
@@ -145,25 +178,21 @@
           <div id="courseList" class="entity-list"></div>
         </section>
 
-        <section class="card side-block" id="groupProgramPanel">
-          <div class="subheader-row">
-            <h2>Group programs</h2>
-            <button class="ghost-btn small hidden" id="clearGroupProgramSelectionBtn">Clear</button>
-          </div>
-          <div id="groupProgramPanelContent">
-            <div id="groupProgramPanelTitle" class="muted">Select a group from the board to edit its programs.</div>
-            <div id="groupProgramCheckboxes" class="checkbox-grid"></div>
-            <div class="form-actions">
-              <button type="button" class="primary-btn hidden" id="saveGroupProgramsBtn">Save programs</button>
-            </div>
-            <div id="groupProgramPanelMessage" class="error-list"></div>
-          </div>
-        </section>
         <section class="card side-block">
           <h2>Teacher load</h2>
           <div id="teacherLoadList" class="teacher-load-list"></div>
         </section>
       </aside>
+
+      <section id="requirementsSection" class="card">
+        <h2>Requirements</h2>
+        <div style="margin-bottom: 10px;">
+          <button type="button" class="primary-btn" id="addGroupTagRequirementPanelBtn">+ Add Group Tag Requirement</button>
+          <button type="button" class="primary-btn" id="addStudyProgramRequirementPanelBtn">+ Add Study Program Requirement</button>
+          <button type="button" class="primary-btn" id="addGroupOnlyRequirementPanelBtn">+ Add Group-only Requirement</button>
+        </div>
+        <div id="requirementsList"></div>
+      </section>
     </main>
 
     <div class="modal hidden" id="entityModal">
@@ -204,10 +233,6 @@
           <label id="entityCourseTagWrap" class="hidden">
             <span>Course tag</span>
             <select name="course_tag_id" id="entityCourseTagSelect"></select>
-          </label>
-          <label id="entityInActionWrap" class="full-span hidden inline-checkbox plain-box">
-            <input type="checkbox" name="in_action" />
-            <span>Mark as active timetable</span>
           </label>
 
           <fieldset id="entityTeacherTagsWrap" class="full-span hidden">
@@ -477,6 +502,21 @@
       </div>
     </div>
 
+    <div class="modal hidden" id="viewRequirementsModal">
+      <div class="modal-card wide">
+        <div class="modal-header">
+          <h2 id="viewRequirementsModalTitle">Requirements</h2>
+          <button class="icon-btn" data-close="viewRequirementsModal">×</button>
+        </div>
+        <div class="form-grid">
+          <div class="full-span" id="viewRequirementsContent"></div>
+          <div class="full-span form-actions between-actions">
+            <button type="button" class="ghost-btn" data-close="viewRequirementsModal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <template id="requirementRowTemplate">
       <div class="requirement-row">
         <input class="requirement-course" list="courseOptions" placeholder="Select or search course" />
@@ -488,6 +528,7 @@
       </div>
     </template>
 
+    <input type="file" id="entityUploadInput" accept=".xlsx" class="hidden" />
     <script src="/static/script.js?v={{ version }}"></script>
     <script>
       // If this runs, JS is working. Hide fallback message.
