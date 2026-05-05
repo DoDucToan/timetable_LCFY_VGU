@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Timetable Builder</title>
   <link rel="icon" type="image/png" href="/static/favicon.png" />
-  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/style.css?v={{ version }}" />
 </head>
 <body>
   <noscript><div style="color: red; font-weight: bold;">JavaScript is disabled in your browser. Please enable JavaScript to use this app.</div></noscript>
@@ -21,6 +21,7 @@
         <button type="button" class="ghost-btn" id="exportProgramBtn">Export by program</button>
         <button type="button" class="ghost-btn" id="exportGroupBtn">Export by group</button>
         <button type="button" class="ghost-btn" id="exportTeacherBtn">Export by teacher</button>
+        <button type="button" class="ghost-btn" id="exportAllTeacherBtn">Export all teachers</button>
         <div class="toolbar-menu">
           <button type="button" class="ghost-btn small" id="manageMenuBtn">Manage</button>
           <div class="menu-dropdown hidden" id="manageMenuDropdown">
@@ -82,40 +83,20 @@
         </div>
       </section>
 
-      <aside class="side-panel">
-        <section class="card side-block" id="groupTagsSection">
-          <div class="subheader-row">
-            <h2>Group tags</h2>
-            <button class="ghost-btn" data-open-entity="group_tag">Add</button>
-          </div>
-          <div id="groupTagList" class="entity-list"></div>
-        </section>
+      <section id="requirementsSection" class="card full-width">
+        <div class="subheader-row">
+          <h2>Requirements</h2>
+        </div>
+        <div class="requirement-action-row">
+          <button type="button" class="primary-btn" id="addGroupTagRequirementPanelBtn">+ Add Group Tag Requirement</button>
+          <button type="button" class="primary-btn" id="addStudyProgramRequirementPanelBtn">+ Add Study Program Requirement</button>
+          <button type="button" class="primary-btn" id="addGroupOnlyRequirementPanelBtn">+ Add Group-only Requirement</button>
+        </div>
+        <div id="requirementsList"></div>
+      </section>
 
-        <section class="card side-block" id="courseTagsSection">
-          <div class="subheader-row">
-            <h2>Course tags</h2>
-            <button class="ghost-btn" data-open-entity="course_tag">Add</button>
-          </div>
-          <div id="courseTagList" class="entity-list"></div>
-        </section>
-
-        <section class="card side-block" id="programsSection">
-          <div class="subheader-row">
-            <h2>Study programs</h2>
-            <button class="ghost-btn" data-open-entity="program">Add</button>
-          </div>
-          <div id="programList" class="entity-list"></div>
-        </section>
-
-        <section class="card side-block" id="roomsSection">
-          <div class="subheader-row">
-            <h2>Rooms</h2>
-            <button class="ghost-btn" data-open-entity="room">Add</button>
-          </div>
-          <div id="roomList" class="entity-list"></div>
-        </section>
-
-        <section class="card side-block" id="teachersSection">
+      <section class="dashboard-grid full-width">
+        <section class="card dashboard-card" id="teachersSection">
           <div class="subheader-row">
             <h2>Teachers</h2>
             <button class="ghost-btn" data-open-entity="teacher">Add</button>
@@ -123,54 +104,14 @@
           <div id="teacherList" class="entity-list"></div>
         </section>
 
-        <section class="card side-block" id="bulkImportSection">
+        <section class="card dashboard-card" id="teacherLoadSection">
           <div class="subheader-row">
-            <h2>Bulk import</h2>
+            <h2>Teacher load</h2>
           </div>
-          <div class="import-row">
-            <span>Teachers</span>
-            <button class="ghost-btn small" id="downloadTeacherTemplateBtn">Download template</button>
-            <button class="ghost-btn small" id="uploadTeacherTemplateBtn">Upload</button>
-          </div>
-          <div class="import-row">
-            <span>Study programs</span>
-            <button class="ghost-btn small" id="downloadProgramTemplateBtn">Download template</button>
-            <button class="ghost-btn small" id="uploadProgramTemplateBtn">Upload</button>
-          </div>
-          <div class="import-row">
-            <span>Course tags</span>
-            <button class="ghost-btn small" id="downloadCourseTagTemplateBtn">Download template</button>
-            <button class="ghost-btn small" id="uploadCourseTagTemplateBtn">Upload</button>
-          </div>
-          <div class="import-row">
-            <span>Rooms</span>
-            <button class="ghost-btn small" id="downloadRoomTemplateBtn">Download template</button>
-            <button class="ghost-btn small" id="uploadRoomTemplateBtn">Upload</button>
-          </div>
-          <div class="import-row">
-            <span>Courses</span>
-            <button class="ghost-btn small" id="downloadCourseTemplateBtn">Download template</button>
-            <button class="ghost-btn small" id="uploadCourseTemplateBtn">Upload</button>
-          </div>
-          <div class="import-row">
-            <span>Group tags</span>
-            <button class="ghost-btn small" id="downloadGroupTagTemplateBtn">Download template</button>
-            <button class="ghost-btn small" id="uploadGroupTagTemplateBtn">Upload</button>
-          </div>
-          <div class="import-row">
-            <span>Groups</span>
-            <button class="ghost-btn small" id="downloadGroupTemplateBtn">Download template</button>
-            <button class="ghost-btn small" id="uploadGroupTemplateBtn">Upload</button>
-          </div>
-          <div class="import-row">
-            <span>Requirements</span>
-            <button class="ghost-btn small" id="downloadRequirementTemplateBtn">Download template</button>
-            <button class="ghost-btn small" id="uploadRequirementTemplateBtn">Upload</button>
-          </div>
-          <div id="entityUploadMessage" class="muted" style="margin-top:8px;font-size:.9rem;"></div>
+          <div id="teacherLoadList" class="teacher-load-list"></div>
         </section>
 
-        <section class="card side-block" id="coursesSection">
+        <section class="card dashboard-card span-2" id="coursesSection">
           <div class="subheader-row">
             <h2>Courses</h2>
             <button class="ghost-btn" data-open-entity="course">Add</button>
@@ -178,20 +119,101 @@
           <div id="courseList" class="entity-list"></div>
         </section>
 
-        <section class="card side-block">
-          <h2>Teacher load</h2>
-          <div id="teacherLoadList" class="teacher-load-list"></div>
+        <section class="card dashboard-card" id="programsSection">
+          <div class="subheader-row">
+            <h2>Study programs</h2>
+            <button class="ghost-btn" data-open-entity="program">Add</button>
+          </div>
+          <div id="programList" class="entity-list"></div>
         </section>
-      </aside>
 
-      <section id="requirementsSection" class="card">
-        <h2>Requirements</h2>
-        <div style="margin-bottom: 10px;">
-          <button type="button" class="primary-btn" id="addGroupTagRequirementPanelBtn">+ Add Group Tag Requirement</button>
-          <button type="button" class="primary-btn" id="addStudyProgramRequirementPanelBtn">+ Add Study Program Requirement</button>
-          <button type="button" class="primary-btn" id="addGroupOnlyRequirementPanelBtn">+ Add Group-only Requirement</button>
-        </div>
-        <div id="requirementsList"></div>
+        <section class="card dashboard-card" id="roomsSection">
+          <div class="subheader-row">
+            <h2>Rooms</h2>
+            <button class="ghost-btn" data-open-entity="room">Add</button>
+          </div>
+          <div id="roomList" class="entity-list"></div>
+        </section>
+
+        <section class="card dashboard-card" id="groupTagsSection">
+          <div class="subheader-row">
+            <h2>Group tags</h2>
+            <button class="ghost-btn" data-open-entity="group_tag">Add</button>
+          </div>
+          <div id="groupTagList" class="entity-list"></div>
+        </section>
+
+        <section class="card dashboard-card" id="courseTagsSection">
+          <div class="subheader-row">
+            <h2>Course tag</h2>
+            <button class="ghost-btn" data-open-entity="course_tag">Add</button>
+          </div>
+          <div id="courseTagList" class="entity-list"></div>
+        </section>
+
+        <section class="card dashboard-card upload-card" id="uploadSection">
+          <div class="subheader-row">
+            <h2>Upload</h2>
+          </div>
+          <div class="upload-grid">
+            <div class="upload-row">
+              <strong>Teachers</strong>
+              <div class="upload-actions">
+                <button class="ghost-btn small" id="downloadTeacherTemplateBtn">Download</button>
+                <button class="ghost-btn small" id="uploadTeacherTemplateBtn">Upload</button>
+              </div>
+            </div>
+            <div class="upload-row">
+              <strong>Study programs</strong>
+              <div class="upload-actions">
+                <button class="ghost-btn small" id="downloadProgramTemplateBtn">Download</button>
+                <button class="ghost-btn small" id="uploadProgramTemplateBtn">Upload</button>
+              </div>
+            </div>
+            <div class="upload-row">
+              <strong>Course tags</strong>
+              <div class="upload-actions">
+                <button class="ghost-btn small" id="downloadCourseTagTemplateBtn">Download</button>
+                <button class="ghost-btn small" id="uploadCourseTagTemplateBtn">Upload</button>
+              </div>
+            </div>
+            <div class="upload-row">
+              <strong>Rooms</strong>
+              <div class="upload-actions">
+                <button class="ghost-btn small" id="downloadRoomTemplateBtn">Download</button>
+                <button class="ghost-btn small" id="uploadRoomTemplateBtn">Upload</button>
+              </div>
+            </div>
+            <div class="upload-row">
+              <strong>Courses</strong>
+              <div class="upload-actions">
+                <button class="ghost-btn small" id="downloadCourseTemplateBtn">Download</button>
+                <button class="ghost-btn small" id="uploadCourseTemplateBtn">Upload</button>
+              </div>
+            </div>
+            <div class="upload-row">
+              <strong>Group tags</strong>
+              <div class="upload-actions">
+                <button class="ghost-btn small" id="downloadGroupTagTemplateBtn">Download</button>
+                <button class="ghost-btn small" id="uploadGroupTagTemplateBtn">Upload</button>
+              </div>
+            </div>
+            <div class="upload-row">
+              <strong>Groups</strong>
+              <div class="upload-actions">
+                <button class="ghost-btn small" id="downloadGroupTemplateBtn">Download</button>
+                <button class="ghost-btn small" id="uploadGroupTemplateBtn">Upload</button>
+              </div>
+            </div>
+            <div class="upload-row">
+              <strong>Requirements</strong>
+              <div class="upload-actions">
+                <button class="ghost-btn small" id="downloadRequirementTemplateBtn">Download</button>
+                <button class="ghost-btn small" id="uploadRequirementTemplateBtn">Upload</button>
+              </div>
+            </div>
+          </div>
+        </section>
       </section>
     </main>
 

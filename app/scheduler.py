@@ -15,6 +15,34 @@ MODE_PROGRAM = "program"
 MODE_ELECTIVE = "elective"
 
 
+def _sanitize_text(value: Any) -> str:
+    if value is None:
+        return ''
+    text = str(value).strip()
+    replacements = {
+        'â€”': '—',
+        'â€“': '–',
+        'â€œ': '“',
+        'â€�': '”',
+        'â€™': '’',
+        'Ã©': 'é',
+        'Ã ': 'à',
+        'Ã¨': 'è',
+        'Ãª': 'ê',
+        'Ã§': 'ç',
+        'Ã±': 'ñ',
+        'Ã´': 'ô',
+    }
+    for bad, good in replacements.items():
+        text = text.replace(bad, good)
+    if any(seq in text for seq in replacements.keys()):
+        try:
+            text = text.encode('latin1').decode('utf-8')
+        except Exception:
+            pass
+    return text
+
+
 def estimate_program_size(group: Group, selected_program_count: int) -> int:
     total_programs = max(len(group.study_program_links), 1)
     selected_program_count = max(selected_program_count, 1)
@@ -32,6 +60,7 @@ def validate_new_class(
     mode: str,
     study_program_ids: List[int],
     expected_size: Optional[int],
+    self_study: bool = False,
     allow_teacher_conflict: bool = False,
 ) -> List[str]:
     errors: List[str] = []
@@ -41,20 +70,26 @@ def validate_new_class(
         .options(joinedload(Group.study_program_links).joinedload(GroupStudyProgram.study_program))
     ).unique().scalars().all()
     group_map = {g.id: g for g in groups}
+    current_timetable_id = groups[0].timetable_id if groups else None
 
     if len(groups) != len(set(target_group_ids)):
         errors.append("One or more selected groups do not exist.")
         return errors
 
+    effective_mode = MODE_ELECTIVE if mode == MODE_REQUIRED and self_study else mode
 
     if teacher_id:
         if not allow_teacher_conflict:
             teacher_clash = db.scalar(
-                select(ScheduledClass.id).where(
+                select(ScheduledClass.id)
+                .join(Group, Group.id == ScheduledClass.group_id)
+                .where(
                     ScheduledClass.deploy.is_(True),
                     ScheduledClass.timeslot_id == timeslot_id,
                     ScheduledClass.teacher_id == teacher_id,
-                ).limit(1)
+                    Group.timetable_id == current_timetable_id,
+                )
+                .limit(1)
             )
             if teacher_clash:
                 errors.append("Teacher is already assigned in this timeslot.")
@@ -62,10 +97,12 @@ def validate_new_class(
             # For study program class, allow teacher conflict only if all rooms are the same
             assigned_rooms = db.execute(
                 select(ScheduledClass.room_id)
+                .join(Group, Group.id == ScheduledClass.group_id)
                 .where(
                     ScheduledClass.deploy.is_(True),
                     ScheduledClass.timeslot_id == timeslot_id,
                     ScheduledClass.teacher_id == teacher_id,
+                    Group.timetable_id == current_timetable_id,
                 )
             ).scalars().all()
             # Only consider non-null rooms
@@ -75,13 +112,17 @@ def validate_new_class(
                 if any(rid != room_id for rid in assigned_rooms):
                     errors.append("Teacher cannot teach in multiple rooms at the same time.")
 
-    if room_id and not allow_teacher_conflict:
+    if room_id:
         room_clash = db.scalar(
-            select(ScheduledClass.id).where(
+            select(ScheduledClass.id)
+            .join(Group, Group.id == ScheduledClass.group_id)
+            .where(
                 ScheduledClass.deploy.is_(True),
                 ScheduledClass.timeslot_id == timeslot_id,
                 ScheduledClass.room_id == room_id,
-            ).limit(1)
+                Group.timetable_id == current_timetable_id,
+            )
+            .limit(1)
         )
         if room_clash:
             errors.append("Room is already occupied in this timeslot.")
@@ -100,10 +141,10 @@ def validate_new_class(
                 if room.capacity_num < needed:
                     errors.append(f"Room capacity ({room.capacity_num}) is smaller than estimated needed size ({needed}).")
 
-    if mode == MODE_PROGRAM and not study_program_ids:
+    if effective_mode == MODE_PROGRAM and not study_program_ids:
         errors.append("At least one study program must be selected for a study-program class.")
 
-    if mode == MODE_REQUIRED and len(target_group_ids) > 1:
+    if effective_mode == MODE_REQUIRED and len(target_group_ids) > 1:
         errors.append("Require-all-students classes must be added to one group at a time.")
 
     # student/group clashes
@@ -122,16 +163,15 @@ def validate_new_class(
         if mode == MODE_ELECTIVE:
             continue
 
-        if mode == MODE_REQUIRED:
+        if effective_mode == MODE_REQUIRED:
             blocking = [cls for cls in existing if not cls.course.elective]
             if blocking:
                 errors.append(f"Group {group.code} already has a non-elective class in this timeslot.")
                 continue
 
-        if mode == MODE_PROGRAM:
-            missing = [pid for pid in study_program_ids if pid not in group_program_ids]
-            if missing:
-                errors.append(f"Group {group.code} does not contain all selected study programs.")
+        if effective_mode == MODE_PROGRAM:
+            if not any(pid in group_program_ids for pid in study_program_ids):
+                errors.append(f"Group {group.code} does not contain any selected study programs.")
                 continue
 
             if any((cls.study_program_id is None and not cls.course.elective) for cls in existing):
@@ -159,6 +199,7 @@ def create_classes(
     mode: str,
     study_program_ids: List[int],
     expected_size: Optional[int],
+    self_study: bool = False,
     notes: Optional[str],
     source: str = "ui",
     allow_teacher_conflict: bool = False,
@@ -173,15 +214,17 @@ def create_classes(
         mode=mode,
         study_program_ids=study_program_ids,
         expected_size=expected_size,
+        self_study=self_study,
         allow_teacher_conflict=allow_teacher_conflict,
     )
     if errors:
         return [], errors
 
+    effective_mode = MODE_ELECTIVE if mode == MODE_REQUIRED and self_study else mode
     shared_key = str(uuid4()) if len(target_group_ids) > 1 or len(study_program_ids) > 1 else None
     created: List[ScheduledClass] = []
 
-    if mode == MODE_REQUIRED:
+    if effective_mode == MODE_REQUIRED:
         for group_id in target_group_ids:
             created.append(
                 ScheduledClass(
@@ -198,7 +241,7 @@ def create_classes(
                     source=source,
                 )
             )
-    elif mode == MODE_PROGRAM:
+    elif effective_mode == MODE_PROGRAM:
         for group_id in target_group_ids:
             for study_program_id in study_program_ids:
                 created.append(
@@ -367,19 +410,41 @@ def build_timetable_payload(
         first = bundle[0]
         programs = sorted({cls.study_program.code for cls in bundle if cls.study_program})
         kind = "elective" if first.course.elective else ("required" if first.course.require_all_student_in_group else "program")
-        color_key = COLOR_MAP.get(first.course.course_tag.name, "other")
-        fill_color = FILL_MAP.get(first.course.course_tag.name, "D9D2E9")
+        if kind == "elective":
+            color_key = "elective"
+            fill_color = FILL_MAP["elective"]
+        else:
+            color_key = COLOR_MAP.get(first.course.course_tag.name, "other")
+            fill_color = FILL_MAP.get(first.course.course_tag.name, "D9D2E9")
         if kind == "program":
             program_key = "|".join(programs) if programs else first.course.course_tag.name
             fill_color = PROGRAM_FILL_VARIANTS[abs(hash(program_key)) % len(PROGRAM_FILL_VARIANTS)]
+        group_codes = [_sanitize_text(group_map[group_id].code)] if group_id in group_map else []
+        all_group = False
+        if kind == "program" and group_codes and programs:
+            group_codes_set = set(group_codes)
+            all_group = True
+            for program_code in programs:
+                normalized_code = _sanitize_text(program_code)
+                groups_for_program = {
+                    _sanitize_text(link.study_program.code)
+                    for g in groups
+                    for link in g.study_program_links
+                    if _sanitize_text(link.study_program.code) == normalized_code
+                }
+                if groups_for_program and not groups_for_program.issubset(group_codes_set):
+                    all_group = False
+                    break
         item = {
             "id": min(cls.id for cls in bundle),
-            "course_name": first.course.name,
-            "teacher_name": first.teacher.name if first.teacher else "",
-            "room_name": first.room.code if first.room else "",
-            "program_codes": programs,
-            "group_codes": [group_map[group_id].code] if group_id in group_map else [],
-            "notes": first.notes or "",
+            "course_code": _sanitize_text(first.course.code),
+            "course_name": _sanitize_text(first.course.name),
+            "teacher_name": _sanitize_text(first.teacher.name if first.teacher else ""),
+            "room_name": _sanitize_text(first.room.code if first.room else ""),
+            "program_codes": [_sanitize_text(code) for code in programs],
+            "group_codes": group_codes,
+            "all_group": all_group,
+            "notes": _sanitize_text(first.notes or ""),
             "kind": kind,
             "color_key": color_key,
             "fill_color": fill_color,
@@ -398,12 +463,20 @@ def build_timetable_payload(
         "groups": [
             {
                 "id": g.id,
-                "code": g.code,
-                "name": g.name,
+                "code": _sanitize_text(g.code),
+                "name": _sanitize_text(g.name),
                 "capacity": g.size_num,
-                "group_tag": {"id": g.group_tag.id, "code": g.group_tag.code, "name": g.group_tag.name},
+                "group_tag": {
+                    "id": g.group_tag.id,
+                    "code": _sanitize_text(g.group_tag.code),
+                    "name": _sanitize_text(g.group_tag.name),
+                },
                 "programs": [
-                    {"id": link.study_program.id, "code": link.study_program.code, "name": link.study_program.name}
+                    {
+                        "id": link.study_program.id,
+                        "code": _sanitize_text(link.study_program.code),
+                        "name": _sanitize_text(link.study_program.name),
+                    }
                     for link in sorted(g.study_program_links, key=lambda x: x.study_program.code)
                 ],
             }

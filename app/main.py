@@ -111,6 +111,7 @@ def home(request: Request, db: Session = Depends(get_db)):
         request=request,
         name="home.html",
         context={"cycles": cycles, "version": int(time.time())},
+        media_type="text/html; charset=utf-8",
     )
 
 
@@ -122,6 +123,7 @@ def cycle_page(cycle_id: int, request: Request, db: Session = Depends(get_db)):
         request=request,
         name="index.html",
         context={"version": int(time.time()), "selected_cycle_id": cycle_id},
+        media_type="text/html; charset=utf-8",
     )
 
 
@@ -142,10 +144,32 @@ def _current_timetable_id(db: Session, timetable_id: Optional[int] = None, cycle
     return getattr(timetable, 'id', None)
 
 
+def _sanitize_text(value: Any) -> str:
+    if value is None:
+        return ''
+    text = str(value).strip()
+    if any(seq in text for seq in ['â€”', 'â€“', 'â€œ', 'â€�', 'â€™', 'Ã©', 'Ã ', 'Ã¨', 'Ãª', 'Ã§', 'Ã±', 'Ã´']):
+        try:
+            fixed = text.encode('latin1').decode('utf-8')
+            return fixed
+        except Exception:
+            pass
+    replacements = {
+        'â€”': '—',
+        'â€“': '–',
+        'â€œ': '“',
+        'â€�': '”',
+        'â€™': '’',
+    }
+    for bad, good in replacements.items():
+        text = text.replace(bad, good)
+    return text
+
+
 def _normalize_str(value: Any) -> str:
     if value is None:
         return ''
-    return str(value).strip()
+    return _sanitize_text(value)
 
 
 def _split_codes(value: Any) -> List[str]:
@@ -779,12 +803,13 @@ def _build_timetable_payload(db: Session, timetable_id: Optional[int], cycle_id:
                 "id": min(cls.id for cls in bundle),
                 "class_ids": [cls.id for cls in bundle],
                 "course_id": first.course.id if first.course else None,
-                "course_name": first.course.name,
+                "course_code": getattr(first.course, 'code', '') or '',
+                "course_name": getattr(first.course, 'name', '') or getattr(first.course, 'code', '') or '',
                 "teacher_id": first.teacher.id if first.teacher else None,
                 "teacher_name": first.teacher.name if first.teacher else "",
                 "room_id": first.room.id if first.room else None,
                 "room_name": first.room.code if first.room else "",
-                "program_codes": programs,
+                "program_codes": programs or [],
                 "kind": kind,
                 "color_key": color_map.get(first.course.course_tag.name, "other"),
                 "shared": bool(first.shared_key),
@@ -860,7 +885,7 @@ def _entity_payload(db: Session, timetable_id: Optional[int] = None, cycle_id: O
         group_tag_requirement[cast(int, gt.id)] = [
             {
                 "course_id": r.course_id,
-                "course_name": r.course.name if r.course else str(r.course_id),
+                "course_name": _sanitize_text(r.course.name if r.course else str(r.course_id)),
                 "sessions_required": r.sessions_required,
             }
             for r in reqs
@@ -874,7 +899,7 @@ def _entity_payload(db: Session, timetable_id: Optional[int] = None, cycle_id: O
         program_requirements[cast(int, prog.id)] = [
             {
                 "course_id": r.course_id,
-                "course_name": r.course.name if r.course else str(r.course_id),
+                "course_name": _sanitize_text(r.course.name if r.course else str(r.course_id)),
                 "sessions_required": getattr(r, "sessions_required", 1),
             }
             for r in reqs
@@ -897,31 +922,31 @@ def _entity_payload(db: Session, timetable_id: Optional[int] = None, cycle_id: O
         "group_tags": [
             {
                 "id": gt.id,
-                "code": gt.code,
-                "name": gt.name,
+                "code": _sanitize_text(gt.code),
+                "name": _sanitize_text(gt.name),
                 "requirements": group_tag_requirement.get(cast(int, gt.id), [])
             }
             for gt in group_tags
         ],
-        "course_tags": [{"id": ct.id, "name": ct.name} for ct in course_tags],
+        "course_tags": [{"id": ct.id, "name": _sanitize_text(ct.name)} for ct in course_tags],
         "programs": [
             {
                 "id": p.id,
-                "code": p.code,
-                "name": p.name,
+                "code": _sanitize_text(p.code),
+                "name": _sanitize_text(p.name),
                 "requirements": program_requirements.get(cast(int, p.id), [])
             }
             for p in programs
         ],
-        "rooms": [{"id": r.id, "code": r.code, "name": r.name, "capacity": r.capacity_num} for r in rooms],
-        "teachers": [{"id": t.id, "name": t.name, "course_tag_ids": sorted(link.course_tag_id for link in t.course_tag_links)} for t in teachers],
+        "rooms": [{"id": r.id, "code": _sanitize_text(r.code), "name": _sanitize_text(r.name), "capacity": r.capacity_num} for r in rooms],
+        "teachers": [{"id": t.id, "name": _sanitize_text(t.name), "course_tag_ids": sorted(link.course_tag_id for link in t.course_tag_links)} for t in teachers],
         "courses": [
             {
                 "id": c.id,
-                "code": c.code,
-                "name": c.name,
+                "code": _sanitize_text(c.code),
+                "name": _sanitize_text(c.name),
                 "course_tag_id": c.course_tag_id,
-                "course_tag_name": c.course_tag.name if c.course_tag else None,
+                "course_tag_name": _sanitize_text(c.course_tag.name) if c.course_tag else None,
                 "require_all": c.require_all_student_in_group,
                 "elective": c.elective,
                 "study_program_ids": sorted(link.study_program_id for link in c.study_program_links),
@@ -1272,6 +1297,54 @@ def delete_teacher(teacher_id: int, db: Session = Depends(get_db)):
     return bootstrap_payload(db)
 
 
+def _sync_course_class_type(db: Session, course_id: int, new_require_all: bool, new_elective: bool) -> None:
+    """Keep ScheduledClass rows consistent after a course type change.
+
+    When a course flips between required/program/elective, this sync helper
+    updates classes so they reflect the new type.
+    """
+    course = db.get(Course, course_id)
+    if not course:
+        return
+
+    old_require_all = bool(course.require_all_student_in_group)
+    old_elective = bool(course.elective)
+    new_require_all = bool(new_require_all)
+    new_elective = bool(new_elective)
+
+    if (old_require_all, old_elective) == (new_require_all, new_elective):
+        return
+
+    # Any class with study_program_id must be cleared for required or elective courses.
+    if new_require_all or new_elective:
+        db.query(ScheduledClass).filter(
+            ScheduledClass.course_id == course_id,
+            ScheduledClass.study_program_id.isnot(None),
+        ).update({ScheduledClass.study_program_id: None}, synchronize_session=False)
+        return
+
+    # If course becomes a program course, assign study_program_id for any existing
+    # require-all classes in groups that have exactly one study program.
+    rows = db.query(ScheduledClass).filter(
+        ScheduledClass.course_id == course_id,
+        ScheduledClass.study_program_id.is_(None),
+    ).all()
+    if not rows:
+        return
+
+    group_ids = sorted({row.group_id for row in rows})
+    groups = db.query(Group).options(joinedload(Group.study_program_links)).filter(Group.id.in_(group_ids)).all()
+    program_by_group = {
+        group.id: [link.study_program_id for link in group.study_program_links]
+        for group in groups
+    }
+
+    for row in rows:
+        prog_ids = program_by_group.get(row.group_id, [])
+        if len(prog_ids) == 1:
+            row.study_program_id = prog_ids[0]
+
+
 @app.post("/api/courses")
 def create_course(payload: CourseIn, db: Session = Depends(get_db)):
     if payload.require_all and payload.elective:
@@ -1301,6 +1374,7 @@ def update_course(course_id: int, payload: CourseIn, db: Session = Depends(get_d
     row.code = payload.code.strip().upper()  # type: ignore
     row.name = payload.name.strip()  # type: ignore
     row.course_tag_id = payload.course_tag_id  # type: ignore
+    _sync_course_class_type(db, course_id, payload.require_all, payload.elective)
     row.require_all_student_in_group = payload.require_all  # type: ignore
     row.elective = payload.elective  # type: ignore
     db.query(StudyProgramCourse).filter(StudyProgramCourse.course_id == course_id).delete(synchronize_session=False)
@@ -1425,6 +1499,7 @@ def add_class(payload: ClassCreateIn, db: Session = Depends(get_db)) -> dict[str
         mode=mode,
         study_program_ids=payload.study_program_ids,
         expected_size=payload.expected_size,
+        self_study=getattr(payload, 'self_study', False),
         notes=payload.notes,
         source="ui",
         allow_teacher_conflict=getattr(payload, 'allow_teacher_conflict', False),
@@ -1585,6 +1660,7 @@ def update_class(class_id: int, payload: ClassCreateIn, db: Session = Depends(ge
                 mode=mode,
                 study_program_ids=payload.study_program_ids,
                 expected_size=payload.expected_size,
+                self_study=getattr(payload, 'self_study', False),
                 allow_teacher_conflict=getattr(payload, 'allow_teacher_conflict', False),
             )
     finally:
@@ -1940,24 +2016,36 @@ def export_file(
     import re
     def sanitize_filename(s: str) -> str:
         return re.sub(r'[^\w\-_\. ]', '_', s)
+
+    def make_export_suffix(names: list[str], prefix: str, max_items: int = 5, max_length: int = 80) -> str:
+        cleaned = [sanitize_filename(str(name)).strip('_') for name in names if name]
+        if not cleaned:
+            return f"{prefix}-{len(names)}"
+        if len(cleaned) > max_items:
+            return f"{prefix}-{len(cleaned)}"
+        joined = '_'.join(cleaned)
+        if len(joined) > max_length:
+            joined = joined[:max_length].rstrip('_')
+        return f"{prefix}-{joined}"
+
     cycle_name = sanitize_filename(str(getattr(cycle, 'name', f"cycle{timetable.cycle_id}")))
     cycle_year = str(getattr(cycle, 'year_starting', timetable.cycle_id))
     timetable_id = getattr(timetable, 'id', None)
     if timetable_id is None:
         raise HTTPException(status_code=500, detail="Timetable id is unavailable.")
     if group_ids is not None:
-        suffix_codes = '_'.join(sanitize_filename(str(group.code or group.id)) for group in groups)
-        program_suffix = f"_groups-{suffix_codes}"
+        suffix_codes = make_export_suffix([str(group.code) for group in groups], 'groups')
+        program_suffix = f"_{suffix_codes}"
     elif teacher_ids is not None:
         teacher_names = [
             str(t.name)
             for t in db.scalars(select(Teacher).where(Teacher.id.in_(selected_teacher_ids or []))).all()
         ]
-        suffix_codes = '_'.join(sanitize_filename(name) for name in teacher_names)
-        program_suffix = f"_teachers-{suffix_codes}"
+        suffix_codes = make_export_suffix(teacher_names, 'teachers')
+        program_suffix = f"_{suffix_codes}"
     elif program_ids is not None and selected_programs:
-        suffix_codes = '_'.join(sanitize_filename(str(prog.code)) for prog in selected_programs)
-        program_suffix = f"_programs-{suffix_codes}"
+        suffix_codes = make_export_suffix([str(prog.code) for prog in selected_programs], 'programs')
+        program_suffix = f"_{suffix_codes}"
     elif selected_program is not None:
         program_suffix = f"_program-{sanitize_filename(str(getattr(selected_program, 'code', '')))}"
     else:

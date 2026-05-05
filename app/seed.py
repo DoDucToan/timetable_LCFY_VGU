@@ -35,6 +35,7 @@ PROGRAM_CODES = {"ARC", "BBA", "BCE", "BFA", "BSE", "CSE", "ECE", "SME", "SPE", 
 
 
 def _migrate_course_for_group_table() -> None:
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(DB_PATH))
     cur = conn.cursor()
     cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='course_for_group_only'")

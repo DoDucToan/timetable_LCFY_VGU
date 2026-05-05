@@ -16,6 +16,9 @@ body {
   font-family: Arial, Helvetica, sans-serif;
   color: var(--text);
   background: var(--bg);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .page {
@@ -101,8 +104,8 @@ body {
 }
 
 .strip .small {
-  padding: 4px 10px;
-  font-size: 10px;
+  padding: 4px 0px;
+  font-size: 9px;
   border-radius: 10px;
   min-height: 24px;
   line-height: 1.2;
@@ -110,7 +113,8 @@ body {
 
 .strip-footer {
   display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
+  justify-content: flex-start;
   align-items: center;
   gap: 8px;
   margin-top: 8px;
@@ -239,25 +243,129 @@ body {
   max-height: calc(100vh - 200px);
 }
 
-.side-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: minmax(260px, 1fr) minmax(240px, 1fr) minmax(400px, 2fr) minmax(240px, 1fr) minmax(480px, 4fr);
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 16px;
+    width: 100%;
+    justify-items: stretch;
+    align-items: stretch;
+  }
 
-.import-row {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: 8px;
-  align-items: center;
-  margin-bottom: 10px;
-}
+  .dashboard-card {
+    min-height: 200px;
+    width: 100%;
+  }
 
-.import-row span {
-  font-size: 0.95rem;
-  color: var(--text);
-}
+  #teachersSection {
+    grid-column: 1;
+    grid-row: 1;
+  }
 
+  #teacherLoadSection {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  #coursesSection {
+    grid-column: 3 / span 2;
+    grid-row: 1;
+  }
+
+  #programsSection {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  #roomsSection {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  #groupTagsSection {
+    grid-column: 3;
+    grid-row: 2;
+  }
+
+  #courseTagsSection {
+    grid-column: 4;
+    grid-row: 2;
+  }
+
+  #uploadSection {
+    grid-column: 5;
+    grid-row: 1 / span 2;
+    justify-self: stretch;
+    align-self: stretch;
+    width: 100%;
+    min-height: 100%;
+  }
+
+  .dashboard-card.span-2 {
+    grid-column: span 2;
+  }
+
+  .dashboard-card.span-4 {
+    grid-column: span 4;
+  }
+
+  .upload-card {
+    background: #fff;
+    color: #000;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+  }
+
+  .upload-card .subheader-row h2 {
+    color: #000;
+  }
+
+  .upload-card .upload-grid {
+    display: grid;
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .upload-card .upload-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  }
+
+  .upload-card .upload-row:last-child {
+    border-bottom: none;
+  }
+
+  .upload-card .upload-row strong {
+    color: #000;
+  }
+
+  .upload-card .upload-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .upload-card .ghost-btn {
+    background: rgba(0, 0, 0, 0.04);
+    color: #000;
+    border-color: rgba(0, 0, 0, 0.12);
+  }
+
+  .upload-card .ghost-btn:hover {
+    background: rgba(0, 0, 0, 0.08);
+  }
+
+  .strip-subtitle {
+    font-size: 12px;
+    color: #5f6673;
+    margin-top: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 .side-block {
   padding: 16px;
   scroll-margin-top: 90px;
@@ -309,8 +417,8 @@ body {
 #timetableBoard {
   border-collapse: separate;
   border-spacing: 0;
-  min-width: 1100px;
   width: 100%;
+  min-width: max-content;
   table-layout: fixed;
 }
 
@@ -320,29 +428,49 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
-#timetableBoard th:not(:first-child),
-#timetableBoard td:not(:first-child) {
-  width: 300px;
-  min-width: 300px;
+#timetableBoard th:not(:first-child):not(:nth-child(2)),
+#timetableBoard td:not(:first-child):not(:nth-child(2)) {
+  width: auto;
+  min-width: 880px;
 }
 
 #timetableBoard th:nth-child(2),
 #timetableBoard td:nth-child(2) {
-  width: 90px;
-  min-width: 90px;
+  width: 45px;
+  min-width: 45px;
 }
 
 #timetableBoard th:first-child,
-#timetableBoard td:first-child {
-  width: 70px;
-  min-width: 70px;
+#timetableBoard td.day-cell {
+  width: 60px;
+  min-width: 60px;
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  background: #eef3ff;
+}
+
+#timetableBoard th:nth-child(2),
+#timetableBoard td.time-cell {
+  width: 45px;
+  min-width: 45px;
+  position: sticky;
+  left: 60px;
+  z-index: 4;
+  background: #eef3ff;
 }
 
 #timetableBoard thead th {
   position: sticky;
   top: 0;
   z-index: 2;
-  background: #eef3ff;
+  background: #ffffff;
+  padding: 18px 10px;
+  line-height: 1.2;
+  min-height: 120px;
+  vertical-align: bottom;
+  white-space: normal;
+  word-break: break-word;
 }
 
 #timetableBoard th:first-child,
@@ -482,14 +610,15 @@ body {
 
 .strip-stack {
   display: grid;
-  gap: 12px;
-  padding: 12px;
+  gap: 16px;
+  padding: 16px;
 }
 
 .strip {
   border-radius: 12px;
-  min-height: 160px;
-  padding: 16px 16px;
+  min-height: 180px;
+  max-height: 280px;
+  padding: 18px;
   font-size: 14px;
   line-height: 1.45;
   overflow: hidden;
@@ -515,9 +644,17 @@ body {
   align-items: flex-start;
 }
 
+.strip-header {
+  margin-bottom: 10px;
+}
+
 .strip-main {
   flex: 1 1 auto;
   min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
 }
 
 .strip-side {
@@ -530,17 +667,36 @@ body {
 }
 
 .strip .strip-title {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+  display: block;
+  color: #0f172a;
 }
 
-.strip .strip-programs {
+.strip .strip-subtitle {
+  font-size: 12px;
+  color: #475569;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+}
+
+.strip .strip-programs,
+.strip .strip-groups,
+.strip .strip-note {
   display: block;
   font-size: 11px;
   color: #334155;
   font-weight: 600;
   margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .strip .strip-groups {
@@ -605,6 +761,8 @@ body {
 .lunch-row td {
   background: #f3f3f3;
   height: 20px;
+  border-top: 2px solid rgba(99, 114, 206, 0.24);
+  border-bottom: 2px solid rgba(99, 114, 206, 0.24);
 }
 
 .lunch-row .slot-label,
@@ -652,17 +810,26 @@ body {
 
   /* Requirements section below timetable */
   #requirementsSection {
-    margin: 32px auto 0 auto;
-    max-width: 1200px;
+    margin: 32px 0 0 0;
+    width: 100%;
+    max-width: none;
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: 18px;
     box-shadow: 0 4px 16px rgba(26, 42, 80, 0.04);
     padding: 24px 32px;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 16px;
   }
   #requirementsSection h2 {
     margin-top: 0;
-    font-size: 22px;
+    font-size: 24px;
+  }
+  #requirementsSection .requirement-action-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
   }
   #requirementsList {
     display: flex;

@@ -82,4 +82,5 @@ class ClassCreateIn(BaseModel):
     study_program_ids: List[int] = []
     expected_size: Optional[int] = None
     notes: Optional[str] = None
+    self_study: bool = False
     allow_teacher_conflict: bool = False

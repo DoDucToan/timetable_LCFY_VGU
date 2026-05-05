@@ -35,11 +35,30 @@ PROGRAM_FILL_VARIANTS = [
     "FCE4D6",
     "E2EFDA",
     "F9CB9C",
+    "FFEB9C",
+    "B4C6E7",
+    "EAD1E7",
+    "D9EBCF",
+    "F7D9A6",
+    "CFE2FF",
+]
+
+TAG_FILL_VARIANTS = [
+    "F4B183",
+    "B6D7A8",
+    "C9DAF8",
+    "EAD1DC",
+    "FCE4D6",
+    "D0E0E3",
+    "FFF2CC",
+    "D9D2E9",
+    "E2EFDA",
+    "F9CB9C",
 ]
 
 BLANK_FILL = "D9D9D9"
 REQUIRED_ROW_HEIGHT = 78
-OVERLAY_ROW_HEIGHT = 26
+OVERLAY_ROW_HEIGHT = 56
 
 
 def _format_item(item: Dict[str, Any]) -> str:
@@ -50,6 +69,8 @@ def _format_item(item: Dict[str, Any]) -> str:
     parts.append(course_name)
     if item.get("group_codes"):
         parts.append(f"({', '.join(item['group_codes'])})")
+    if item.get("all_group"):
+        parts.append("(all group)")
     if item["program_codes"]:
         parts.append(f"[{', '.join(item['program_codes'])}]")
     if item["notes"]:
@@ -58,7 +79,42 @@ def _format_item(item: Dict[str, Any]) -> str:
         parts.append(item["teacher_name"])
     if item["room_name"]:
         parts.append(f"Room: {item['room_name']}")
+    if item.get("kind") == "required":
+        return "\n".join(parts)
     return "_".join(parts)
+
+
+def _get_fill_color(item: Dict[str, Any]) -> str:
+    if item.get("kind") == "program":
+        return item.get("fill_color") or PROGRAM_FILL_VARIANTS[abs(hash(str(item.get("id", "")))) % len(PROGRAM_FILL_VARIANTS)]
+
+    if item.get("kind") == "elective":
+        return FILL_MAP.get("elective", "C49A00")
+
+    color_key = item.get("color_key") or str(item.get("course_code", "other"))
+    return FILL_MAP.get(color_key, TAG_FILL_VARIANTS[abs(hash(color_key)) % len(TAG_FILL_VARIANTS)])
+
+
+def _assign_program_colors_for_slot(overlays: List[Dict[str, Any]]) -> None:
+    used: set[str] = set()
+    for item in overlays:
+        if item.get("kind") != "program":
+            continue
+        seed = "|".join(
+            [
+                str(item.get("course_name", "")),
+                str(item.get("teacher_name", "")),
+                str(item.get("room_name", "")),
+                ",".join(item.get("program_codes", [])),
+            ]
+        )
+        index = abs(hash(seed)) % len(PROGRAM_FILL_VARIANTS)
+        for attempt in range(len(PROGRAM_FILL_VARIANTS)):
+            candidate = PROGRAM_FILL_VARIANTS[(index + attempt) % len(PROGRAM_FILL_VARIANTS)]
+            if candidate not in used:
+                item["fill_color"] = candidate
+                used.add(candidate)
+                break
 
 
 def _required_item(items: List[Dict[str, Any]]) -> Dict[str, Any] | None:
@@ -117,7 +173,7 @@ def _write_overlay_merge(
         end_column=end_col,
     )
     cell = _cell(ws, row_idx, start_col, _format_item(item))
-    cell.fill = PatternFill("solid", fgColor=item.get("fill_color", FILL_MAP.get(item["color_key"], "D9D2E9")))
+    cell.fill = PatternFill("solid", fgColor=_get_fill_color(item))
     cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
     cell.font = Font(bold=True, size=10)
     for c in range(start_col, end_col + 1):
@@ -208,7 +264,7 @@ def _write_timetable_sheet(
         cell.font = Font(bold=True)
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         cell.border = border
-        ws.column_dimensions[get_column_letter(idx)].width = 24
+        ws.column_dimensions[get_column_letter(idx)].width = float(24)
 
     row = 5
     weekday_names = {1: "MONDAY", 2: "TUESDAY", 3: "WEDNESDAY", 4: "THURSDAY", 5: "FRIDAY"}
@@ -238,8 +294,17 @@ def _write_timetable_sheet(
                     found = next((uo for uo in unique_overlays if _same_overlay_connectable(item, uo)), None)
                     if found:
                         found["program_codes"] = sorted(set(found.get("program_codes", []) + item.get("program_codes", [])))
+                        found["group_codes"] = sorted(set(found.get("group_codes", []) + item.get("group_codes", [])))
+                        found["all_group"] = found.get("all_group", False) or item.get("all_group", False)
                     elif not any(_same_overlay(item, uo) for uo in unique_overlays):
-                        unique_overlays.append({**item, "program_codes": list(item.get("program_codes", []))})
+                        unique_overlays.append(
+                            {
+                                **item,
+                                "program_codes": list(item.get("program_codes", [])),
+                                "group_codes": list(item.get("group_codes", [])),
+                                "all_group": item.get("all_group", False),
+                            }
+                        )
 
             kind_order = {"required": 0, "program": 1, "elective": 2}
             unique_overlays.sort(
@@ -250,6 +315,7 @@ def _write_timetable_sheet(
                     item.get("room_name", ""),
                 )
             )
+            _assign_program_colors_for_slot(unique_overlays)
             overlay_depth = len(unique_overlays)
             slot_start_row = row
             required_row = row
@@ -389,8 +455,8 @@ def _write_timetable_sheet(
         ws.cell(row=idx, column=1, value=item["teacher"])
         ws.cell(row=idx, column=2, value=item["timeslot_count"])
 
-    ws.column_dimensions["A"].width = 10
-    ws.column_dimensions["B"].width = 16
+    ws.column_dimensions["A"].width = float(10)
+    ws.column_dimensions["B"].width = float(16)
 
 
 def export_timetable_xlsx(
@@ -475,6 +541,38 @@ def export_timetable_xlsx(
                 blank_fill,
                 border,
             )
+
+    if teacher_ids is not None:
+        from .models import Teacher
+        teacher_sheets = list(db.scalars(select(Teacher).where(Teacher.id.in_(teacher_ids)).order_by(Teacher.name)).all())
+        if teacher_sheets:
+            sheet_titles = _unique_sheet_titles([str(t.name or t.id) for t in teacher_sheets])
+            for teacher, sheet_title in zip(teacher_sheets, sheet_titles):
+                if sheet_title == ws.title:
+                    sheet_title = _sanitize_sheet_title(f"{sheet_title}-1")
+                teacher_ws = wb.create_sheet(title=sheet_title)
+                teacher_payload = build_timetable_payload(
+                    db,
+                    timetable_id,
+                    study_program_ids=study_program_ids,
+                    group_ids=None,
+                    teacher_ids=[cast(int, getattr(teacher, 'id'))],
+                )
+                _write_timetable_sheet(
+                    db,
+                    teacher_ws,
+                    teacher_payload,
+                    timetable_id,
+                    study_program_ids,
+                    None,
+                    [cast(int, getattr(teacher, 'id'))],
+                    [],
+                    title_fill,
+                    header_fill,
+                    lunch_fill,
+                    blank_fill,
+                    border,
+                )
 
     wb.save(output_path)
     return output_path
