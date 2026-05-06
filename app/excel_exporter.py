@@ -1,16 +1,17 @@
 from __future__ import annotations
 from pathlib import Path
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Dict, List, Optional, Set, Tuple, cast
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from openpyxl import Workbook
 from openpyxl.cell.cell import Cell
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.dimensions import RowDimension
 from openpyxl.worksheet.worksheet import Worksheet
 from .scheduler import build_timetable_payload, teacher_load_rows
-from .models import Group, GroupStudyProgram, StudyProgram
+from .models import Group, GroupStudyProgram, StudyProgram, ScheduledClass
 import re
 
 FILL_MAP = {
@@ -58,7 +59,8 @@ TAG_FILL_VARIANTS = [
 BLANK_FILL = "D9D9D9"
 REQUIRED_ROW_HEIGHT = 117
 OVERLAY_ROW_HEIGHT = 40
-
+_LINE_HEIGHT_PTS = 22    # ← add this
+_OVERLAY_MIN_HEIGHT = 24  # ← add this
 
 def _format_item(item: Dict[str, Any]) -> str:
     course_name = str(item["course_name"])
@@ -84,40 +86,49 @@ def _format_item(item: Dict[str, Any]) -> str:
 
 
 def _estimate_line_count(text: str, width_cols: int) -> int:
-    # Approximate how many wrapped lines Excel will need for a merged cell width.
-    line_width = max(18, int(24 * width_cols))
+    line_width = max(12, int(18 * width_cols))
+    total_lines = 0
+    paragraphs = text.split("\n")  # ← NEW: honour hard newlines
     separators = [" ", "_", "-", "/", ",", "(", ")", "["]
-    words: List[str] = [text]
-    for sep in separators:
-        parts: List[str] = []
-        for word in words:
-            parts.extend(word.split(sep))
-        words = [part for part in parts if part]
 
-    line_count = 0
-    current_len = 0
-    for word in words:
-        word_len = len(word)
-        if current_len == 0:
-            current_len = word_len
-        elif current_len + 1 + word_len <= line_width:
-            current_len += 1 + word_len
-        else:
-            line_count += 1
-            current_len = word_len
-        if word_len >= line_width:
-            line_count += word_len // line_width
-            current_len = word_len % line_width
+    for paragraph in paragraphs:
+        words: List[str] = [paragraph]
+        for sep in separators:
+            parts: List[str] = []
+            for word in words:
+                parts.extend(word.split(sep))
+            words = [part for part in parts if part]
+
+        if not words:
+            total_lines += 1
+            continue
+
+        line_count = 0
+        current_len = 0
+        for word in words:
+            word_len = len(word)
             if current_len == 0:
-                current_len = 0
-    if current_len > 0:
-        line_count += 1
-    return max(1, line_count)
+                current_len = word_len
+            elif current_len + 1 + word_len <= line_width:
+                current_len += 1 + word_len
+            else:
+                line_count += 1
+                current_len = word_len
+            if word_len >= line_width:
+                line_count += word_len // line_width
+                current_len = word_len % line_width
+        if current_len > 0:
+            line_count += 1
+        total_lines += max(1, line_count)
+
+    return max(1, total_lines)
+
+
 
 
 def _row_height_for_text(text: str, width_cols: int = 1, min_height: int = 24) -> int:
     line_count = _estimate_line_count(text, width_cols)
-    return max(min_height, line_count * 18 + 6)
+    return max(min_height, line_count * _LINE_HEIGHT_PTS + 10)  # ← uses constant
 
 
 def _get_fill_color(item: Dict[str, Any]) -> str:
@@ -214,6 +225,200 @@ def _write_overlay_merge(
     cell.font = Font(bold=True, size=15)
     for c in range(start_col, end_col + 1):
         ws.cell(row=row_idx, column=c).border = border
+
+
+def _write_group_timetable_sheet(
+    ws: Worksheet,
+    payload: Dict[str, Any],
+    group: Dict[str, Any],
+    blank_fill: PatternFill,
+    border: Border,
+) -> None:
+    timeslots = sorted(payload["timeslots"], key=lambda t: t["sort_order"])
+    group_id = group["id"]
+    program_codes = [p["code"] for p in group.get("programs", []) if p.get("code")]
+    title = f"Group {group['code']}"
+    if program_codes:
+        title += f" ({', '.join(program_codes)})"
+    ws.title = _sanitize_sheet_title(title)
+
+    time_labels: List[str] = []
+    for timeslot in timeslots:
+        if timeslot["label"] not in time_labels:
+            time_labels.append(timeslot["label"])
+
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=2 + len(time_labels))
+    title_cell = _cell(ws, 1, 1, title)
+    title_cell.font = Font(bold=True, size=15)
+    title_cell.alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[1].height = 30
+
+    day_time_border = Border(
+        left=border.left,
+        right=border.right,
+        top=border.top,
+        bottom=border.bottom,
+        diagonal=border.left,
+        diagonalDown=True,
+    )
+    day_time_cell = ws.cell(row=2, column=1, value="Time\nDate")
+    day_time_cell.font = Font(bold=True)
+    day_time_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    day_time_cell.border = day_time_border
+
+    for idx, label in enumerate(time_labels, start=2):
+        header_cell = ws.cell(row=2, column=idx, value=label)
+        header_cell.font = Font(bold=True, size=11)
+        header_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        header_cell.border = border
+        ws.column_dimensions[get_column_letter(idx)].width = float(22)
+
+    ws.column_dimensions["A"].width = float(16)
+
+    days = sorted({(t["day_index"], t["weekday"]) for t in timeslots}, key=lambda d: d[0])
+    row = 3
+    for day_index, weekday in days:
+        day_cell = ws.cell(row=row, column=1, value=weekday)
+        day_cell.font = Font(bold=True)
+        day_cell.alignment = Alignment(horizontal="center", vertical="center")
+        day_cell.border = border
+
+        for col_idx, label in enumerate(time_labels, start=2):
+            cell = cast(Cell, ws.cell(row=row, column=col_idx))
+            cell.border = border
+            day_slots = [ts for ts in timeslots if ts["day_index"] == day_index and ts["label"] == label]
+            if not day_slots:
+                cell.fill = blank_fill
+                continue
+
+            timeslot = day_slots[0]
+            items = payload["cells"].get(str(timeslot["id"]), {}).get(str(group_id), [])
+            if not items:
+                cell.fill = blank_fill
+                continue
+
+            text = "\n\n".join(_format_item(item) for item in items)
+            fill_color = _get_fill_color(items[0])
+            cell.value = text
+            cell.fill = PatternFill("solid", fgColor=fill_color)
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            cell.font = Font(bold=True, size=12)
+            needed_height = _row_height_for_text(text, width_cols=1, min_height=_OVERLAY_MIN_HEIGHT)
+            row_dimension = ws.row_dimensions[row]
+            current_height = float(getattr(row_dimension, "height", 0) or 0)
+            row_dimension.height = float(max(current_height, needed_height))
+
+        row += 1
+
+
+def _build_teacher_schedule_rows(
+    db: Session,
+    timetable_id: Optional[int],
+    teacher_id: int,
+    group_ids: Optional[List[int]] = None,
+    study_program_ids: Optional[List[int]] = None,
+) -> List[Dict[str, Any]]:
+    query = select(ScheduledClass).options(
+        joinedload(ScheduledClass.group),
+        joinedload(ScheduledClass.timeslot),
+        joinedload(ScheduledClass.room),
+        joinedload(ScheduledClass.course),
+        joinedload(ScheduledClass.study_program),
+    ).where(
+        ScheduledClass.deploy.is_(True),
+        ScheduledClass.teacher_id == teacher_id,
+    )
+    if timetable_id is not None:
+        query = query.join(Group).where(Group.timetable_id == timetable_id)
+    if group_ids is not None:
+        query = query.where(ScheduledClass.group_id.in_(group_ids))
+    classes = db.execute(query).unique().scalars().all()
+
+    grouped: Dict[Tuple[str, int, int, str, str, str], Dict[str, Set[str]]] = {}
+    for cls in classes:
+        if not cls.timeslot:
+            continue
+        key: Tuple[str, int, int, str, str, str] = (
+            cls.timeslot.weekday,
+            cls.timeslot.day_index,
+            cls.timeslot.sort_order,
+            cls.timeslot.label,
+            cls.room.code if cls.room else "",
+            cls.course.name if cls.course else "",
+        )
+        entry = grouped.setdefault(
+            key,
+            {
+                "group_codes": set(),
+                "program_codes": set(),
+            },
+        )
+        if cls.group and cls.group.code:
+            entry["group_codes"].add(cls.group.code)
+        if cls.study_program and cls.study_program.code:
+            entry["program_codes"].add(cls.study_program.code)
+
+    rows: List[Dict[str, Any]] = []
+    for key in sorted(grouped.keys(), key=lambda k: (k[1], k[2], k[3], k[0])):
+        weekday, day_index, sort_order, timeslot_label, room_name, course_name = key
+        entry = grouped[key]
+        rows.append(
+            {
+                "weekday": weekday,
+                "day_index": day_index,
+                "sort_order": sort_order,
+                "timeslot": timeslot_label,
+                "group_code": ", ".join(sorted(entry["group_codes"])),
+                "program_code": ", ".join(sorted(entry["program_codes"])),
+                "room_name": room_name,
+                "course_name": course_name,
+            }
+        )
+    return rows
+
+
+def _write_teacher_schedule_sheet(
+    ws: Worksheet,
+    teacher_name: str,
+    rows: List[Dict[str, Any]],
+    border: Border,
+) -> None:
+    ws.title = _sanitize_sheet_title(teacher_name)
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=6)
+    title_cell = _cell(ws, 1, 1, f"Teacher: {teacher_name}")
+    title_cell.font = Font(bold=True, size=15)
+    title_cell.alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[1].height = 30
+
+    headers = ["Day", "Timeslot", "Group", "Program", "Room", "Course"]
+    for idx, label in enumerate(headers, start=1):
+        cell = ws.cell(row=2, column=idx, value=label)
+        cell.font = Font(bold=True, size=11)
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = border
+
+    ws.column_dimensions["A"].width = float(12)
+    ws.column_dimensions["B"].width = float(18)
+    ws.column_dimensions["C"].width = float(18)
+    ws.column_dimensions["D"].width = float(18)
+    ws.column_dimensions["E"].width = float(12)
+    ws.column_dimensions["F"].width = float(26)
+
+    if not rows:
+        cell = _cell(ws, 3, 1, "No scheduled classes for this teacher.")
+        cell.font = Font(italic=True)
+        return
+
+    for idx, row_info in enumerate(rows, start=3):
+        ws.cell(row=idx, column=1, value=row_info["weekday"]).border = border
+        ws.cell(row=idx, column=2, value=row_info["timeslot"]).border = border
+        ws.cell(row=idx, column=3, value=row_info["group_code"]).border = border
+        ws.cell(row=idx, column=4, value=row_info["program_code"]).border = border
+        ws.cell(row=idx, column=5, value=row_info["room_name"]).border = border
+        course_cell = ws.cell(row=idx, column=6, value=row_info["course_name"])
+        course_cell.border = border
+        course_cell.alignment = Alignment(wrap_text=True, horizontal="left", vertical="center")
+        ws.row_dimensions[idx].height = 24
 
 
 def _sanitize_sheet_title(title: str, max_length: int = 31) -> str:
@@ -380,7 +585,8 @@ def _write_timetable_sheet(
             time_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
             time_cell.border = border
 
-            ws.row_dimensions[required_row].height = REQUIRED_ROW_HEIGHT
+            required_row_height = REQUIRED_ROW_HEIGHT
+            ws.row_dimensions[required_row].height = required_row_height
 
             col_idx = 3
             while col_idx <= total_cols:
@@ -405,6 +611,12 @@ def _write_timetable_sheet(
                     next_col += 1
                 if end_col > col_idx:
                     _write_overlay_merge(ws, required_row, col_idx, end_col, req, border)
+                    req_height = _row_height_for_text(
+                        _format_item(req),
+                        width_cols=end_col - col_idx + 1,
+                        min_height=REQUIRED_ROW_HEIGHT,
+                    )
+                    required_row_height = max(required_row_height, req_height)
                     col_idx = end_col + 1
                 else:
                     req_cell = _cell(ws, required_row, col_idx)
@@ -413,7 +625,15 @@ def _write_timetable_sheet(
                     req_cell.border = border
                     req_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
                     req_cell.font = Font(bold=True, size=15)
+                    req_height = _row_height_for_text(
+                        _format_item(req),
+                        width_cols=1,
+                        min_height=REQUIRED_ROW_HEIGHT,
+                    )
+                    required_row_height = max(required_row_height, req_height)
                     col_idx += 1
+            ws.row_dimensions[required_row].height = required_row_height
+
             for col_idx2, group in enumerate(groups, start=3):
                 items = slot_items.get(str(group["id"]), [])
                 req = _required_item(items)
@@ -432,9 +652,24 @@ def _write_timetable_sheet(
                 overlay_row = required_row + 1 + overlay_idx
                 row_has_overlay = [any(_same_overlay(item, overlay_item) for item in group_items) for group_items in overlay_rows_content]
                 present_cols = [3 + idx for idx, has in enumerate(row_has_overlay) if has]
-                width_cols = max(1, len(present_cols))
-                ws.row_dimensions[overlay_row].height = _row_height_for_text(_format_item(overlay_item), width_cols=width_cols, min_height=24)
-
+                # Compute height based on each contiguous merged segment, not on total present columns.
+                needed_height = _OVERLAY_MIN_HEIGHT
+                segment_width = 0
+                for has in row_has_overlay + [False]:
+                    if has:
+                        segment_width += 1
+                        continue
+                    if segment_width:
+                        segment_height = _row_height_for_text(
+                            _format_item(overlay_item),
+                            width_cols=segment_width,
+                            min_height=_OVERLAY_MIN_HEIGHT,
+                        )
+                        needed_height = max(needed_height, segment_height)
+                        segment_width = 0
+                row_dimension: RowDimension = ws.row_dimensions[overlay_row]
+                current_height = float(getattr(row_dimension, "height", 0) or 0)
+                setattr(row_dimension, "height", float(max(current_height, needed_height)))
                 if overlay_item.get("kind") == "program" and len(present_cols) > 1:
                     start_col = min(present_cols)
                     end_col = max(present_cols)
@@ -544,7 +779,6 @@ def export_timetable_xlsx(
 
     wb = Workbook()
     ws = cast(Worksheet, wb.active)
-    ws.title = "Phase4 Timetable"
     payload = build_timetable_payload(
         db,
         timetable_id,
@@ -552,6 +786,34 @@ def export_timetable_xlsx(
         group_ids=group_ids,
         teacher_ids=teacher_ids,
     )
+
+    if teacher_ids is not None:
+        from .models import Teacher
+        teacher_sheets = list(db.scalars(select(Teacher).where(Teacher.id.in_(teacher_ids)).order_by(Teacher.name)).all())
+        sheet_titles = _unique_sheet_titles([str(t.name or t.id) for t in teacher_sheets])
+        for idx, (teacher, sheet_title) in enumerate(zip(teacher_sheets, sheet_titles)):
+            if idx == 0:
+                ws.title = sheet_title
+            else:
+                ws = wb.create_sheet(title=sheet_title)
+            rows = _build_teacher_schedule_rows(db, timetable_id, cast(int, getattr(teacher, 'id')))
+            _write_teacher_schedule_sheet(ws, str(teacher.name), rows, border)
+        wb.save(output_path)
+        return output_path
+
+    if group_ids is not None:
+        group_sheets = payload["groups"]
+        sheet_titles = _unique_sheet_titles([str(group["code"]) for group in group_sheets])
+        for idx, (group, sheet_title) in enumerate(zip(group_sheets, sheet_titles)):
+            if idx == 0:
+                ws.title = sheet_title
+            else:
+                ws = wb.create_sheet(title=sheet_title)
+            _write_group_timetable_sheet(ws, payload, group, blank_fill, border)
+        wb.save(output_path)
+        return output_path
+
+    ws.title = "Phase4 Timetable"
     _write_timetable_sheet(
         db,
         ws,
@@ -604,38 +866,6 @@ def export_timetable_xlsx(
                 blank_fill,
                 border,
             )
-
-    if teacher_ids is not None:
-        from .models import Teacher
-        teacher_sheets = list(db.scalars(select(Teacher).where(Teacher.id.in_(teacher_ids)).order_by(Teacher.name)).all())
-        if teacher_sheets:
-            sheet_titles = _unique_sheet_titles([str(t.name or t.id) for t in teacher_sheets])
-            for teacher, sheet_title in zip(teacher_sheets, sheet_titles):
-                if sheet_title == ws.title:
-                    sheet_title = _sanitize_sheet_title(f"{sheet_title}-1")
-                teacher_ws = wb.create_sheet(title=sheet_title)
-                teacher_payload = build_timetable_payload(
-                    db,
-                    timetable_id,
-                    study_program_ids=study_program_ids,
-                    group_ids=None,
-                    teacher_ids=[cast(int, getattr(teacher, 'id'))],
-                )
-                _write_timetable_sheet(
-                    db,
-                    teacher_ws,
-                    teacher_payload,
-                    timetable_id,
-                    study_program_ids,
-                    None,
-                    [cast(int, getattr(teacher, 'id'))],
-                    [],
-                    title_fill,
-                    header_fill,
-                    lunch_fill,
-                    blank_fill,
-                    border,
-                )
 
     wb.save(output_path)
     return output_path
