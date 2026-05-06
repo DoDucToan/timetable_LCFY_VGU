@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Streamin
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 from contextlib import asynccontextmanager
 from .database import SessionLocal, get_db
@@ -104,6 +105,12 @@ app = FastAPI(title="Timetable Builder", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
 
+@app.exception_handler(IntegrityError)
+def integrity_error_handler(request: Request, exc: IntegrityError):
+    detail = str(exc.orig) if getattr(exc, 'orig', None) else str(exc)
+    return JSONResponse(status_code=400, content={"detail": detail})
+
+
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request, db: Session = Depends(get_db)):
     cycles = db.scalars(select(Cycle).order_by(Cycle.year_starting.desc(), Cycle.name)).all()
@@ -125,6 +132,89 @@ def cycle_page(cycle_id: int, request: Request, db: Session = Depends(get_db)):
         context={"version": int(time.time()), "selected_cycle_id": cycle_id},
         media_type="text/html; charset=utf-8",
     )
+
+
+def render_entity_page(request: Request, section: str, open_new: bool = False, cycle_id: Optional[int] = None) -> HTMLResponse:
+    template_name = {
+        "teachers": "teachers.html",
+        "rooms": "rooms.html",
+        "courses": "courses.html",
+        "study-programs": "study-programs.html",
+        "course-tags": "course-tags.html",
+        "group-tags": "group-tags.html",
+        "upload": "upload.html",
+    }.get(section, "entity.html")
+    return templates.TemplateResponse(
+        request=request,
+        name=template_name,
+        context={"version": int(time.time()), "selected_cycle_id": cycle_id, "active_section": section, "open_new": open_new, "template_name": template_name},
+        media_type="text/html; charset=utf-8",
+    )
+
+
+@app.get("/teachers", response_class=HTMLResponse)
+def teachers_page(request: Request, cycle_id: Optional[int] = Query(default=None)):
+    return render_entity_page(request, "teachers", False, cycle_id)
+
+
+@app.get("/teachers/new", response_class=HTMLResponse)
+def teachers_new_page(request: Request, cycle_id: Optional[int] = Query(default=None)):
+    return render_entity_page(request, "teachers", True, cycle_id)
+
+
+@app.get("/rooms", response_class=HTMLResponse)
+def rooms_page(request: Request, cycle_id: Optional[int] = Query(default=None)):
+    return render_entity_page(request, "rooms", False, cycle_id)
+
+
+@app.get("/rooms/new", response_class=HTMLResponse)
+def rooms_new_page(request: Request, cycle_id: Optional[int] = Query(default=None)):
+    return render_entity_page(request, "rooms", True, cycle_id)
+
+
+@app.get("/courses", response_class=HTMLResponse)
+def courses_page(request: Request, cycle_id: Optional[int] = Query(default=None)):
+    return render_entity_page(request, "courses", False, cycle_id)
+
+
+@app.get("/courses/new", response_class=HTMLResponse)
+def courses_new_page(request: Request, cycle_id: Optional[int] = Query(default=None)):
+    return render_entity_page(request, "courses", True, cycle_id)
+
+
+@app.get("/study-programs", response_class=HTMLResponse)
+def programs_page(request: Request, cycle_id: Optional[int] = Query(default=None)):
+    return render_entity_page(request, "study-programs", False, cycle_id)
+
+
+@app.get("/study-programs/new", response_class=HTMLResponse)
+def programs_new_page(request: Request, cycle_id: Optional[int] = Query(default=None)):
+    return render_entity_page(request, "study-programs", True, cycle_id)
+
+
+@app.get("/course-tags", response_class=HTMLResponse)
+def course_tags_page(request: Request, cycle_id: Optional[int] = Query(default=None)):
+    return render_entity_page(request, "course-tags", False, cycle_id)
+
+
+@app.get("/course-tags/new", response_class=HTMLResponse)
+def course_tags_new_page(request: Request, cycle_id: Optional[int] = Query(default=None)):
+    return render_entity_page(request, "course-tags", True, cycle_id)
+
+
+@app.get("/group-tags", response_class=HTMLResponse)
+def group_tags_page(request: Request, cycle_id: Optional[int] = Query(default=None)):
+    return render_entity_page(request, "group-tags", False, cycle_id)
+
+
+@app.get("/group-tags/new", response_class=HTMLResponse)
+def group_tags_new_page(request: Request, cycle_id: Optional[int] = Query(default=None)):
+    return render_entity_page(request, "group-tags", True, cycle_id)
+
+
+@app.get("/upload", response_class=HTMLResponse)
+def upload_page(request: Request, cycle_id: Optional[int] = Query(default=None)):
+    return render_entity_page(request, "upload", False, cycle_id)
 
 
 def _selected_timetable(db: Session, timetable_id: Optional[int], cycle_id: Optional[int] = None) -> Optional[Timetable]:
@@ -2030,6 +2120,7 @@ def export_file(
 
     cycle_name = sanitize_filename(str(getattr(cycle, 'name', f"cycle{timetable.cycle_id}")))
     cycle_year = str(getattr(cycle, 'year_starting', timetable.cycle_id))
+    cycle_label = cycle_name if cycle_year in cycle_name else f"{cycle_name}_{cycle_year}"
     timetable_id = getattr(timetable, 'id', None)
     if timetable_id is None:
         raise HTTPException(status_code=500, detail="Timetable id is unavailable.")
@@ -2051,7 +2142,7 @@ def export_file(
     else:
         program_suffix = "_all-programs"
     timestamp = time.strftime('%Y%m%d-%H%M%S')
-    filename = f"timetable_{cycle_name}_{cycle_year}_timetable{timetable_id}{program_suffix}_{timestamp}.xlsx"
+    filename = f"timetable_{cycle_label}_{timetable_id}{program_suffix}_{timestamp}.xlsx"
     out_path: Path = EXPORT_DIR / filename
     selected_program_ids = (
         list(program_ids)

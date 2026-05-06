@@ -1,0 +1,16 @@
+{% extends "entity_base.html" %}
+
+{% block title %}Manage Group Tags{% endblock %}
+{% block subtitle %}Manage group tags.{% endblock %}
+
+{% block content %}
+<main>
+  <section class="card dashboard-card full-width" id="groupTagsSection">
+    <div class="subheader-row">
+      <h2>Group tags</h2>
+      <button class="ghost-btn" data-open-entity="group_tag">Add</button>
+    </div>
+    <div id="groupTagList" class="entity-list"></div>
+  </section>
+</main>
+{% endblock %}

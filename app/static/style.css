@@ -46,6 +46,32 @@ body {
   max-width: 900px;
 }
 
+.page-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 20px 0 0;
+}
+
+.page-nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: white;
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.page-nav-link.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
 .card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -135,6 +161,89 @@ body {
   padding: 10px 12px;
   margin-bottom: 16px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+body[data-active-section] .selection-bar,
+body[data-active-section] .board-panel,
+body[data-active-section] #requirementsSection {
+  display: none !important;
+}
+
+body[data-active-section] .dashboard-grid > section {
+  display: none;
+}
+
+body[data-active-section="teachers"] #teachersSection,
+body[data-active-section="rooms"] #roomsSection,
+body[data-active-section="courses"] #coursesSection,
+body[data-active-section="study-programs"] #programsSection,
+body[data-active-section="course-tags"] #courseTagsSection,
+body[data-active-section="group-tags"] #groupTagsSection,
+body[data-active-section="upload"] #uploadSection {
+  display: block !important;
+}
+
+body[data-active-section] .layout {
+  display: block;
+}
+
+body[data-active-section] .page {
+  width: 100vw !important;
+  max-width: none !important;
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+  margin: 0 !important;
+}
+
+body[data-active-section] .topbar,
+body[data-active-section] .layout,
+body[data-active-section] .dashboard-grid,
+body[data-active-section] .dashboard-grid > section,
+body[data-active-section] .page-nav {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+body[data-active-section] .layout {
+  display: block !important;
+}
+
+body[data-active-section] .dashboard-grid {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 16px !important;
+  justify-content: stretch !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 auto !important;
+}
+
+body[data-active-section] .dashboard-grid > section {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+}
+
+body[data-active-section] .full-width {
+  max-width: none !important;
+  margin: 0 auto !important;
+}
+
+.top-nav a.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.top-nav a.tiny {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.nav-divider {
+  flex: 1 1 100%;
+  height: 0;
 }
 
 .toolbar-menu {
@@ -386,6 +495,15 @@ body {
   overflow: auto;
 }
 
+body[data-active-section] .entity-list,
+body[data-active-section] .teacher-load-list {
+  max-height: 720px !important;
+}
+
+body[data-active-section] .dashboard-card {
+  min-height: 600px !important;
+}
+
 .entity-row,
 .teacher-load-row {
   display: flex;
@@ -480,6 +598,22 @@ body {
 
 #timetableBoard thead tr:first-child th {
   border-top: 1px solid var(--border);
+}
+
+.day-divider-row td {
+  height: 8px;
+  padding: 0;
+  background: rgba(36, 87, 197, 0.18);
+  border: none;
+}
+
+.day-divider-row td::before {
+  content: '';
+  display: block;
+  height: 4px;
+  margin: 2px 0 0;
+  width: 100%;
+  background: rgba(36, 87, 197, 0.5);
 }
 
 .time-header,
@@ -612,12 +746,14 @@ body {
   display: grid;
   gap: 16px;
   padding: 16px;
+  align-items: stretch;
+  justify-items: stretch;
 }
 
 .strip {
   border-radius: 12px;
   min-height: 180px;
-  max-height: 280px;
+  max-height: 180px;
   padding: 18px;
   font-size: 14px;
   line-height: 1.45;
@@ -626,14 +762,30 @@ body {
   flex-direction: column;
   justify-content: space-between;
   gap: 8px;
+  width: 100%;
   height: 100%;
+  box-sizing: border-box;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
 
 .strip.empty {
   background: #f1f3f8;
   padding: 0;
-  min-height: 12px;
+  min-height: 180px;
+  height: 100%;
+}
+
+.strip.empty.plus {
+  background: #eef3ff;
+  align-items: center;
+  justify-content: center;
+  color: #0f172a;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.plus-icon {
+  pointer-events: none;
 }
 
 .strip-top {

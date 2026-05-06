@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Timetable Builder - Manage {{ active_section | replace('-', ' ') | title }}</title>
+  <link rel="icon" type="image/png" href="/static/favicon.png" />
+  <link rel="stylesheet" href="/static/style.css?v={{ version }}" />
+</head>
+<body data-active-section="{{ active_section }}">
+  <div class="page">
+    <div id="js-fallback-message" style="display:none;color:red;font-weight:bold;">JavaScript did not execute. Please check your browser console for errors.</div>
+    <header class="topbar">
+      <div>
+        <h1>Timetable Builder</h1>
+        <p class="muted">Manage {{ active_section | replace('-', ' ') }}.</p>
+      </div>
+      <div class="header-actions">
+        <a class="ghost-btn" href="{{ '/cycle/' ~ selected_cycle_id if selected_cycle_id else '/' }}">Back to timetable</a>
+        <div class="toolbar-menu">
+          <button type="button" class="ghost-btn small" id="manageMenuBtn">Manage</button>
+          <div class="menu-dropdown hidden" id="manageMenuDropdown">
+            <a class="menu-item" href="/group-tags{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Group tags</a>
+            <a class="menu-item" href="/course-tags{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Course tags</a>
+            <a class="menu-item" href="/study-programs{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Study programs</a>
+            <a class="menu-item" href="/rooms{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Rooms</a>
+            <a class="menu-item" href="/teachers{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Teachers</a>
+            <a class="menu-item" href="/courses{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Courses</a>
+            <a class="menu-item" href="/upload{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Upload</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <nav class="page-nav" aria-label="Page navigation">
+      <a class="page-nav-link{% if active_section | default('') == '' %} active{% endif %}" href="{{ '/cycle/' ~ selected_cycle_id if selected_cycle_id else '/' }}">Timetable</a>
+      <a class="page-nav-link{% if active_section == 'teachers' %} active{% endif %}" href="/teachers{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Teachers</a>
+      <a class="page-nav-link{% if active_section == 'rooms' %} active{% endif %}" href="/rooms{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Rooms</a>
+      <a class="page-nav-link{% if active_section == 'courses' %} active{% endif %}" href="/courses{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Courses</a>
+      <a class="page-nav-link{% if active_section == 'study-programs' %} active{% endif %}" href="/study-programs{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Study programs</a>
+      <a class="page-nav-link{% if active_section == 'course-tags' %} active{% endif %}" href="/course-tags{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Course tags</a>
+      <a class="page-nav-link{% if active_section == 'group-tags' %} active{% endif %}" href="/group-tags{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Group tags</a>
+      <a class="page-nav-link{% if active_section == 'upload' %} active{% endif %}" href="/upload{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Upload</a>
+    </nav>
+
+    <main class="layout">
+      <section class="dashboard-grid full-width">
+        <section class="card dashboard-card" id="teachersSection">
+          <div class="subheader-row">
+            <h2>Teachers</h2>
+            <button class="ghost-btn" data-open-entity="teacher">Add</button>
+          </div>
+          <div id="teacherList" class="entity-list"></div>
+        </section>
+
+        <section class="card dashboard-card" id="roomsSection">
+          <div class="subheader-row">
+            <h2>Rooms</h2>
+            <button class="ghost-btn" data-open-entity="room">Add</button>
+          </div>
+          <div id="roomList" class="entity-list"></div>
+        </section>
+
+        <section class="card dashboard-card" id="coursesSection">
+          <div class="subheader-row">
+            <h2>Courses</h2>
+            <button class="ghost-btn" data-open-entity="course">Add</button>
+          </div>
+          <div id="courseList" class="entity-list"></div>
+        </section>
+
+        <section class="card dashboard-card" id="programsSection">
+          <div class="subheader-row">
+            <h2>Study programs</h2>
+            <button class="ghost-btn" data-open-entity="program">Add</button>
+          </div>
+          <div id="programList" class="entity-list"></div>
+        </section>
+
+        <section class="card dashboard-card" id="groupTagsSection">
+          <div class="subheader-row">
+            <h2>Group tags</h2>
+            <button class="ghost-btn" data-open-entity="group_tag">Add</button>
+          </div>
+          <div id="groupTagList" class="entity-list"></div>
+        </section>
+
+        <section class="card dashboard-card" id="courseTagsSection">
+          <div class="subheader-row">
+            <h2>Course tags</h2>
+            <button class="ghost-btn" data-open-entity="course_tag">Add</button>
+          </div>
+          <div id="courseTagList" class="entity-list"></div>
+        </section>
+
+        <section class="card dashboard-card upload-card" id="uploadSection">
+          <div class="subheader-row">
+            <h2>Upload</h2>
+          </div>
+          <div class="upload-grid">
+            <div class="upload-row">
+              <strong>Teachers</strong>
+              <div class="upload-actions">
+                <button class="ghost-btn small" id="downloadTeacherTemplateBtn">Download</button>
+                <button class="ghost-btn small" id="uploadTeacherTemplateBtn">Upload</button>
+              </div>
+            </div>
+            <div class="upload-row">
+              <strong>Study programs</strong>
+              <div class="upload-actions">
+                <button class="ghost-btn small" id="downloadProgramTemplateBtn">Download</button>
+                <button class="ghost-btn small" id="uploadProgramTemplateBtn">Upload</button>
+              </div>
+            </div>
+            <div class="upload-row">
+              <strong>Course tags</strong>
+              <div class="upload-actions">
+                <button class="ghost-btn small" id="downloadCourseTagTemplateBtn">Download</button>
+                <button class="ghost-btn small" id="uploadCourseTagTemplateBtn">Upload</button>
+              </div>
+            </div>
+            <div class="upload-row">
+              <strong>Rooms</strong>
+              <div class="upload-actions">
+                <button class="ghost-btn small" id="downloadRoomTemplateBtn">Download</button>
+                <button class="ghost-btn small" id="uploadRoomTemplateBtn">Upload</button>
+              </div>
+            </div>
+            <div class="upload-row">
+              <strong>Courses</strong>
+              <div class="upload-actions">
+                <button class="ghost-btn small" id="downloadCourseTemplateBtn">Download</button>
+                <button class="ghost-btn small" id="uploadCourseTemplateBtn">Upload</button>
+              </div>
+            </div>
+            <div class="upload-row">
+              <strong>Group tags</strong>
+              <div class="upload-actions">
+                <button class="ghost-btn small" id="downloadGroupTagTemplateBtn">Download</button>
+                <button class="ghost-btn small" id="uploadGroupTagTemplateBtn">Upload</button>
+              </div>
+            </div>
+            <div class="upload-row">
+              <strong>Groups</strong>
+              <div class="upload-actions">
+                <button class="ghost-btn small" id="downloadGroupTemplateBtn">Download</button>
+                <button class="ghost-btn small" id="uploadGroupTemplateBtn">Upload</button>
+              </div>
+            </div>
+            <div class="upload-row">
+              <strong>Requirements</strong>
+              <div class="upload-actions">
+                <button class="ghost-btn small" id="downloadRequirementTemplateBtn">Download</button>
+                <button class="ghost-btn small" id="uploadRequirementTemplateBtn">Upload</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <input type="file" id="entityUploadInput" accept=".xlsx" class="hidden" />
+    <script type="application/json" id="initial-page-data">
+      {{ {
+        "activeSection": active_section | default(''),
+        "openNew": open_new | default(false),
+        "selectedCycleId": selected_cycle_id if selected_cycle_id is defined and selected_cycle_id is not none else none
+      } | tojson }}
+    </script>
+    <script src="/static/script.js?v={{ version }}"></script>
+    <script>
+      document.getElementById('js-fallback-message').style.display = 'none';
+    </script>
+  </div>
+</body>
+</html>

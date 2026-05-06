@@ -1,0 +1,16 @@
+{% extends "entity_base.html" %}
+
+{% block title %}Manage Course Tags{% endblock %}
+{% block subtitle %}Manage course tags.{% endblock %}
+
+{% block content %}
+<main>
+  <section class="card dashboard-card full-width" id="courseTagsSection">
+    <div class="subheader-row">
+      <h2>Course tags</h2>
+      <button class="ghost-btn" data-open-entity="course_tag">Add</button>
+    </div>
+    <div id="courseTagList" class="entity-list"></div>
+  </section>
+</main>
+{% endblock %}

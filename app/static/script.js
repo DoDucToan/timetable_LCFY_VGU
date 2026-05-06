@@ -313,6 +313,8 @@ window.addEventListener('DOMContentLoaded', () => {
   if (pathMatch) {
     state.selectedCycleId = Number(pathMatch[1]);
     refreshData(null, state.selectedCycleId);
+  } else if (state.selectedCycleId != null) {
+    refreshData(null, state.selectedCycleId);
   } else {
     refreshData();
   }
@@ -671,6 +673,48 @@ function bindGlobalActions() {
     });
   });
 
+  let initialPage = {};
+  const initialPageData = document.getElementById('initial-page-data');
+  if (initialPageData && initialPageData.textContent) {
+    try {
+      initialPage = JSON.parse(initialPageData.textContent);
+    } catch {
+      initialPage = {};
+    }
+  }
+  if (typeof initialPage.selectedCycleId !== 'undefined' && initialPage.selectedCycleId !== null) {
+    state.selectedCycleId = initialPage.selectedCycleId;
+  }
+  if (initialPage.activeSection) {
+    const sectionMap = {
+      'teachers': '#teachersSection',
+      'rooms': '#roomsSection',
+      'courses': '#coursesSection',
+      'study-programs': '#programsSection',
+      'course-tags': '#courseTagsSection',
+      'group-tags': '#groupTagsSection',
+      'upload': '#uploadSection',
+    };
+    const target = document.querySelector(sectionMap[initialPage.activeSection]);
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    if (initialPage.openNew) {
+      const entityTypeMap = {
+        'teachers': 'teacher',
+        'rooms': 'room',
+        'courses': 'course',
+        'study-programs': 'program',
+        'course-tags': 'course_tag',
+        'group-tags': 'group_tag',
+      };
+      const entityType = entityTypeMap[initialPage.activeSection];
+      if (entityType) {
+        openEntityModal(entityType);
+      }
+    }
+  }
+
   const manageMenuBtn = document.getElementById('manageMenuBtn');
   const manageMenuDropdown = document.getElementById('manageMenuDropdown');
   if (manageMenuBtn && manageMenuDropdown) {
@@ -808,18 +852,19 @@ function showError(msg) {
 function renderContextSelectors() {
   // Debug log
   console.log('renderContextSelectors: cycles', state.data.cycles);
-  fillSelect(
-    els.cycleSelect,
-    (state.data.cycles || []).map(item => ({ value: item.id, label: `${item.name} (${item.year_starting})` })),
-    true
-  );
-  let selectedCycleId = state.selectedCycleId ?? null;
-  if (selectedCycleId == null && state.data.cycles?.length) {
-    selectedCycleId = state.data.cycles[0].id;
+  const selectedCycleId = state.selectedCycleId ?? (state.data.cycles?.length ? state.data.cycles[0].id : null);
+
+  if (els.cycleSelect) {
+    fillSelect(
+      els.cycleSelect,
+      (state.data.cycles || []).map(item => ({ value: item.id, label: `${item.name} (${item.year_starting})` })),
+      true
+    );
+    if (selectedCycleId) {
+      els.cycleSelect.value = String(selectedCycleId);
+    }
   }
-  if (selectedCycleId) {
-    els.cycleSelect.value = String(selectedCycleId);
-  }
+
   // Debug log
   console.log('renderContextSelectors: timetables', state.data.timetables);
   const timetableOptions = (state.data.timetables || [])
@@ -828,19 +873,32 @@ function renderContextSelectors() {
       value: item.id,
       label: `Timetable #${item.id}`,
     }));
-  fillSelect(els.timetableSelect, timetableOptions, true);
-  if (state.timetableId && timetableOptions.some(item => Number(item.value) === Number(state.timetableId))) {
-    els.timetableSelect.value = String(state.timetableId);
-  } else if (timetableOptions.length) {
-    els.timetableSelect.value = String(timetableOptions[0].value);
+
+  if (els.timetableSelect) {
+    fillSelect(els.timetableSelect, timetableOptions, true);
+    if (state.timetableId && timetableOptions.some(item => Number(item.value) === Number(state.timetableId))) {
+      els.timetableSelect.value = String(state.timetableId);
+    } else if (timetableOptions.length) {
+      els.timetableSelect.value = String(timetableOptions[0].value);
+      state.timetableId = Number(timetableOptions[0].value);
+    } else {
+      state.timetableId = null;
+    }
+  } else if (!state.timetableId && timetableOptions.length) {
     state.timetableId = Number(timetableOptions[0].value);
-  } else {
-    state.timetableId = null;
   }
+
   // Debug log
-  console.log('renderContextSelectors: cycleSelect.innerHTML', els.cycleSelect.innerHTML);
-  console.log('renderContextSelectors: timetableSelect.innerHTML', els.timetableSelect.innerHTML);
-  els.exportBtn.href = state.timetableId ? `/export.xlsx?timetable_id=${state.timetableId}` : '/export.xlsx';
+  if (els.cycleSelect) {
+    console.log('renderContextSelectors: cycleSelect.innerHTML', els.cycleSelect.innerHTML);
+  }
+  if (els.timetableSelect) {
+    console.log('renderContextSelectors: timetableSelect.innerHTML', els.timetableSelect.innerHTML);
+  }
+
+  if (els.exportBtn) {
+    els.exportBtn.href = state.timetableId ? `/export.xlsx?timetable_id=${state.timetableId}` : '/export.xlsx';
+  }
   if (els.deleteSelectedGroupsBtn) {
     els.deleteSelectedGroupsBtn.disabled = state.selectedGroupIds.size === 0;
   }
@@ -894,6 +952,7 @@ function renderEntityLists() {
 
 function renderEntityList(containerId, items, type, labelFn, metaFn = null) {
   const root = els[containerId];
+  if (!root) return;
   root.innerHTML = '';
   items.forEach(item => {
     const row = document.createElement('div');
@@ -921,36 +980,51 @@ function renderEntityList(containerId, items, type, labelFn, metaFn = null) {
 }
 
 function populateStaticInputs() {
-  fillSelect(
-    els.groupTagSelect,
-    (state.data.group_tags || []).map(item => ({ value: item.id, label: `${item.code} — ${item.name}` })),
-    true
-  );
+  if (els.groupTagSelect) {
+    fillSelect(
+      els.groupTagSelect,
+      (state.data.group_tags || []).map(item => ({ value: item.id, label: `${item.code} — ${item.name}` })),
+      true
+    );
+  }
 
-  fillSelect(
-    els.entityCycleSelect,
-    (state.data.cycles || []).map(item => ({ value: item.id, label: `${item.name} (${item.year_starting})` })),
-    true
-  );
+  if (els.entityCycleSelect) {
+    fillSelect(
+      els.entityCycleSelect,
+      (state.data.cycles || []).map(item => ({ value: item.id, label: `${item.name} (${item.year_starting})` })),
+      true
+    );
+  }
 
-  fillSelect(
-    els.entityCourseTagSelect,
-    (state.data.course_tags || []).map(item => ({ value: item.id, label: item.name })),
-    true
-  );
+  if (els.entityCourseTagSelect) {
+    fillSelect(
+      els.entityCourseTagSelect,
+      (state.data.course_tags || []).map(item => ({ value: item.id, label: item.name })),
+      true
+    );
+  }
 
-  renderProgramCheckboxes(els.groupProgramOptions, state.data.programs || [], 'groupPrograms');
-  renderProgramCheckboxes(els.entityCoursePrograms, state.data.programs || [], 'entityPrograms');
-  renderProgramCheckboxes(els.entityTeacherTags, state.data.course_tags || [], 'entityTeacherTags', 'name');
-  fillSelect(
-    els.roomSelect,
-    [{ value: '', label: 'No room' }, ...(state.data.rooms || []).map(r => ({ value: r.id, label: `${r.code} (${r.capacity})` }))],
-    false
-  );
+  if (els.groupProgramOptions) {
+    renderProgramCheckboxes(els.groupProgramOptions, state.data.programs || [], 'groupPrograms');
+  }
+  if (els.entityCoursePrograms) {
+    renderProgramCheckboxes(els.entityCoursePrograms, state.data.programs || [], 'entityPrograms');
+  }
+  if (els.entityTeacherTags) {
+    renderProgramCheckboxes(els.entityTeacherTags, state.data.course_tags || [], 'entityTeacherTags', 'name');
+  }
+  if (els.roomSelect) {
+    fillSelect(
+      els.roomSelect,
+      [{ value: '', label: 'No room' }, ...(state.data.rooms || []).map(r => ({ value: r.id, label: `${r.code} (${r.capacity})` }))],
+      false
+    );
+  }
   syncClassFormVisibility();
 }
 
 function renderTeacherLoad() {
+  if (!els.teacherLoadList) return;
   els.teacherLoadList.innerHTML = '';
   (state.data.teacher_load || []).forEach(item => {
     const div = document.createElement('div');
@@ -984,6 +1058,8 @@ function setSelectValues(select, values) {
 }
 
 function renderBoard() {
+  if (!els.timetableBoard) return;
+
   const groups = state.data.groups || [];
   const timeslots = [...(state.data.timeslots || [])].sort((a, b) => a.sort_order - b.sort_order);
   const cells = state.data.cells || {};
@@ -1137,6 +1213,15 @@ function renderBoard() {
   days.forEach(day => {
     const daySlots = timeslots.filter(slot => slot.weekday === day);
     daySlots.forEach((slot, index) => {
+      if (index === 0 && day !== 'MONDAY') {
+        const divider = document.createElement('tr');
+        divider.className = 'day-divider-row';
+        const dividerCell = document.createElement('td');
+        dividerCell.colSpan = groups.length + 2;
+        divider.appendChild(dividerCell);
+        tbody.appendChild(divider);
+      }
+
       const tr = document.createElement('tr');
       if (index === 0) {
         const dayCell = document.createElement('td');
@@ -1152,7 +1237,7 @@ function renderBoard() {
       tr.appendChild(timeTd);
 
       const rowKeys = slotRowMap[String(slot.id)]?.keys || [];
-      const rows = Math.max(6, rowKeys.length);
+      const rows = Math.max(1, rowKeys.length + 1);
 
       groups.forEach(group => {
         const td = document.createElement('td');
@@ -1167,16 +1252,22 @@ function renderBoard() {
         const stack = document.createElement('div');
         stack.className = 'strip-stack';
         stack.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
-        stack.style.height = `${rows * 180}px`;
-        stack.style.minHeight = `${rows * 180}px`;
+        const totalPadding = 32; // 16px top + 16px bottom
+        const totalGaps = 16 * Math.max(0, rows - 1);
+        stack.style.height = `${rows * 180 + totalPadding + totalGaps}px`;
+        stack.style.minHeight = stack.style.height;
         const itemsByKey = slotRowMap[String(slot.id)]?.groupItemsByKey[String(group.id)] || {};
         for (let i = 0; i < rows; i += 1) {
           const strip = document.createElement('div');
-          strip.className = 'strip empty';
           const item = itemsByKey[rowKeys[i]];
           if (item) {
             strip.className = `strip filled ${item.color_key} ${item.kind}`;
             strip.innerHTML = renderStrip(item);
+          } else if (i === rows - 1) {
+            strip.className = 'strip empty plus';
+            strip.innerHTML = '<span class="plus-icon">+</span>';
+          } else {
+            strip.className = 'strip empty';
           }
           stack.appendChild(strip);
         }
@@ -1554,11 +1645,15 @@ async function submitEntityForm(event) {
   state.data = data;
   state.timetableId = state.data.selected_timetable_id || state.timetableId;
   closeModal('entityModal');
-  renderContextSelectors();
-  renderEntityLists();
-  renderBoard();
-  renderTeacherLoad();
-  populateStaticInputs();
+  const isEntityPage = window.location.pathname !== '/' && !window.location.pathname.startsWith('/cycle/');
+  if (isEntityPage) {
+    window.location.reload();
+    return;
+  }
+
+  const query = new URLSearchParams(window.location.search);
+  const cycleId = state.selectedCycleId || Number(query.get('cycle_id')) || null;
+  await refreshData(state.timetableId, cycleId);
 }
 
 function buildEntityPayload(type) {
@@ -1633,11 +1728,14 @@ async function deleteEntity(type, id, confirmText) {
   }
   state.data = data;
   state.timetableId = state.data.selected_timetable_id || state.timetableId;
-  renderContextSelectors();
-  renderEntityLists();
-  renderBoard();
-  renderTeacherLoad();
-  populateStaticInputs();
+  const isEntityPage = window.location.pathname !== '/' && !window.location.pathname.startsWith('/cycle/');
+  if (isEntityPage) {
+    window.location.reload();
+    return;
+  }
+  const query = new URLSearchParams(window.location.search);
+  const cycleId = state.selectedCycleId || Number(query.get('cycle_id')) || null;
+  await refreshData(state.timetableId, cycleId);
 }
 
 function addRequirementRow(courseId = null, sessionsRequired = 1) {
@@ -1880,7 +1978,9 @@ function intersectProgramsForSelectedGroups(selected = state.selected) {
 }
 
 function syncClassFormVisibility() {
-  const mode = els.classForm.querySelector('input[name="mode"]:checked').value;
+  if (!els.classForm) return;
+  const mode = els.classForm.querySelector('input[name="mode"]:checked')?.value;
+  if (!mode) return;
   const effectiveMode = mode;
   let courses = state.data.courses || [];
   let filteredByProgram = false;
@@ -2423,7 +2523,11 @@ async function safeJson(res) {
   try {
     return await res.json();
   } catch {
-    return {};
+    const raw = await res.text();
+    if (raw) {
+      return { detail: raw.trim() };
+    }
+    return { detail: res.statusText || `HTTP ${res.status}` };
   }
 }
 

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Timetable Builder - {% block title %}Manage{% endblock %}</title>
+  <link rel="icon" type="image/png" href="/static/favicon.png" />
+  <link rel="stylesheet" href="/static/style.css?v={{ version }}" />
+</head>
+<body data-active-section="{{ active_section }}" data-template="{{ template_name }}">
+  <noscript><div style="color: red; font-weight: bold;">JavaScript is disabled in your browser. Please enable JavaScript to use this app.</div></noscript>
+  <div class="page">
+    <div id="js-fallback-message" style="display:none;color:red;font-weight:bold;">JavaScript did not execute. Please check your browser console for errors.</div>
+    <header class="topbar">
+      <div>
+        <h1>Timetable Builder</h1>
+        <p class="muted">{% block subtitle %}Manage the selected entity.{% endblock %}</p>
+      </div>
+      <div class="header-actions">
+        <a class="ghost-btn" href="{{ '/cycle/' ~ selected_cycle_id if selected_cycle_id else '/' }}">Back to timetable</a>
+        <div class="toolbar-menu">
+          <button type="button" class="ghost-btn small" id="manageMenuBtn">Manage</button>
+          <div class="menu-dropdown hidden" id="manageMenuDropdown">
+            <a class="menu-item" href="/group-tags{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Group tags</a>
+            <a class="menu-item" href="/course-tags{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Course tags</a>
+            <a class="menu-item" href="/study-programs{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Study programs</a>
+            <a class="menu-item" href="/rooms{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Rooms</a>
+            <a class="menu-item" href="/teachers{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Teachers</a>
+            <a class="menu-item" href="/courses{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Courses</a>
+            <a class="menu-item" href="/upload{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Upload</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <nav class="page-nav" aria-label="Page navigation">
+      <a class="page-nav-link{% if active_section | default('') == '' %} active{% endif %}" href="{{ '/cycle/' ~ selected_cycle_id if selected_cycle_id else '/' }}">Timetable</a>
+      <a class="page-nav-link{% if active_section == 'teachers' %} active{% endif %}" href="/teachers{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Teachers</a>
+      <a class="page-nav-link{% if active_section == 'rooms' %} active{% endif %}" href="/rooms{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Rooms</a>
+      <a class="page-nav-link{% if active_section == 'courses' %} active{% endif %}" href="/courses{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Courses</a>
+      <a class="page-nav-link{% if active_section == 'study-programs' %} active{% endif %}" href="/study-programs{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Study programs</a>
+      <a class="page-nav-link{% if active_section == 'course-tags' %} active{% endif %}" href="/course-tags{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Course tags</a>
+      <a class="page-nav-link{% if active_section == 'group-tags' %} active{% endif %}" href="/group-tags{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Group tags</a>
+      <a class="page-nav-link{% if active_section == 'upload' %} active{% endif %}" href="/upload{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Upload</a>
+    </nav>
+
+    <main class="layout">
+      {% block content %}{% endblock %}
+    </main>
+
+    <div class="modal hidden" id="entityModal">
+      <div class="modal-card wide">
+        <div class="modal-header">
+          <h2 id="entityModalTitle">Manage item</h2>
+          <button class="icon-btn" data-close="entityModal">×</button>
+        </div>
+        <form id="entityForm" class="form-grid">
+          <fieldset id="entityGroupsWrap" class="full-span hidden">
+            <legend>Groups</legend>
+            <button type="button" id="selectAllEntityGroupsBtn" class="ghost-btn small">All groups</button>
+            <div id="entityGroups" class="checkbox-grid"></div>
+          </fieldset>
+          <input type="hidden" name="entity_type" />
+          <input type="hidden" name="entity_id" />
+          <label id="entityNameWrap" class="full-span">
+            <span>Name</span>
+            <input name="name" />
+          </label>
+          <label id="entityCodeWrap">
+            <span>Code</span>
+            <input name="code" />
+          </label>
+          <label id="entityYearWrap" class="hidden">
+            <span>Year starting</span>
+            <input type="number" name="year_starting" />
+          </label>
+          <label id="entityCapacityWrap" class="hidden">
+            <span>Capacity</span>
+            <input type="number" name="capacity" />
+          </label>
+          <label id="entityCycleWrap" class="hidden">
+            <span>Cycle</span>
+            <select name="cycle_id" id="entityCycleSelect"></select>
+          </label>
+          <label id="entityCourseTagWrap" class="hidden">
+            <span>Course tag</span>
+            <select name="course_tag_id" id="entityCourseTagSelect"></select>
+          </label>
+          <fieldset id="entityTeacherTagsWrap" class="full-span hidden">
+            <legend>Teacher can teach course tags</legend>
+            <div id="entityTeacherTags" class="checkbox-grid"></div>
+          </fieldset>
+          <fieldset id="entityCourseProgramsWrap" class="full-span hidden">
+            <legend>Study programs for this course</legend>
+            <div id="entityCoursePrograms" class="checkbox-grid"></div>
+          </fieldset>
+          <div id="entityCourseFlagsWrap" class="full-span hidden plain-box">
+            <label class="inline-checkbox"><input type="checkbox" name="require_all" /> <span>Require all students in group</span></label>
+            <label class="inline-checkbox"><input type="checkbox" name="elective" /> <span>Elective</span></label>
+          </div>
+          <div id="entityRequirementsWrap" class="full-span hidden">
+            <div class="subheader-row">
+              <h3>Required courses for this group tag</h3>
+              <button type="button" class="ghost-btn" id="addEntityRequirementBtn">+ Add requirement</button>
+            </div>
+            <div id="entityRequirementRows" class="requirement-list"></div>
+          </div>
+          <div id="entityErrors" class="error-list full-span"></div>
+          <div class="full-span form-actions between-actions">
+            <button type="button" id="entityDeleteBtn" class="danger-btn hidden">Delete</button>
+            <div class="right-actions">
+              <button type="button" class="ghost-btn" data-close="entityModal">Cancel</button>
+              <button type="submit" class="primary-btn">Save</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal hidden" id="addRequirementModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2 id="addRequirementModalTitle">Add Requirement</h2>
+          <button class="icon-btn" data-close="addRequirementModal">×</button>
+        </div>
+        <form id="addRequirementForm" class="form-grid">
+          <label id="requirementTagOrProgramLabel" class="full-span">
+            <span id="requirementTagOrProgramText">Group Tag(s)</span>
+            <select id="requirementTagOrProgramSelect" multiple size="6" required></select>
+          </label>
+          <label class="full-span">
+            <span>Course</span>
+            <select id="requirementCourseSelect" required></select>
+          </label>
+          <label class="full-span" id="requirementSessionsRow">
+            <span>Sessions</span>
+            <input type="number" id="requirementSessionsInput" min="1" value="1" required />
+          </label>
+          <div class="full-span form-actions between-actions">
+            <button type="button" class="ghost-btn" data-close="addRequirementModal">Cancel</button>
+            <button type="submit" class="primary-btn">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal hidden" id="groupOnlyRequirementModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2 id="groupOnlyRequirementModalTitle">Add group-only requirement</h2>
+          <button class="icon-btn" data-close="groupOnlyRequirementModal">×</button>
+        </div>
+        <form id="groupOnlyRequirementForm" class="form-grid">
+          <label class="full-span">
+            <span>Group(s)</span>
+            <select id="groupOnlyRequirementGroupSelect" multiple size="6" required></select>
+          </label>
+          <label class="full-span">
+            <span>Course</span>
+            <select id="groupOnlyRequirementCourseSelect" required></select>
+          </label>
+          <label class="full-span">
+            <span>Sessions</span>
+            <input type="number" id="groupOnlyRequirementSessionsInput" min="1" value="1" required />
+          </label>
+          <div class="full-span form-actions between-actions">
+            <button type="button" class="ghost-btn" data-close="groupOnlyRequirementModal">Cancel</button>
+            <button type="submit" class="primary-btn">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal hidden" id="viewRequirementsModal">
+      <div class="modal-card wide">
+        <div class="modal-header">
+          <h2 id="viewRequirementsModalTitle">Requirements</h2>
+          <button class="icon-btn" data-close="viewRequirementsModal">×</button>
+        </div>
+        <div class="form-grid">
+          <div class="full-span" id="viewRequirementsContent"></div>
+          <div class="full-span form-actions between-actions">
+            <button type="button" class="ghost-btn" data-close="viewRequirementsModal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <template id="requirementRowTemplate">
+      <div class="requirement-row">
+        <input class="requirement-course" list="courseOptions" placeholder="Select or search course" />
+        <datalist id="courseOptions"></datalist>
+        <input type="number" class="requirement-count" min="1" value="1" />
+        <button type="button" class="icon-btn remove-row-btn">×</button>
+      </div>
+    </template>
+
+    <input type="file" id="entityUploadInput" accept=".xlsx" class="hidden" />
+    <script type="application/json" id="initial-page-data">
+      {{ {
+        "activeSection": active_section | default(''),
+        "openNew": open_new | default(false),
+        "selectedCycleId": selected_cycle_id if selected_cycle_id is defined and selected_cycle_id is not none else none,
+      } | tojson }}
+    </script>
+    <script src="/static/script.js?v={{ version }}"></script>
+    <script>
+      document.getElementById('js-fallback-message').style.display = 'none';
+    </script>
+  </div>
+</body>
+</html>

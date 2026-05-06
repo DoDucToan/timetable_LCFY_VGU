@@ -1,0 +1,72 @@
+{% extends "entity_base.html" %}
+
+{% block title %}Manage Upload{% endblock %}
+{% block subtitle %}Manage upload.{% endblock %}
+
+{% block content %}
+<main>
+  <section class="card dashboard-card upload-card full-width" id="uploadSection">
+    <div class="subheader-row">
+      <h2>Upload</h2>
+    </div>
+    <div class="upload-grid">
+      <div class="upload-row">
+        <strong>Teachers</strong>
+        <div class="upload-actions">
+          <button class="ghost-btn small" id="downloadTeacherTemplateBtn">Download</button>
+          <button class="ghost-btn small" id="uploadTeacherTemplateBtn">Upload</button>
+        </div>
+      </div>
+      <div class="upload-row">
+        <strong>Study programs</strong>
+        <div class="upload-actions">
+          <button class="ghost-btn small" id="downloadProgramTemplateBtn">Download</button>
+          <button class="ghost-btn small" id="uploadProgramTemplateBtn">Upload</button>
+        </div>
+      </div>
+      <div class="upload-row">
+        <strong>Course tags</strong>
+        <div class="upload-actions">
+          <button class="ghost-btn small" id="downloadCourseTagTemplateBtn">Download</button>
+          <button class="ghost-btn small" id="uploadCourseTagTemplateBtn">Upload</button>
+        </div>
+      </div>
+      <div class="upload-row">
+        <strong>Rooms</strong>
+        <div class="upload-actions">
+          <button class="ghost-btn small" id="downloadRoomTemplateBtn">Download</button>
+          <button class="ghost-btn small" id="uploadRoomTemplateBtn">Upload</button>
+        </div>
+      </div>
+      <div class="upload-row">
+        <strong>Courses</strong>
+        <div class="upload-actions">
+          <button class="ghost-btn small" id="downloadCourseTemplateBtn">Download</button>
+          <button class="ghost-btn small" id="uploadCourseTemplateBtn">Upload</button>
+        </div>
+      </div>
+      <div class="upload-row">
+        <strong>Group tags</strong>
+        <div class="upload-actions">
+          <button class="ghost-btn small" id="downloadGroupTagTemplateBtn">Download</button>
+          <button class="ghost-btn small" id="uploadGroupTagTemplateBtn">Upload</button>
+        </div>
+      </div>
+      <div class="upload-row">
+        <strong>Groups</strong>
+        <div class="upload-actions">
+          <button class="ghost-btn small" id="downloadGroupTemplateBtn">Download</button>
+          <button class="ghost-btn small" id="uploadGroupTemplateBtn">Upload</button>
+        </div>
+      </div>
+      <div class="upload-row">
+        <strong>Requirements</strong>
+        <div class="upload-actions">
+          <button class="ghost-btn small" id="downloadRequirementTemplateBtn">Download</button>
+          <button class="ghost-btn small" id="uploadRequirementTemplateBtn">Upload</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</section>
+{% endblock %}

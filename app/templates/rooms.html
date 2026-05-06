@@ -1,0 +1,16 @@
+{% extends "entity_base.html" %}
+
+{% block title %}Manage Rooms{% endblock %}
+{% block subtitle %}Manage rooms.{% endblock %}
+
+{% block content %}
+<main>
+  <section class="card dashboard-card full-width" id="roomsSection">
+    <div class="subheader-row">
+      <h2>Rooms</h2>
+      <button class="ghost-btn" data-open-entity="room">Add</button>
+    </div>
+    <div id="roomList" class="entity-list"></div>
+  </section>
+</main>
+{% endblock %}

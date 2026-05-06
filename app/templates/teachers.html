@@ -1,0 +1,16 @@
+{% extends "entity_base.html" %}
+
+{% block title %}Manage Teachers{% endblock %}
+{% block subtitle %}Manage teachers.{% endblock %}
+
+{% block content %}
+<main>
+  <section class="card dashboard-card full-width" id="teachersSection">
+    <div class="subheader-row">
+      <h2>Teachers</h2>
+      <button class="ghost-btn" data-open-entity="teacher">Add</button>
+    </div>
+    <div id="teacherList" class="entity-list"></div>
+  </section>
+</main>
+{% endblock %}

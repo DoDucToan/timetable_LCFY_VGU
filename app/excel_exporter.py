@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 from pathlib import Path
 from typing import Any, Dict, List, Optional, cast
 from sqlalchemy import select
@@ -57,8 +56,8 @@ TAG_FILL_VARIANTS = [
 ]
 
 BLANK_FILL = "D9D9D9"
-REQUIRED_ROW_HEIGHT = 78
-OVERLAY_ROW_HEIGHT = 56
+REQUIRED_ROW_HEIGHT = 117
+OVERLAY_ROW_HEIGHT = 40
 
 
 def _format_item(item: Dict[str, Any]) -> str:
@@ -81,7 +80,44 @@ def _format_item(item: Dict[str, Any]) -> str:
         parts.append(f"Room: {item['room_name']}")
     if item.get("kind") == "required":
         return "\n".join(parts)
-    return "_".join(parts)
+    return " ".join(parts)
+
+
+def _estimate_line_count(text: str, width_cols: int) -> int:
+    # Approximate how many wrapped lines Excel will need for a merged cell width.
+    line_width = max(18, int(24 * width_cols))
+    separators = [" ", "_", "-", "/", ",", "(", ")", "["]
+    words: List[str] = [text]
+    for sep in separators:
+        parts: List[str] = []
+        for word in words:
+            parts.extend(word.split(sep))
+        words = [part for part in parts if part]
+
+    line_count = 0
+    current_len = 0
+    for word in words:
+        word_len = len(word)
+        if current_len == 0:
+            current_len = word_len
+        elif current_len + 1 + word_len <= line_width:
+            current_len += 1 + word_len
+        else:
+            line_count += 1
+            current_len = word_len
+        if word_len >= line_width:
+            line_count += word_len // line_width
+            current_len = word_len % line_width
+            if current_len == 0:
+                current_len = 0
+    if current_len > 0:
+        line_count += 1
+    return max(1, line_count)
+
+
+def _row_height_for_text(text: str, width_cols: int = 1, min_height: int = 24) -> int:
+    line_count = _estimate_line_count(text, width_cols)
+    return max(min_height, line_count * 18 + 6)
 
 
 def _get_fill_color(item: Dict[str, Any]) -> str:
@@ -175,7 +211,7 @@ def _write_overlay_merge(
     cell = _cell(ws, row_idx, start_col, _format_item(item))
     cell.fill = PatternFill("solid", fgColor=_get_fill_color(item))
     cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-    cell.font = Font(bold=True, size=10)
+    cell.font = Font(bold=True, size=15)
     for c in range(start_col, end_col + 1):
         ws.cell(row=row_idx, column=c).border = border
 
@@ -235,7 +271,7 @@ def _write_timetable_sheet(
         title_text += f" - {', '.join(selected_program_codes)}"
     title_cell = _cell(ws, 1, 1, title_text)
     title_cell.fill = title_fill
-    title_cell.font = Font(color="FFFFFF", bold=True, size=14)
+    title_cell.font = Font(color="FFFFFF", bold=True, size=15)
     title_cell.alignment = Alignment(horizontal="center", vertical="center")
 
     ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=total_cols)
@@ -250,7 +286,7 @@ def _write_timetable_sheet(
     ws["B4"] = "Time"
     for cell in [ws["A4"], ws["B4"]]:
         cell.fill = header_fill
-        cell.font = Font(bold=True)
+        cell.font = Font(bold=True, size=15)
         cell.alignment = Alignment(horizontal="center", vertical="center")
         cell.border = border
 
@@ -261,10 +297,11 @@ def _write_timetable_sheet(
             group_label += f" ({program_codes})"
         cell = ws.cell(row=4, column=idx, value=group_label)
         cell.fill = header_fill
-        cell.font = Font(bold=True)
+        cell.font = Font(bold=True, size=15)
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         cell.border = border
         ws.column_dimensions[get_column_letter(idx)].width = float(24)
+    ws.row_dimensions[4].height = 72
 
     row = 5
     weekday_names = {1: "MONDAY", 2: "TUESDAY", 3: "WEDNESDAY", 4: "THURSDAY", 5: "FRIDAY"}
@@ -276,6 +313,22 @@ def _write_timetable_sheet(
         weekday = weekday_names[day_idx]
         day_slots: List[Dict[str, Any]] = sorted(day_to_slots.get(weekday, []), key=lambda item: item["sort_order"])
         day_start_row = row
+
+        if day_slots and day_idx != 1:
+            group_header_row = row
+            for idx, group in enumerate(groups, start=3):
+                program_codes = ", ".join([p["code"] for p in group.get("programs", [])])
+                group_label = group["code"]
+                if program_codes:
+                    group_label += f" ({program_codes})"
+                cell = ws.cell(row=group_header_row, column=idx, value=group_label)
+                cell.fill = header_fill
+                cell.font = Font(bold=True, size=15)
+                cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                cell.border = border
+            ws.cell(row=group_header_row, column=2).border = border
+            ws.row_dimensions[group_header_row].height = 72
+            row += 1
 
         for slot_index, slot in enumerate(day_slots):
             slot_items = cell_map.get(str(slot["id"]), {})
@@ -328,8 +381,6 @@ def _write_timetable_sheet(
             time_cell.border = border
 
             ws.row_dimensions[required_row].height = REQUIRED_ROW_HEIGHT
-            for overlay_row in overlay_rows:
-                ws.row_dimensions[overlay_row].height = OVERLAY_ROW_HEIGHT
 
             col_idx = 3
             while col_idx <= total_cols:
@@ -361,7 +412,7 @@ def _write_timetable_sheet(
                     req_cell.fill = PatternFill("solid", fgColor=FILL_MAP.get(req["color_key"], "D9D2E9"))
                     req_cell.border = border
                     req_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-                    req_cell.font = Font(bold=True, size=10)
+                    req_cell.font = Font(bold=True, size=15)
                     col_idx += 1
             for col_idx2, group in enumerate(groups, start=3):
                 items = slot_items.get(str(group["id"]), [])
@@ -375,12 +426,15 @@ def _write_timetable_sheet(
                     cell = _cell(ws, overlay_row, col_idx2)
                     cell.border = border
                     cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-                    cell.font = Font(bold=True, size=10)
+                    cell.font = Font(bold=True, size=15)
 
             for overlay_idx, overlay_item in enumerate(unique_overlays):
                 overlay_row = required_row + 1 + overlay_idx
                 row_has_overlay = [any(_same_overlay(item, overlay_item) for item in group_items) for group_items in overlay_rows_content]
                 present_cols = [3 + idx for idx, has in enumerate(row_has_overlay) if has]
+                width_cols = max(1, len(present_cols))
+                ws.row_dimensions[overlay_row].height = _row_height_for_text(_format_item(overlay_item), width_cols=width_cols, min_height=24)
+
                 if overlay_item.get("kind") == "program" and len(present_cols) > 1:
                     start_col = min(present_cols)
                     end_col = max(present_cols)
@@ -427,6 +481,15 @@ def _write_timetable_sheet(
                 row += 1
 
         day_end_row = row - 1
+        day_separator_border = Border(
+            left=Side(style="thin", color="000000"),
+            right=Side(style="thin", color="000000"),
+            top=Side(style="thin", color="000000"),
+            bottom=Side(style="medium", color="000000"),
+        )
+        for c in range(1, total_cols + 1):
+            cell = _cell(ws, day_end_row, c)
+            cell.border = day_separator_border
         ws.merge_cells(start_row=day_start_row, start_column=1, end_row=day_end_row, end_column=1)
         dcell = ws.cell(row=day_start_row, column=1, value=weekday)
         dcell.alignment = Alignment(horizontal="center", vertical="center", text_rotation=90)
