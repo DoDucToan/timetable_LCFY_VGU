@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from collections import defaultdict
+import hashlib
+import json
 import time
 from pathlib import Path
 from typing import Any, Iterable, cast, Dict, List, Optional
@@ -1062,6 +1064,22 @@ def api_bootstrap(
     db: Session = Depends(get_db),
 ):
     return JSONResponse(bootstrap_payload(db, timetable_id, cycle_id))
+
+
+@app.get("/api/bootstrap-version")
+def api_bootstrap_version(
+    timetable_id: Optional[int] = Query(default=None),
+    cycle_id: Optional[int] = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    payload = bootstrap_payload(db, timetable_id, cycle_id)
+    version = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+    ).hexdigest()
+    return JSONResponse(
+        {"version": version},
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
 
 
 def _apply_group_payload(group: Group, payload: GroupCreateIn, db: Session) -> None:
