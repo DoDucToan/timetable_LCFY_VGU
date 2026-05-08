@@ -18,36 +18,6 @@
 
 // ...existing code...
 
-// Fetches the latest data and updates the UI
-let lastBootstrapVersion = null;
-
-async function fetchBootstrapVersion(timetableId = null, cycleId = null) {
-  try {
-    const params = new URLSearchParams();
-    if (timetableId != null) params.set('timetable_id', timetableId);
-    if (cycleId != null) params.set('cycle_id', cycleId);
-    const url = `/api/bootstrap-version?${params.toString()}`;
-    const res = await fetch(url, { cache: 'no-cache', headers: { 'Cache-Control': 'no-cache' } });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.version || null;
-  } catch (err) {
-    console.error('Failed to fetch bootstrap version', err);
-    return null;
-  }
-}
-
-async function checkForServerChanges() {
-  const version = await fetchBootstrapVersion(state.timetableId, state.selectedCycleId);
-  if (!version) return;
-  if (lastBootstrapVersion && lastBootstrapVersion !== version) {
-    console.info('Detected server data change, reloading page.');
-    window.location.reload(true);
-    return;
-  }
-  lastBootstrapVersion = version;
-}
-
 async function refreshData(timetableId = null, cycleId = null) {
   try {
     let url = '/api/bootstrap';
@@ -347,9 +317,6 @@ window.addEventListener('DOMContentLoaded', () => {
   } else {
     refreshData();
   }
-
-  checkForServerChanges();
-  setInterval(checkForServerChanges, 10000);
 });
 
 function bindExportWarning() {
@@ -1677,8 +1644,8 @@ async function submitEntityForm(event) {
   state.data = data;
   state.timetableId = state.data.selected_timetable_id || state.timetableId;
   closeModal('entityModal');
-  const isEntityPage = window.location.pathname !== '/' && !window.location.pathname.startsWith('/cycle/');
-  if (isEntityPage) {
+  const reloadEntityTypes = new Set(['room', 'course', 'teacher', 'course_tag', 'group_tag', 'group']);
+  if (reloadEntityTypes.has(type)) {
     window.location.reload();
     return;
   }
@@ -1760,8 +1727,8 @@ async function deleteEntity(type, id, confirmText) {
   }
   state.data = data;
   state.timetableId = state.data.selected_timetable_id || state.timetableId;
-  const isEntityPage = window.location.pathname !== '/' && !window.location.pathname.startsWith('/cycle/');
-  if (isEntityPage) {
+  const reloadEntityTypes = new Set(['room', 'course', 'teacher', 'course_tag', 'group_tag', 'group']);
+  if (reloadEntityTypes.has(type)) {
     window.location.reload();
     return;
   }
@@ -1894,11 +1861,7 @@ async function submitGroupForm(event) {
   state.data = data;
   state.timetableId = state.data.selected_timetable_id || state.timetableId;
   closeModal('groupModal');
-  renderContextSelectors();
-  renderEntityLists();
-  renderBoard();
-  renderTeacherLoad();
-  populateStaticInputs();
+  window.location.reload();
 }
 
 async function deleteCurrentGroup() {
@@ -1920,8 +1883,7 @@ async function deleteGroupById(groupId) {
   }
   state.editingGroupId = null;
   closeModal('groupModal');
-  state.selectedGroupIds.delete(groupId);
-  await refreshData(state.timetableId, state.selectedCycleId);
+  window.location.reload();
 }
 
 async function openClassModal(classId = null) {
