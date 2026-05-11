@@ -131,9 +131,19 @@ def _row_height_for_text(text: str, width_cols: int = 1, min_height: int = 24) -
     return max(min_height, line_count * _LINE_HEIGHT_PTS + 10)  # ← uses constant
 
 
+def _program_fill_color(program_codes: List[str]) -> str:
+    if not program_codes:
+        return PROGRAM_FILL_VARIANTS[0]
+    key = "|".join(sorted(program_codes))
+    return PROGRAM_FILL_VARIANTS[abs(hash(key)) % len(PROGRAM_FILL_VARIANTS)]
+
+
 def _get_fill_color(item: Dict[str, Any]) -> str:
     if item.get("kind") == "program":
-        return item.get("fill_color") or PROGRAM_FILL_VARIANTS[abs(hash(str(item.get("id", "")))) % len(PROGRAM_FILL_VARIANTS)]
+        if item.get("fill_color"):
+            return item["fill_color"]
+        program_codes = item.get("program_codes", [])
+        return _program_fill_color([str(code) for code in program_codes])
 
     if item.get("kind") == "elective":
         return FILL_MAP.get("elective", "C49A00")
@@ -150,19 +160,69 @@ def _assign_program_colors_for_slot(overlays: List[Dict[str, Any]], program_colo
         program_codes = sorted(set(item.get("program_codes", [])))
         if not program_codes:
             continue
-        for program_code in program_codes:
-            if program_code not in program_color_map:
-                index = abs(hash(program_code)) % len(PROGRAM_FILL_VARIANTS)
-                for attempt in range(len(PROGRAM_FILL_VARIANTS)):
-                    candidate = PROGRAM_FILL_VARIANTS[(index + attempt) % len(PROGRAM_FILL_VARIANTS)]
-                    if candidate not in used:
-                        program_color_map[program_code] = candidate
-                        used.add(candidate)
-                        break
-                else:
-                    program_color_map[program_code] = PROGRAM_FILL_VARIANTS[index]
-                    used.add(PROGRAM_FILL_VARIANTS[index])
-        item["fill_color"] = program_color_map[program_codes[0]]
+        program_key = ",".join(program_codes)
+        if program_key not in program_color_map:
+            index = abs(hash(program_key)) % len(PROGRAM_FILL_VARIANTS)
+            for attempt in range(len(PROGRAM_FILL_VARIANTS)):
+                candidate = PROGRAM_FILL_VARIANTS[(index + attempt) % len(PROGRAM_FILL_VARIANTS)]
+                if candidate not in used:
+                    program_color_map[program_key] = candidate
+                    used.add(candidate)
+                    break
+            else:
+                program_color_map[program_key] = PROGRAM_FILL_VARIANTS[index]
+                used.add(PROGRAM_FILL_VARIANTS[index])
+        item["fill_color"] = program_color_map[program_key]
+
+
+def _build_program_color_map(payload: Dict[str, Any]) -> Dict[str, str]:
+    program_color_map: Dict[str, str] = {}
+    groups = payload["groups"]
+    timeslots = sorted(payload["timeslots"], key=lambda t: t["sort_order"])
+    weekday_order = sorted({(t["day_index"], t["weekday"]) for t in timeslots}, key=lambda d: d[0])
+    timeslots_by_day = [ts for day_index, _ in weekday_order for ts in sorted([t for t in timeslots if t["day_index"] == day_index], key=lambda t: t["sort_order"])]
+
+    for slot in timeslots_by_day:
+        slot_items = payload["cells"].get(str(slot["id"]), {})
+        overlay_rows_content: List[List[Dict[str, Any]]] = []
+        for group in groups:
+            items = _overlay_items(slot_items.get(str(group["id"]), []))
+            deduped: List[Dict[str, Any]] = []
+            for item in items:
+                if not any(_same_overlay(item, d) for d in deduped):
+                    deduped.append(item)
+            overlay_rows_content.append(deduped)
+
+        unique_overlays: List[Dict[str, Any]] = []
+        for overlays in overlay_rows_content:
+            for item in overlays:
+                found = next((uo for uo in unique_overlays if _same_overlay_connectable(item, uo)), None)
+                if found:
+                    found["program_codes"] = sorted(set(found.get("program_codes", []) + item.get("program_codes", [])))
+                    found["group_codes"] = sorted(set(found.get("group_codes", []) + item.get("group_codes", [])))
+                    found["all_group"] = found.get("all_group", False) or item.get("all_group", False)
+                elif not any(_same_overlay(item, uo) for uo in unique_overlays):
+                    unique_overlays.append(
+                        {
+                            **item,
+                            "program_codes": list(item.get("program_codes", [])),
+                            "group_codes": list(item.get("group_codes", [])),
+                            "all_group": item.get("all_group", False),
+                        }
+                    )
+
+        kind_order = {"required": 0, "program": 1, "elective": 2}
+        unique_overlays.sort(
+            key=lambda item: (
+                kind_order.get(str(item.get("kind") or ""), 3),
+                item.get("course_name", ""),
+                item.get("teacher_name", ""),
+                item.get("room_name", ""),
+            )
+        )
+        _assign_program_colors_for_slot(unique_overlays, program_color_map)
+
+    return program_color_map
 
 
 def _required_item(items: List[Dict[str, Any]]) -> Dict[str, Any] | None:
@@ -234,6 +294,7 @@ def _write_group_timetable_sheet(
     group: Dict[str, Any],
     blank_fill: PatternFill,
     border: Border,
+    program_color_map: Dict[str, str],
 ) -> None:
     timeslots = sorted(payload["timeslots"], key=lambda t: t["sort_order"])
     group_id = group["id"]
@@ -248,68 +309,117 @@ def _write_group_timetable_sheet(
         if timeslot["label"] not in time_labels:
             time_labels.append(timeslot["label"])
 
-    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=2 + len(time_labels))
+    days = sorted({(t["day_index"], t["weekday"]) for t in timeslots}, key=lambda d: d[0])
+
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=1 + len(days))
     title_cell = _cell(ws, 1, 1, title)
     title_cell.font = Font(bold=True, size=15)
     title_cell.alignment = Alignment(horizontal="center", vertical="center")
-    ws.row_dimensions[1].height = 30
+    ws.row_dimensions[1].height = 32
 
-    day_time_border = Border(
-        left=border.left,
-        right=border.right,
-        top=border.top,
-        bottom=border.bottom,
-        diagonal=border.left,
-        diagonalDown=True,
-    )
-    day_time_cell = ws.cell(row=2, column=1, value="Time\nDate")
-    day_time_cell.font = Font(bold=True)
-    day_time_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-    day_time_cell.border = day_time_border
+    header_cell = ws.cell(row=2, column=1, value="Time")
+    header_cell.font = Font(bold=True, size=11)
+    header_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    header_cell.border = border
+    ws.column_dimensions["A"].width = float(18)
 
-    for idx, label in enumerate(time_labels, start=2):
-        header_cell = ws.cell(row=2, column=idx, value=label)
-        header_cell.font = Font(bold=True, size=11)
-        header_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-        header_cell.border = border
-        ws.column_dimensions[get_column_letter(idx)].width = float(22)
+    for idx, (_day_index, weekday) in enumerate(days, start=2):
+        cell = ws.cell(row=2, column=idx, value=weekday)
+        cell.font = Font(bold=True, size=11)
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        cell.border = border
+        ws.column_dimensions[get_column_letter(idx)].width = float(26)
 
-    ws.column_dimensions["A"].width = float(16)
-
-    days = sorted({(t["day_index"], t["weekday"]) for t in timeslots}, key=lambda d: d[0])
+    elective_items: List[Dict[str, Any]] = []
     row = 3
-    for day_index, weekday in days:
-        day_cell = ws.cell(row=row, column=1, value=weekday)
-        day_cell.font = Font(bold=True)
-        day_cell.alignment = Alignment(horizontal="center", vertical="center")
-        day_cell.border = border
-
-        for col_idx, label in enumerate(time_labels, start=2):
-            cell = cast(Cell, ws.cell(row=row, column=col_idx))
-            cell.border = border
+    for label in time_labels:
+        day_cells: Dict[int, List[Dict[str, Any]]] = {}
+        for day_index, weekday in days:
             day_slots = [ts for ts in timeslots if ts["day_index"] == day_index and ts["label"] == label]
             if not day_slots:
-                cell.fill = blank_fill
+                day_cells[day_index] = []
                 continue
-
             timeslot = day_slots[0]
-            items = payload["cells"].get(str(timeslot["id"]), {}).get(str(group_id), [])
-            if not items:
-                cell.fill = blank_fill
-                continue
+            slot_items = payload["cells"].get(str(timeslot["id"]), {}).get(str(group_id), [])
+            expanded_items: List[Dict[str, Any]] = []
+            for item in slot_items:
+                if item.get("kind") == "elective":
+                    elective_items.append({
+                        "day": weekday,
+                        "time": label,
+                        "item": item,
+                    })
+                    continue
+                expanded_items.append(item)
+            day_cells[day_index] = expanded_items
 
-            text = "\n\n".join(_format_item(item) for item in items)
-            fill_color = _get_fill_color(items[0])
-            cell.value = text
-            cell.fill = PatternFill("solid", fgColor=fill_color)
-            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-            cell.font = Font(bold=True, size=12)
-            needed_height = _row_height_for_text(text, width_cols=1, min_height=_OVERLAY_MIN_HEIGHT)
-            row_dimension = ws.row_dimensions[row]
+        rows_for_label = max(max(len(items), 1) for items in day_cells.values())
+        if rows_for_label > 1:
+            ws.merge_cells(start_row=row, start_column=1, end_row=row + rows_for_label - 1, end_column=1)
+        time_cell = _cell(ws, row, 1, label)
+        time_cell.font = Font(bold=True)
+        time_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        time_cell.border = border
+
+        for row_offset in range(rows_for_label):
+            current_row = row + row_offset
+            if row_offset > 0:
+                merged_time_cell = _cell(ws, current_row, 1, None)
+                merged_time_cell.border = border
+            row_height = _OVERLAY_MIN_HEIGHT
+            for col_idx, (day_index, weekday) in enumerate(days, start=2):
+                cell = _cell(ws, current_row, col_idx)
+                cell.border = border
+                items = day_cells.get(day_index, [])
+                if row_offset >= len(items):
+                    cell.fill = blank_fill
+                    continue
+
+                item = items[row_offset]
+                if item.get("kind") == "program":
+                    program_key = "|".join(sorted(item.get("program_codes", [])))
+                    if program_key in program_color_map:
+                        item["fill_color"] = program_color_map[program_key]
+                text = _format_item(item)
+                fill_color = _get_fill_color(item)
+                cell.value = text
+                cell.fill = PatternFill("solid", fgColor=fill_color)
+                cell.alignment = Alignment(horizontal="center", vertical="top", wrap_text=True)
+                cell.font = Font(bold=True, size=12)
+                needed_height = _row_height_for_text(text, width_cols=1, min_height=_OVERLAY_MIN_HEIGHT)
+                row_height = max(row_height, needed_height)
+
+            row_dimension = ws.row_dimensions[current_row]
             current_height = float(getattr(row_dimension, "height", 0) or 0)
-            row_dimension.height = float(max(current_height, needed_height))
+            row_dimension.height = float(max(current_height, row_height))
 
+        row += rows_for_label
+
+    if elective_items:
         row += 1
+        header_row = row
+        ws.merge_cells(start_row=header_row, start_column=1, end_row=header_row, end_column=1 + len(days))
+        header_cell = _cell(ws, header_row, 1, "Elective classes")
+        header_cell.font = Font(bold=True, size=12)
+        header_cell.alignment = Alignment(horizontal="left", vertical="center")
+        row += 1
+
+        ws.cell(row=row, column=1, value="Day").font = Font(bold=True)
+        ws.cell(row=row, column=2, value="Time").font = Font(bold=True)
+        ws.cell(row=row, column=3, value="Class details").font = Font(bold=True)
+        ws.row_dimensions[row].height = 24
+        row += 1
+
+        for elective in elective_items:
+            ws.cell(row=row, column=1, value=elective["day"]) .border = border
+            ws.cell(row=row, column=2, value=elective["time"]) .border = border
+            detail = _format_item(elective["item"])
+            detail_cell = _cell(ws, row, 3, detail)
+            detail_cell.alignment = Alignment(wrap_text=True, vertical="top")
+            detail_cell.border = border
+            detail_cell.font = Font(bold=True, size=12)
+            ws.row_dimensions[row].height = _row_height_for_text(detail, width_cols=3, min_height=_OVERLAY_MIN_HEIGHT)
+            row += 1
 
 
 def _build_teacher_schedule_rows(
@@ -805,13 +915,14 @@ def export_timetable_xlsx(
 
     if group_ids is not None:
         group_sheets = payload["groups"]
+        program_color_map = _build_program_color_map(payload)
         sheet_titles = _unique_sheet_titles([str(group["code"]) for group in group_sheets])
         for idx, (group, sheet_title) in enumerate(zip(group_sheets, sheet_titles)):
             if idx == 0:
                 ws.title = sheet_title
             else:
                 ws = wb.create_sheet(title=sheet_title)
-            _write_group_timetable_sheet(ws, payload, group, blank_fill, border)
+            _write_group_timetable_sheet(ws, payload, group, blank_fill, border, program_color_map)
         wb.save(output_path)
         return output_path
 

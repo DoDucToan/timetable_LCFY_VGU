@@ -402,6 +402,7 @@ function cacheEls() {
     'exportBtn',
     'exportProgramBtn',
     'exportGroupBtn',
+    'exportAllGroupBtn',
     'exportTeacherBtn',
     'exportAllTeacherBtn',
     'exportProgramModal',
@@ -542,6 +543,9 @@ function bindGlobalActions() {
   }
   if (els.exportGroupBtn) {
     els.exportGroupBtn.addEventListener('click', openExportGroupModal);
+  }
+  if (els.exportAllGroupBtn) {
+    els.exportAllGroupBtn.addEventListener('click', openExportAllGroup);
   }
   if (els.exportTeacherBtn) {
     els.exportTeacherBtn.addEventListener('click', openExportTeacherModal);
@@ -910,6 +914,9 @@ function renderContextSelectors() {
   }
   if (els.exportGroupBtn) {
     els.exportGroupBtn.disabled = !state.timetableId || !(state.data.groups || []).length;
+  }
+  if (els.exportAllGroupBtn) {
+    els.exportAllGroupBtn.disabled = !state.timetableId || !(state.data.groups || []).length;
   }
   if (els.exportTeacherBtn) {
     els.exportTeacherBtn.disabled = !state.timetableId || !(state.data.teachers || []).length;
@@ -2611,6 +2618,26 @@ async function submitExportGroupForm(e) {
   const url = `/export.xlsx?timetable_id=${state.timetableId}&${params}`;
   closeModal('exportGroupModal');
   await downloadExcel(url, 'Exporting groups...');
+}
+
+function openExportAllGroup() {
+  if (!state.timetableId) {
+    alert('Select a timetable first.');
+    return;
+  }
+  const groups = state.data.groups || [];
+  if (!groups.length) {
+    alert('No groups available to export.');
+    return;
+  }
+  const groupIds = [...new Set(groups.map(g => Number(g.id)).filter(Boolean))];
+  if (!groupIds.length) {
+    alert('No groups available to export.');
+    return;
+  }
+  const params = groupIds.map(id => `group_ids=${id}`).join('&');
+  const url = `/export.xlsx?timetable_id=${state.timetableId}&${params}`;
+  downloadExcel(url, 'Exporting all groups...');
 }
 
 function openExportAllTeacher() {
