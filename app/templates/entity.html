@@ -12,7 +12,9 @@
     <div id="js-fallback-message" style="display:none;color:red;font-weight:bold;">JavaScript did not execute. Please check your browser console for errors.</div>
     <header class="topbar">
       <div>
-        <h1>Timetable Builder</h1>
+        <a class="brand-logo" href="/">
+          <img src="{{ url_for('static', path='VGU-Logo.png') }}" alt="Timetable Builder" />
+        </a>
         <p class="muted">Manage {{ active_section | replace('-', ' ') }}.</p>
       </div>
       <div class="header-actions">

@@ -142,26 +142,27 @@ def _get_fill_color(item: Dict[str, Any]) -> str:
     return FILL_MAP.get(color_key, TAG_FILL_VARIANTS[abs(hash(color_key)) % len(TAG_FILL_VARIANTS)])
 
 
-def _assign_program_colors_for_slot(overlays: List[Dict[str, Any]]) -> None:
-    used: set[str] = set()
+def _assign_program_colors_for_slot(overlays: List[Dict[str, Any]], program_color_map: Dict[str, str]) -> None:
+    used: set[str] = set(program_color_map.values())
     for item in overlays:
         if item.get("kind") != "program":
             continue
-        seed = "|".join(
-            [
-                str(item.get("course_name", "")),
-                str(item.get("teacher_name", "")),
-                str(item.get("room_name", "")),
-                ",".join(item.get("program_codes", [])),
-            ]
-        )
-        index = abs(hash(seed)) % len(PROGRAM_FILL_VARIANTS)
-        for attempt in range(len(PROGRAM_FILL_VARIANTS)):
-            candidate = PROGRAM_FILL_VARIANTS[(index + attempt) % len(PROGRAM_FILL_VARIANTS)]
-            if candidate not in used:
-                item["fill_color"] = candidate
-                used.add(candidate)
-                break
+        program_codes = sorted(set(item.get("program_codes", [])))
+        if not program_codes:
+            continue
+        for program_code in program_codes:
+            if program_code not in program_color_map:
+                index = abs(hash(program_code)) % len(PROGRAM_FILL_VARIANTS)
+                for attempt in range(len(PROGRAM_FILL_VARIANTS)):
+                    candidate = PROGRAM_FILL_VARIANTS[(index + attempt) % len(PROGRAM_FILL_VARIANTS)]
+                    if candidate not in used:
+                        program_color_map[program_code] = candidate
+                        used.add(candidate)
+                        break
+                else:
+                    program_color_map[program_code] = PROGRAM_FILL_VARIANTS[index]
+                    used.add(PROGRAM_FILL_VARIANTS[index])
+        item["fill_color"] = program_color_map[program_codes[0]]
 
 
 def _required_item(items: List[Dict[str, Any]]) -> Dict[str, Any] | None:
@@ -468,6 +469,7 @@ def _write_timetable_sheet(
     groups = payload["groups"]
     timeslots = payload["timeslots"]
     cell_map = payload["cells"]
+    program_color_map: Dict[str, str] = {}
 
     total_cols = 2 + len(groups)
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=total_cols)
@@ -573,7 +575,7 @@ def _write_timetable_sheet(
                     item.get("room_name", ""),
                 )
             )
-            _assign_program_colors_for_slot(unique_overlays)
+            _assign_program_colors_for_slot(unique_overlays, program_color_map)
             overlay_depth = len(unique_overlays)
             slot_start_row = row
             required_row = row
