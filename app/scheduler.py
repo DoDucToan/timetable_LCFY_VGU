@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, cast
 from uuid import uuid4
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import func, or_, select
+from sqlalchemy.engine import ScalarResult
 from sqlalchemy.orm import Session, joinedload
 
 from .models import Course, Group, GroupStudyProgram, ScheduledClass, StudyProgram, Timeslot
@@ -46,7 +47,8 @@ def _sanitize_text(value: Any) -> str:
 def estimate_program_size(group: Group, selected_program_count: int) -> int:
     total_programs = max(len(group.study_program_links), 1)
     selected_program_count = max(selected_program_count, 1)
-    return max(1, round(group.size_num * selected_program_count / total_programs))
+    size_num = int(cast(int, group.size_num) or 0)
+    return max(1, round(size_num * selected_program_count / total_programs))
 
 
 def validate_new_class(
@@ -69,8 +71,8 @@ def validate_new_class(
         .where(Group.id.in_(target_group_ids))
         .options(joinedload(Group.study_program_links).joinedload(GroupStudyProgram.study_program))
     ).unique().scalars().all()
-    group_map = {g.id: g for g in groups}
-    current_timetable_id = groups[0].timetable_id if groups else None
+    group_map: Dict[int, Group] = {cast(int, g.id): g for g in groups}
+    current_timetable_id = cast(int, groups[0].timetable_id) if groups else None
 
     if len(groups) != len(set(target_group_ids)):
         errors.append("One or more selected groups do not exist.")
@@ -78,7 +80,7 @@ def validate_new_class(
 
     effective_mode = MODE_ELECTIVE if mode == MODE_REQUIRED and self_study else mode
 
-    if teacher_id:
+    if teacher_id is not None:
         if not allow_teacher_conflict:
             teacher_clash = db.scalar(
                 select(ScheduledClass.id)
@@ -91,11 +93,11 @@ def validate_new_class(
                 )
                 .limit(1)
             )
-            if teacher_clash:
+            if teacher_clash is not None:
                 errors.append("Teacher is already assigned in this timeslot.")
         else:
             # For study program class, allow teacher conflict only if all rooms are the same
-            assigned_rooms = db.execute(
+            assigned_rooms_result = db.execute(
                 select(ScheduledClass.room_id)
                 .join(Group, Group.id == ScheduledClass.group_id)
                 .where(
@@ -104,7 +106,8 @@ def validate_new_class(
                     ScheduledClass.teacher_id == teacher_id,
                     Group.timetable_id == current_timetable_id,
                 )
-            ).scalars().all()
+            )
+            assigned_rooms: List[Optional[int]] = cast(List[Optional[int]], cast(ScalarResult[Optional[int]], assigned_rooms_result.scalars()).all())
             # Only consider non-null rooms
             assigned_rooms = [rid for rid in assigned_rooms if rid is not None]
             if assigned_rooms:
@@ -112,7 +115,7 @@ def validate_new_class(
                 if any(rid != room_id for rid in assigned_rooms):
                     errors.append("Teacher cannot teach in multiple rooms at the same time.")
 
-    if room_id:
+    if room_id is not None:
         room_clash = db.scalar(
             select(ScheduledClass.id)
             .join(Group, Group.id == ScheduledClass.group_id)
@@ -124,21 +127,22 @@ def validate_new_class(
             )
             .limit(1)
         )
-        if room_clash:
+        if room_clash is not None:
             errors.append("Room is already occupied in this timeslot.")
 
-    if room_id:
+    if room_id is not None:
         from .models import Room
         room = db.get(Room, room_id)
         if room:
-            if expected_size and room.capacity_num < expected_size:
+            room_capacity = int(cast(int, room.capacity_num) or 0)
+            if expected_size is not None and room_capacity < expected_size:
                 errors.append(f"Room capacity ({room.capacity_num}) is smaller than expected class size ({expected_size}).")
             elif expected_size is None:
                 if mode == MODE_REQUIRED:
-                    needed = sum(group_map[g].size_num for g in target_group_ids if g in group_map)
+                    needed = sum(int(cast(int, group_map[g].size_num) or 0) for g in target_group_ids if g in group_map)
                 else:
                     needed = sum(estimate_program_size(group_map[g], max(len(study_program_ids), 1)) for g in target_group_ids if g in group_map)
-                if room.capacity_num < needed:
+                if room_capacity < needed:
                     errors.append(f"Room capacity ({room.capacity_num}) is smaller than estimated needed size ({needed}).")
 
     if effective_mode == MODE_PROGRAM and not study_program_ids:
@@ -150,18 +154,22 @@ def validate_new_class(
     # student/group clashes
     for group_id in target_group_ids:
         group = group_map[group_id]
-        group_program_ids = {link.study_program_id for link in group.study_program_links}
-        existing = db.scalars(
+        group_program_ids: set[Optional[int]] = {
+            cast(Optional[int], link.study_program_id)
+            for link in group.study_program_links
+        }
+
+        if mode == MODE_ELECTIVE:
+            continue
+
+        existing: List[ScheduledClass] = list(db.scalars(
             select(ScheduledClass)
             .where(
                 ScheduledClass.deploy.is_(True),
                 ScheduledClass.group_id == group_id,
                 ScheduledClass.timeslot_id == timeslot_id,
             )
-        ).all()
-
-        if mode == MODE_ELECTIVE:
-            continue
+        ).all())
 
         if effective_mode == MODE_REQUIRED:
             blocking = [cls for cls in existing if not cls.course.elective]
@@ -174,7 +182,7 @@ def validate_new_class(
                 errors.append(f"Group {group.code} does not contain any selected study programs.")
                 continue
 
-            if any((cls.study_program_id is None and not cls.course.elective) for cls in existing):
+            if any((cast(Optional[int], cls.study_program_id) is None and not cast(bool, cls.course.elective)) for cls in existing):
                 errors.append(f"Group {group.code} already has a require-all-students class in this timeslot.")
                 continue
 
@@ -352,11 +360,11 @@ def build_timetable_payload(
     if study_program_ids is not None:
         group_query = group_query.join(GroupStudyProgram).where(GroupStudyProgram.study_program_id.in_(study_program_ids)).distinct()
     groups = db.execute(group_query.order_by(Group.sort_order)).unique().scalars().all()
-    group_map = {g.id: g for g in groups}
+    group_map: Dict[int, Group] = {cast(int, g.id): g for g in groups}
     timeslots = db.scalars(select(Timeslot).order_by(Timeslot.sort_order)).all()
     class_ids_filter: Optional[List[int]] = None
     if study_program_ids is not None:
-        class_ids_filter = [group.id for group in groups]
+        class_ids_filter = [cast(int, group.id) for group in groups]
 
     class_query = select(ScheduledClass).options(
         joinedload(ScheduledClass.course).joinedload(Course.course_tag),
@@ -371,42 +379,48 @@ def build_timetable_payload(
     if teacher_ids is not None:
         class_query = class_query.where(ScheduledClass.teacher_id.in_(teacher_ids))
     if class_ids_filter is not None:
+        study_program_ids_list: List[int] = cast(List[int], study_program_ids)
         class_query = class_query.join(Course, ScheduledClass.course).where(
             ScheduledClass.group_id.in_(class_ids_filter),
             or_(
                 Course.require_all_student_in_group.is_(True),
                 Course.elective.is_(True),
-                ScheduledClass.study_program_id.in_(study_program_ids),
+                ScheduledClass.study_program_id.in_(study_program_ids_list),
             ),
         )
-    classes = db.execute(class_query).unique().scalars().all()
+    classes: List[ScheduledClass] = cast(List[ScheduledClass], db.execute(class_query).unique().scalars().all())
 
     cell_map: Dict[str, Dict[str, List[Dict[str, Any]]]] = defaultdict(lambda: defaultdict(list))
 
-    grouped: Dict[Tuple[int, int, int | None, str | None], List[ScheduledClass]] = defaultdict(list)
+    grouped: Dict[tuple[int | str | None, ...], List[ScheduledClass]] = defaultdict(list)
     for cls in classes:
-        if cls.shared_key:
+        shared_key = cast(Optional[str], cls.shared_key)
+        if shared_key is not None:
             key = (
-                cls.timeslot_id,
-                cls.group_id,
-                cls.course_id,
-                cls.shared_key,
+                cast(int, cls.timeslot_id),
+                cast(int, cls.group_id),
+                cast(int, cls.course_id),
+                shared_key,
             )
         else:
-            kind = "elective" if cls.course.elective else ("required" if cls.course.require_all_student_in_group else "program")
+            kind = "elective" if cast(bool, cls.course.elective) else ("required" if cast(bool, cls.course.require_all_student_in_group) else "program")
+            notes_value = getattr(cls, "notes")
+            notes = str(notes_value) if notes_value is not None else ""
+            teacher_id_value = getattr(cls, "teacher_id")
+            room_id_value = getattr(cls, "room_id")
             key = (
-                cls.timeslot_id,
-                cls.group_id,
-                cls.course_id,
+                cast(int, cls.timeslot_id),
+                cast(int, cls.group_id),
+                cast(int, cls.course_id),
                 kind,
-                cls.teacher_id,
-                cls.room_id,
-                cls.notes or "",
+                int(teacher_id_value) if teacher_id_value is not None else None,
+                int(room_id_value) if room_id_value is not None else None,
+                notes,
             )
         grouped[key].append(cls)
 
     for key, bundle in grouped.items():
-        group_id = key[1]
+        group_id = cast(int, key[1])
         first = bundle[0]
         programs = sorted({cls.study_program.code for cls in bundle if cls.study_program})
         kind = "elective" if first.course.elective else ("required" if first.course.require_all_student_in_group else "program")
@@ -435,7 +449,10 @@ def build_timetable_payload(
                 if groups_for_program and not groups_for_program.issubset(group_codes_set):
                     all_group = False
                     break
-        item = {
+        group_tag_code = ""
+        if group_id in group_map and group_map[group_id].group_tag:
+            group_tag_code = _sanitize_text(group_map[group_id].group_tag.code)
+        item: Dict[str, Any] = {
             "id": min(cls.id for cls in bundle),
             "course_code": _sanitize_text(first.course.code),
             "course_name": _sanitize_text(first.course.name),
@@ -443,6 +460,7 @@ def build_timetable_payload(
             "room_name": _sanitize_text(first.room.code if first.room else ""),
             "program_codes": [_sanitize_text(code) for code in programs],
             "group_codes": group_codes,
+            "group_tag_code": group_tag_code,
             "all_group": all_group,
             "notes": _sanitize_text(first.notes or ""),
             "kind": kind,
@@ -451,12 +469,12 @@ def build_timetable_payload(
             "shared": bool(first.shared_key),
             "expected_size": first.expected_size,
         }
-        cell_map[str(first.timeslot_id)][str(group_id)].append(item)
+        cell_map[str(cast(int, first.timeslot_id))][str(group_id)].append(item)
 
     # sort display order within each cell
     sort_rank = {"required": 0, "program": 1, "elective": 2}
     for tmap in cell_map.values():
-        for gid, items in tmap.items():
+        for items in tmap.values():
             items.sort(key=lambda item: (sort_rank[item["kind"]], item["course_name"]))
 
     return {
@@ -519,15 +537,17 @@ def teacher_load_rows(
     if teacher_ids is not None:
         query = query.where(ScheduledClass.teacher_id.in_(teacher_ids))
     if study_program_ids is not None:
+        study_program_ids_list: List[int] = study_program_ids
         query = query.join(GroupStudyProgram, GroupStudyProgram.group_id == ScheduledClass.group_id).where(
-            GroupStudyProgram.study_program_id.in_(study_program_ids),
+            GroupStudyProgram.study_program_id.in_(study_program_ids_list),
             or_(
                 ScheduledClass.study_program_id.is_(None),
-                ScheduledClass.study_program_id.in_(study_program_ids),
+                ScheduledClass.study_program_id.in_(study_program_ids_list),
             ),
         )
-    rows = db.execute(query.group_by(ScheduledClass.teacher_id).order_by(func.count(func.distinct(ScheduledClass.timeslot_id)).desc())).all()
-    result = []
+    raw_rows = db.execute(query.group_by(ScheduledClass.teacher_id).order_by(func.count(func.distinct(ScheduledClass.timeslot_id)).desc())).all()
+    rows: List[tuple[int, int]] = [(int(row[0]), int(row[1])) for row in raw_rows]
+    result: List[Dict[str, Any]] = []
     from .models import Teacher
     for teacher_id, count in rows:
         teacher = db.get(Teacher, teacher_id)

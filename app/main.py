@@ -783,7 +783,11 @@ def teacher_load_rows_for_timetable(db: Session, timetable_id: int) -> List[Dict
     result: List[Dict[str, Any]] = []
     for teacher_id, count in rows:
         teacher = db.get(Teacher, teacher_id)
-        result.append({"teacher": teacher.name if teacher else str(teacher_id), "timeslot_count": int(count)})
+        result.append({
+            "teacher_id": teacher_id,
+            "teacher": teacher.name if teacher else str(teacher_id),
+            "timeslot_count": int(count),
+        })
     return result
 
 
@@ -914,6 +918,7 @@ def _build_timetable_payload(db: Session, timetable_id: Optional[int], cycle_id:
     payload["groups"] = [
         {
             "id": g.id,
+            "timetable_id": getattr(g, "timetable_id", None),
             "code": g.code,
             "name": g.name,
             "capacity": g.size_num,
@@ -1804,6 +1809,7 @@ def delete_class(class_id: int, db: Session = Depends(get_db)):
         db.query(ScheduledClass).filter(ScheduledClass.shared_key == shared_key).delete(synchronize_session=False)
     elif getattr(row, 'study_program_id', None) is not None:
         db.query(ScheduledClass).filter(
+            ScheduledClass.group_id == row.group_id,
             ScheduledClass.timeslot_id == row.timeslot_id,
             ScheduledClass.course_id == row.course_id,
             ScheduledClass.teacher_id == row.teacher_id,

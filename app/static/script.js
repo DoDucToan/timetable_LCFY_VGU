@@ -414,6 +414,9 @@ function cacheEls() {
     'exportTeacherModal',
     'exportTeacherForm',
     'exportTeacherOptions',
+    'teacherScheduleModal',
+    'teacherScheduleModalTitle',
+    'teacherScheduleTableWrapper',
     'groupTagList',
     'courseTagList',
     'programList',
@@ -1035,9 +1038,132 @@ function renderTeacherLoad() {
   (state.data.teacher_load || []).forEach(item => {
     const div = document.createElement('div');
     div.className = 'teacher-load-row';
-    div.innerHTML = `<span>${escapeHtml(item.teacher)}</span><strong>${item.timeslot_count}</strong>`;
+    const teacherName = escapeHtml(item.teacher);
+    const rowCount = Number(item.timeslot_count) || 0;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'ghost-btn small';
+    button.textContent = 'View schedule';
+    button.addEventListener('click', event => {
+      event.stopPropagation();
+      openTeacherScheduleModal(item);
+    });
+    div.innerHTML = `<span>${teacherName}</span><strong>${rowCount}</strong>`;
+    div.appendChild(button);
     els.teacherLoadList.appendChild(div);
   });
+}
+
+function openTeacherScheduleModal(item) {
+  if (!els.teacherScheduleModal || !els.teacherScheduleModalTitle || !els.teacherScheduleTableWrapper) return;
+  const teacherName = item.teacher;
+  const teacherId = item.teacher_id ?? null;
+  els.teacherScheduleModalTitle.textContent = `Teacher schedule: ${teacherName}`;
+  renderTeacherScheduleTable(teacherId, teacherName);
+  openModal('teacherScheduleModal');
+}
+
+function renderTeacherScheduleTable(teacherId, teacherName) {
+  if (!els.teacherScheduleTableWrapper) return;
+  els.teacherScheduleTableWrapper.innerHTML = '';
+  const rows = buildTeacherScheduleRows(teacherId, teacherName);
+  if (!rows.length) {
+    const msg = document.createElement('div');
+    msg.className = 'muted';
+    msg.textContent = 'No scheduled classes found for this teacher.';
+    els.teacherScheduleTableWrapper.appendChild(msg);
+    return;
+  }
+
+  const table = document.createElement('table');
+  table.className = 'requirements-modal-table';
+  const thead = document.createElement('thead');
+  thead.innerHTML = `
+    <tr>
+      <th>Day</th>
+      <th>Timeslot</th>
+      <th>Group</th>
+      <th>Program</th>
+      <th>Room</th>
+      <th>Course</th>
+    </tr>
+  `;
+  table.appendChild(thead);
+  const tbody = document.createElement('tbody');
+  rows.forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(row.weekday)}</td>
+      <td>${escapeHtml(row.timeslot)}</td>
+      <td>${escapeHtml(row.group_code)}</td>
+      <td>${escapeHtml(row.program_code)}</td>
+      <td>${escapeHtml(row.room_name)}</td>
+      <td>${escapeHtml(row.course_name)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  els.teacherScheduleTableWrapper.appendChild(table);
+}
+
+function buildTeacherScheduleRows(teacherId, teacherName) {
+  const timeslotMap = new Map((state.data.timeslots || []).map(ts => [String(ts.id), ts]));
+  const groupMap = new Map((state.data.groups || []).map(g => [String(g.id), g]));
+  const cells = state.data.cells || {};
+  const grouped = new Map();
+
+  Object.entries(cells).forEach(([timeslotId, groups]) => {
+    const timeslot = timeslotMap.get(timeslotId);
+    if (!timeslot || typeof groups !== 'object' || groups === null) return;
+    Object.entries(groups).forEach(([groupId, items]) => {
+      if (!Array.isArray(items)) return;
+      items.forEach(item => {
+        const matchesTeacher = teacherId != null ? item.teacher_id === teacherId : item.teacher_name === teacherName;
+        if (!matchesTeacher) return;
+        const rowKey = [
+          String(timeslot.weekday || ''),
+          Number(timeslot.sort_order) || 0,
+          String(timeslot.label || ''),
+          String(item.room_name || ''),
+          String(item.course_name || ''),
+        ].join('||');
+
+        const existing = grouped.get(rowKey) || {
+          weekday: timeslot.weekday || '',
+          sort_order: Number(timeslot.sort_order) || 0,
+          timeslot: timeslot.label || '',
+          group_codes: new Set(),
+          program_codes: new Set(),
+          room_name: item.room_name || '',
+          course_name: item.course_name || '',
+        };
+
+        const groupCode = groupMap.get(groupId)?.code || '';
+        if (groupCode) {
+          existing.group_codes.add(groupCode);
+        }
+        if (Array.isArray(item.program_codes)) {
+          item.program_codes.forEach(code => {
+            if (code) existing.program_codes.add(code);
+          });
+        }
+        grouped.set(rowKey, existing);
+      });
+    });
+  });
+
+  const rows = Array.from(grouped.values()).map(entry => ({
+    weekday: entry.weekday,
+    sort_order: entry.sort_order,
+    timeslot: entry.timeslot,
+    group_code: Array.from(entry.group_codes).sort().join(', '),
+    program_code: Array.from(entry.program_codes).sort().join(', '),
+    room_name: entry.room_name,
+    course_name: entry.course_name,
+  }));
+
+  rows.sort((a, b) => a.sort_order - b.sort_order || a.weekday.localeCompare(b.weekday) || a.timeslot.localeCompare(b.timeslot));
+  return rows;
 }
 
 function itemRowKey(item) {
@@ -1290,7 +1416,7 @@ function renderBoard() {
               : 'Delete this class?';
             if (confirm(message)) {
               await fetch(`/api/classes/${classId}`, { method: 'DELETE' });
-              await refreshData();
+              await refreshData(state.timetableId, state.selectedCycleId);
             }
           } else if (e.target.matches('[data-edit-class]')) {
             e.stopPropagation();
@@ -1392,7 +1518,7 @@ async function saveGroupPrograms() {
   const group = (state.data?.groups || []).find(g => g.id === groupId);
   if (!group) return;
   const payload = {
-    timetable_id: group.timetable_id,
+    timetable_id: group.timetable_id || state.timetableId,
     code: group.code,
     name: group.name,
     group_tag_id: group.group_tag?.id ?? null,
@@ -1952,7 +2078,7 @@ async function openClassModal(classId = null) {
   const preselectedGroupIds = editingClass ? [editingClass.group_id] : selected.map(item => item.groupId);
   precheckGroups(els.classGroupOptions, preselectedGroupIds);
   const selectedTimeslotId = selected[0].timeslotId;
-  syncClassFormVisibility();
+  syncClassFormVisibility(editingClass ? editingClass.course_id : null);
   updateRoomOptions(editingClass ? editingClass.room_id : null, selectedTimeslotId, editingClass ? editingClass.course_id : null);
 
   // Pre-fill form if editing
@@ -1978,7 +2104,7 @@ function intersectProgramsForSelectedGroups(selected = state.selected) {
   return (state.data.programs || []).filter(p => set.has(p.id));
 }
 
-function syncClassFormVisibility() {
+function syncClassFormVisibility(currentCourseId = null) {
   if (!els.classForm) return;
   const mode = els.classForm.querySelector('input[name="mode"]:checked')?.value;
   if (!mode) return;
@@ -1990,12 +2116,16 @@ function syncClassFormVisibility() {
   if (mode === 'program') {
     if (selectedProgramIds.length > 0) {
       filteredByProgram = true;
+      const selectedPrograms = (state.data.programs || []).filter(p => selectedProgramIds.includes(p.id));
       const programCourseIds = new Set();
       const programRequiredCourseIds = new Set();
-      selectedProgramIds.forEach(programId => {
-        const program = (state.data.programs || []).find(p => p.id === programId);
-        if (program && program.requirements) {
-          program.requirements.forEach(req => programCourseIds.add(req.course_id));
+      selectedPrograms.forEach(program => {
+        if (program.requirements) {
+          program.requirements.forEach(req => {
+            if (req.course_id) {
+              programCourseIds.add(req.course_id);
+            }
+          });
         }
       });
 
@@ -2008,7 +2138,7 @@ function syncClassFormVisibility() {
           const deployedCounts = getDeployedCourseCountsForGroup(groupId);
           selectedProgramIds.forEach(programId => {
             if (!groupProgramIds.includes(programId)) return;
-            const program = (state.data.programs || []).find(p => p.id === programId);
+            const program = selectedPrograms.find(p => p.id === programId);
             if (!program || !program.requirements) return;
             program.requirements.forEach(req => {
               const courseId = req.course_id;
@@ -2024,9 +2154,17 @@ function syncClassFormVisibility() {
       }
 
       if (selectedGroupIds.length > 0) {
-        courses = courses.filter(c => programRequiredCourseIds.has(c.id));
+        if (programRequiredCourseIds.size > 0) {
+          courses = courses.filter(c => programRequiredCourseIds.has(c.id));
+        } else if (programCourseIds.size > 0) {
+          courses = courses.filter(c => programCourseIds.has(c.id));
+        } else {
+          courses = [];
+        }
       } else if (programCourseIds.size > 0) {
         courses = courses.filter(c => programCourseIds.has(c.id));
+      } else {
+        courses = (state.data.courses || []).filter(c => c.study_program_ids && c.study_program_ids.some(pid => selectedProgramIds.includes(pid)));
       }
     }
   }
@@ -2056,6 +2194,13 @@ function syncClassFormVisibility() {
     }
   }
 
+  if (currentCourseId != null && !courses.some(c => c.id === currentCourseId)) {
+    const existingCourse = (state.data.courses || []).find(c => c.id === currentCourseId);
+    if (existingCourse) {
+      courses = [existingCourse, ...courses];
+    }
+  }
+
   // Filter by mode as before, but preserve required course selection for required_all mode.
   courses = courses.filter(course => {
     if (mode === 'required_all') {
@@ -2070,6 +2215,13 @@ function syncClassFormVisibility() {
     }
     return course.elective;
   });
+
+  if (currentCourseId != null && !courses.some(c => c.id === currentCourseId)) {
+    const existingCourse = (state.data.courses || []).find(c => c.id === currentCourseId);
+    if (existingCourse) {
+      courses = [existingCourse, ...courses];
+    }
+  }
 
   const allowProgramMode = selectedProgramIds.length > 0;
   fillSelect(els.courseSelect, courses.map(c => ({ value: c.id, label: c.name })), true);

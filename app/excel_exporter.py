@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from openpyxl import Workbook
+from openpyxl.drawing.image import Image as OpenpyxlImage
 from openpyxl.cell.cell import Cell
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
@@ -68,8 +69,12 @@ def _format_item(item: Dict[str, Any]) -> str:
     if item.get("kind") == "elective":
         parts.append("(Elective)")
     parts.append(course_name)
-    if item.get("group_codes"):
-        parts.append(f"({', '.join(item['group_codes'])})")
+    group_codes: List[str] = cast(List[str], item.get("group_codes") or [])
+    if item.get("kind") == "required":
+        if len(group_codes) > 1:
+            parts.append(f"({', '.join(group_codes)})")
+    elif item.get("kind") != "elective" and group_codes:
+        parts.append(f"({', '.join(group_codes)})")
     if item.get("all_group"):
         parts.append("(all group)")
     if item["program_codes"]:
@@ -539,6 +544,24 @@ def _sanitize_sheet_title(title: str, max_length: int = 31) -> str:
     return clean[:max_length]
 
 
+def _logo_path() -> Path:
+    return Path(__file__).resolve().parent / "static" / "VGU-Logo.png"
+
+
+def _insert_logo(ws: Worksheet) -> None:
+    logo_file = _logo_path()
+    if not logo_file.exists():
+        return
+    try:
+        image = OpenpyxlImage(str(logo_file))
+    except ImportError:
+        return
+    image.width = 120
+    image.height = 40
+    image.anchor = "A1"
+    ws.add_image(image)
+
+
 def _unique_sheet_titles(names: List[str]) -> List[str]:
     seen: Dict[str, int] = {}
     result: List[str] = []
@@ -587,12 +610,12 @@ def _write_timetable_sheet(
     if selected_program_codes:
         title_text += f" - {', '.join(selected_program_codes)}"
     title_cell = _cell(ws, 1, 1, title_text)
-    title_cell.fill = title_fill
-    title_cell.font = Font(color="FFFFFF", bold=True, size=15)
+    # title_cell.fill = title_fill
+    title_cell.font = Font(bold=True, size=24)
     title_cell.alignment = Alignment(horizontal="center", vertical="center")
 
     ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=total_cols)
-    subtitle_text = "Interactive export with required blocks on top and shared/program/elective strips below"
+    subtitle_text = ""
     if selected_program_codes:
         subtitle_text += f" (Study programs: {', '.join(selected_program_codes)})"
     subtitle_cell = _cell(ws, 2, 1, subtitle_text)
@@ -901,7 +924,15 @@ def export_timetable_xlsx(
 
     if teacher_ids is not None:
         from .models import Teacher
-        teacher_sheets = list(db.scalars(select(Teacher).where(Teacher.id.in_(teacher_ids)).order_by(Teacher.name)).all())
+        teacher_query = select(Teacher).where(Teacher.id.in_(teacher_ids)).order_by(Teacher.name)
+        if timetable_id is not None:
+            teacher_query = (
+                teacher_query.join(ScheduledClass, ScheduledClass.teacher_id == Teacher.id)
+                .join(Group, Group.id == ScheduledClass.group_id)
+                .where(ScheduledClass.deploy.is_(True), Group.timetable_id == timetable_id)
+                .distinct()
+            )
+        teacher_sheets = list(db.scalars(teacher_query).all())
         sheet_titles = _unique_sheet_titles([str(t.name or t.id) for t in teacher_sheets])
         for idx, (teacher, sheet_title) in enumerate(zip(teacher_sheets, sheet_titles)):
             if idx == 0:
@@ -910,6 +941,7 @@ def export_timetable_xlsx(
                 ws = wb.create_sheet(title=sheet_title)
             rows = _build_teacher_schedule_rows(db, timetable_id, cast(int, getattr(teacher, 'id')))
             _write_teacher_schedule_sheet(ws, str(teacher.name), rows, border)
+            _insert_logo(ws)
         wb.save(output_path)
         return output_path
 
@@ -923,6 +955,7 @@ def export_timetable_xlsx(
             else:
                 ws = wb.create_sheet(title=sheet_title)
             _write_group_timetable_sheet(ws, payload, group, blank_fill, border, program_color_map)
+            _insert_logo(ws)
         wb.save(output_path)
         return output_path
 
@@ -942,6 +975,7 @@ def export_timetable_xlsx(
         blank_fill,
         border,
     )
+    _insert_logo(ws)
 
     filtered_export = study_program_ids is not None or group_ids is not None or teacher_ids is not None
     program_sheets: List[StudyProgram] = []
@@ -979,6 +1013,7 @@ def export_timetable_xlsx(
                 blank_fill,
                 border,
             )
+            _insert_logo(program_ws)
 
     wb.save(output_path)
     return output_path
