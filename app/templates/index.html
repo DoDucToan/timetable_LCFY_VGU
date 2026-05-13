@@ -96,11 +96,19 @@
           <h2>Requirements</h2>
         </div>
         <div class="requirement-action-row">
-          <button type="button" class="primary-btn" id="addGroupTagRequirementPanelBtn">+ Add Group Tag Requirement</button>
-          <button type="button" class="primary-btn" id="addStudyProgramRequirementPanelBtn">+ Add Study Program Requirement</button>
-          <button type="button" class="primary-btn" id="addGroupOnlyRequirementPanelBtn">+ Add Group-only Requirement</button>
+          <div class="requirement-action-group">
+            <button type="button" class="primary-btn" id="addGroupTagRequirementPanelBtn">+ Add Group Tag Requirement</button>
+            <div id="groupTagRequirementsSummary" class="requirement-summary"></div>
+          </div>
+          <div class="requirement-action-group">
+            <button type="button" class="primary-btn" id="addStudyProgramRequirementPanelBtn">+ Add Study Program Requirement</button>
+            <div id="programRequirementsSummary" class="requirement-summary"></div>
+          </div>
+          <div class="requirement-action-group">
+            <button type="button" class="primary-btn" id="addGroupOnlyRequirementPanelBtn">+ Add Group-only Requirement</button>
+            <div id="groupOnlyRequirementsSummary" class="requirement-summary"></div>
+          </div>
         </div>
-        <div id="requirementsList"></div>
       </section>
 
       <section class="dashboard-grid full-width">
@@ -188,6 +196,10 @@
           <label id="entityYearWrap" class="hidden">
             <span>Year starting</span>
             <input type="number" name="year_starting" />
+          </label>
+          <label id="entityGermanTimeslotWrap" class="full-span hidden inline-checkbox">
+            <input type="checkbox" name="german_timeslots" />
+            <span>Generate German-style 20-timeslot schedule</span>
           </label>
           <label id="entityCapacityWrap" class="hidden">
             <span>Capacity</span>

@@ -606,7 +606,7 @@ def _write_timetable_sheet(
 
     total_cols = 2 + len(groups)
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=total_cols)
-    title_text = "Foundation Year 2025/26: Semester 2 - Phase 4"
+    title_text = payload.get('cycle_name') or "Foundation Year 2025/26: Semester 2 - Phase 4"
     if selected_program_codes:
         title_text += f" - {', '.join(selected_program_codes)}"
     title_cell = _cell(ws, 1, 1, title_text)
@@ -670,8 +670,39 @@ def _write_timetable_sheet(
             ws.row_dimensions[group_header_row].height = 72
             row += 1
 
-        for slot_index, slot in enumerate(day_slots):
+        for slot in day_slots:
             slot_items = cell_map.get(str(slot["id"]), {})
+            is_german_slot = str(slot.get("label", "")).startswith("German")
+            if is_german_slot:
+                slot_start_row = row
+                required_row = row
+                slot_end_row = row
+                ws.merge_cells(start_row=slot_start_row, start_column=2, end_row=slot_end_row, end_column=2)
+                time_cell = ws.cell(row=slot_start_row, column=2, value=slot["label"])
+                time_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                time_cell.border = border
+
+                row_height = _OVERLAY_MIN_HEIGHT
+                for col_idx2, group in enumerate(groups, start=3):
+                    items = slot_items.get(str(group["id"]), [])
+                    cell = _cell(ws, required_row, col_idx2)
+                    if not items:
+                        cell.fill = blank_fill
+                        cell.border = border
+                        continue
+                    text = "\n".join(_format_item(item) for item in items)
+                    first_item = items[0]
+                    cell.value = text
+                    cell.fill = PatternFill("solid", fgColor=_get_fill_color(first_item))
+                    cell.alignment = Alignment(horizontal="center", vertical="top", wrap_text=True)
+                    cell.font = Font(bold=True, size=15)
+                    cell.border = border
+                    needed_height = _row_height_for_text(text, width_cols=1, min_height=_OVERLAY_MIN_HEIGHT)
+                    row_height = max(row_height, needed_height)
+                ws.row_dimensions[required_row].height = row_height
+                row += 1
+                continue
+
             overlay_rows_content: List[List[Dict[str, Any]]] = []
             for group in groups:
                 items = _overlay_items(slot_items.get(str(group["id"]), []))
@@ -839,7 +870,7 @@ def _write_timetable_sheet(
 
             row = slot_end_row + 1
 
-            if slot_index == 0 and len(day_slots) > 1:
+            if slot.get("end") == "12.00":
                 lunch_row = row
                 ws.merge_cells(start_row=lunch_row, start_column=2, end_row=lunch_row, end_column=total_cols)
                 lunch = ws.cell(row=lunch_row, column=2, value="Lunch break")

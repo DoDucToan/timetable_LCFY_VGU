@@ -10,6 +10,7 @@ class Cycle(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
     year_starting = Column(Integer, nullable=False)
+    german_timeslots = Column(Boolean, default=False, nullable=False)
 
     timetables = relationship("Timetable", back_populates="cycle")
 

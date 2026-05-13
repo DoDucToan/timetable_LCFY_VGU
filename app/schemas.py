@@ -11,6 +11,7 @@ class GroupRequirementIn(BaseModel):
 class CycleIn(BaseModel):
     name: str
     year_starting: int = Field(ge=2000, le=2100)
+    german_timeslots: bool = False
 
 
 class TimetableIn(BaseModel):

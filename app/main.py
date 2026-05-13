@@ -95,6 +95,47 @@ def _ensure_default_timeslots() -> None:
 
 
 
+def _ensure_german_timeslots(db: Session) -> None:
+    german_rows = [
+        ("MONDAY", 1, "8.45", "10.15", "German 8.45 - 10.15", 11),
+        ("MONDAY", 1, "10.30", "12.00", "German 10.30 - 12.00", 12),
+        ("MONDAY", 1, "13.00", "14.30", "German 13.00 - 14.30", 13),
+        ("MONDAY", 1, "14.45", "16.15", "German 14.45 - 16.15", 14),
+        ("TUESDAY", 2, "8.45", "10.15", "German 8.45 - 10.15", 15),
+        ("TUESDAY", 2, "10.30", "12.00", "German 10.30 - 12.00", 16),
+        ("TUESDAY", 2, "13.00", "14.30", "German 13.00 - 14.30", 17),
+        ("TUESDAY", 2, "14.45", "16.15", "German 14.45 - 16.15", 18),
+        ("WEDNESDAY", 3, "8.45", "10.15", "German 8.45 - 10.15", 19),
+        ("WEDNESDAY", 3, "10.30", "12.00", "German 10.30 - 12.00", 20),
+        ("WEDNESDAY", 3, "13.00", "14.30", "German 13.00 - 14.30", 21),
+        ("WEDNESDAY", 3, "14.45", "16.15", "German 14.45 - 16.15", 22),
+        ("THURSDAY", 4, "8.45", "10.15", "German 8.45 - 10.15", 23),
+        ("THURSDAY", 4, "10.30", "12.00", "German 10.30 - 12.00", 24),
+        ("THURSDAY", 4, "13.00", "14.30", "German 13.00 - 14.30", 25),
+        ("THURSDAY", 4, "14.45", "16.15", "German 14.45 - 16.15", 26),
+        ("FRIDAY", 5, "8.45", "10.15", "German 8.45 - 10.15", 27),
+        ("FRIDAY", 5, "10.30", "12.00", "German 10.30 - 12.00", 28),
+        ("FRIDAY", 5, "13.00", "14.30", "German 13.00 - 14.30", 29),
+        ("FRIDAY", 5, "14.45", "16.15", "German 14.45 - 16.15", 30),
+    ]
+    existing_sort_orders = set(db.scalars(select(Timeslot.sort_order).where(Timeslot.sort_order.in_([row[5] for row in german_rows]))).all())
+    for weekday, day_index, start_time, end_time, label, sort_order in german_rows:
+        if sort_order in existing_sort_orders:
+            continue
+        db.add(
+            Timeslot(
+                weekday=weekday,
+                day_index=day_index,
+                start_time=start_time,
+                end_time=end_time,
+                label=label,
+                sort_order=sort_order,
+            )
+        )
+    if len(existing_sort_orders) < len(german_rows):
+        db.commit()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # Added type annotation
     ensure_database()
@@ -692,9 +733,9 @@ def _import_groups(file: UploadFile, db: Session, timetable_id: Optional[int] = 
                 sort_order = None
         group = None
         if group_id is not None:
-            group = db.get(Group, group_id)
-            if not group:
-                raise HTTPException(status_code=404, detail=f'Group not found: {group_id}')
+            existing_group = db.get(Group, group_id)
+            if existing_group is not None and getattr(existing_group, 'timetable_id', None) == timetable_id:
+                group = existing_group
         if group is None:
             group = db.scalar(select(Group).where(Group.timetable_id == timetable_id, Group.code == code).limit(1))
         if group is None:
@@ -1012,11 +1053,22 @@ def teacher_load_rows_for_timetable(db: Session, timetable_id: int) -> List[Dict
 
 def _build_timetable_payload(db: Session, timetable_id: Optional[int], cycle_id: Optional[int] = None) -> Dict[str, Any]:
     timetable = _selected_timetable(db, timetable_id, cycle_id)
-    timeslots = db.scalars(select(Timeslot).order_by(Timeslot.sort_order)).all()
+    german_cycle = False
+    cycle = None
+    if timetable:
+        cycle = getattr(timetable, 'cycle', None) or db.get(Cycle, timetable.cycle_id)
+        german_cycle = bool(getattr(cycle, 'german_timeslots', False))
+    timeslot_query = select(Timeslot).order_by(Timeslot.sort_order)
+    if german_cycle:
+        timeslot_query = timeslot_query.where(Timeslot.label.like('German%'))
+    else:
+        timeslot_query = timeslot_query.where(~Timeslot.label.like('German%'))
+    timeslots = db.scalars(timeslot_query).all()
 
     payload: Dict[str, Any] = {
         "selected_timetable_id": timetable.id if timetable else None,
         "selected_cycle_id": getattr(timetable, 'cycle_id', None) if timetable else cycle_id,
+        "cycle_name": getattr(cycle, 'name', '') if timetable and cycle is not None else '',
         "timeslots": [
             {
                 "id": t.id,
@@ -1231,7 +1283,7 @@ def _entity_payload(db: Session, timetable_id: Optional[int] = None, cycle_id: O
 
 
     return {
-        "cycles": [{"id": c.id, "name": c.name, "year_starting": c.year_starting} for c in cycles],
+        "cycles": [{"id": c.id, "name": c.name, "year_starting": c.year_starting, "german_timeslots": getattr(c, 'german_timeslots', False)} for c in cycles],
         "timetables": [{"id": t.id, "cycle_id": t.cycle_id} for t in timetables],
         "group_tags": [
             {
@@ -1327,11 +1379,13 @@ def _apply_group_payload(group: Group, payload: GroupCreateIn, db: Session) -> N
 
 @app.post("/api/cycles")
 def create_cycle(payload: CycleIn, db: Session = Depends(get_db)):
-    row = Cycle(name=payload.name.strip(), year_starting=payload.year_starting)
+    row = Cycle(name=payload.name.strip(), year_starting=payload.year_starting, german_timeslots=payload.german_timeslots)
     db.add(row)
     db.flush()
     timetable = Timetable(cycle_id=row.id, in_action=False)
     db.add(timetable)
+    if payload.german_timeslots:
+        _ensure_german_timeslots(db)
     db.commit()
     return bootstrap_payload(db)
 
@@ -1343,6 +1397,7 @@ def update_cycle(cycle_id: int, payload: CycleIn, db: Session = Depends(get_db))
         raise HTTPException(status_code=404, detail="Cycle not found.")
     row.name = payload.name.strip()  # type: ignore
     row.year_starting = payload.year_starting  # type: ignore
+    row.german_timeslots = payload.german_timeslots  # type: ignore
     db.commit()
     return bootstrap_payload(db)
 

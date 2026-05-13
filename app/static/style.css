@@ -1012,9 +1012,23 @@ body[data-active-section] .dashboard-card {
   }
   #requirementsSection .requirement-action-row {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(3, minmax(220px, 1fr));
+    grid-auto-rows: auto;
+    gap: 16px;
     margin-bottom: 20px;
+  }
+  #requirementsSection .requirement-action-group {
+    display: grid;
+    grid-template-rows: auto auto;
+    gap: 12px;
+  }
+  #requirementsSection .requirement-action-row button.primary-btn,
+  #requirementsSection .requirement-action-row .requirement-summary button {
+    width: 100%;
+  }
+  #requirementsSection .requirement-summary {
+    display: flex;
+    justify-content: center;
   }
   #requirementsList {
     display: flex;

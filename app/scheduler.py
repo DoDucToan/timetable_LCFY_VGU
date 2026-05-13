@@ -8,7 +8,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.engine import ScalarResult
 from sqlalchemy.orm import Session, joinedload
 
-from .models import Course, Group, GroupStudyProgram, ScheduledClass, StudyProgram, Timeslot
+from .models import Cycle, Course, Group, GroupStudyProgram, ScheduledClass, StudyProgram, Timetable, Timeslot
 
 
 MODE_REQUIRED = "required_all"
@@ -78,7 +78,13 @@ def validate_new_class(
         errors.append("One or more selected groups do not exist.")
         return errors
 
+    if mode == MODE_REQUIRED and len(target_group_ids) > 1:
+        errors.append("Require-all-students classes must be added to one group at a time.")
+
     effective_mode = MODE_ELECTIVE if mode == MODE_REQUIRED and self_study else mode
+
+    if mode == MODE_REQUIRED and allow_teacher_conflict:
+        errors.append("Teacher conflict is not allowed for require-all classes.")
 
     if teacher_id is not None:
         if not allow_teacher_conflict:
@@ -361,7 +367,20 @@ def build_timetable_payload(
         group_query = group_query.join(GroupStudyProgram).where(GroupStudyProgram.study_program_id.in_(study_program_ids)).distinct()
     groups = db.execute(group_query.order_by(Group.sort_order)).unique().scalars().all()
     group_map: Dict[int, Group] = {cast(int, g.id): g for g in groups}
-    timeslots = db.scalars(select(Timeslot).order_by(Timeslot.sort_order)).all()
+    timetable = None
+    cycle = None
+    if timetable_id is not None:
+        timetable = db.get(Timetable, timetable_id)
+        german_cycle = False
+        if timetable is not None:
+            cycle = getattr(timetable, 'cycle', None) or db.get(Cycle, timetable.cycle_id)
+            german_cycle = bool(getattr(cycle, 'german_timeslots', False))
+        if german_cycle:
+            timeslots = db.scalars(select(Timeslot).where(Timeslot.label.like('German%')).order_by(Timeslot.sort_order)).all()
+        else:
+            timeslots = db.scalars(select(Timeslot).where(~Timeslot.label.like('German%')).order_by(Timeslot.sort_order)).all()
+    else:
+        timeslots = db.scalars(select(Timeslot).order_by(Timeslot.sort_order)).all()
     class_ids_filter: Optional[List[int]] = None
     if study_program_ids is not None:
         class_ids_filter = [cast(int, group.id) for group in groups]
@@ -478,6 +497,7 @@ def build_timetable_payload(
             items.sort(key=lambda item: (sort_rank[item["kind"]], item["course_name"]))
 
     return {
+        "cycle_name": getattr(cycle, 'name', '') if timetable_id is not None and timetable is not None and cycle is not None else '',
         "groups": [
             {
                 "id": g.id,

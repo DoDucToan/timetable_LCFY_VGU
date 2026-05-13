@@ -154,10 +154,27 @@ def _ensure_group_sort_order_column() -> None:
     conn.close()
 
 
+def _ensure_cycle_german_column() -> None:
+    conn = sqlite3.connect(str(DB_PATH))
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='cycle'")
+        if cur.fetchone() is None:
+            return
+        cur.execute("PRAGMA table_info(cycle)")
+        columns = [row[1] for row in cur.fetchall()]
+        if 'german_timeslots' not in columns:
+            cur.execute('ALTER TABLE cycle ADD COLUMN german_timeslots BOOLEAN NOT NULL DEFAULT 0')
+            conn.commit()
+    finally:
+        conn.close()
+
+
 def ensure_database() -> None:
     _migrate_course_for_group_table()
     _ensure_group_sort_order_column()
     _ensure_requirement_unique_constraints()
+    _ensure_cycle_german_column()
     Base.metadata.create_all(bind=engine)
 
 

@@ -64,9 +64,11 @@ async function refreshData(timetableId = null, cycleId = null) {
 }
 
 function renderRequirementsSection() {
-  const root = document.getElementById('requirementsList');
-  if (!root) return;
-  root.innerHTML = '';
+  const groupTagRoot = document.getElementById('groupTagRequirementsSummary');
+  const programRoot = document.getElementById('programRequirementsSummary');
+  const groupOnlyRoot = document.getElementById('groupOnlyRequirementsSummary');
+  if (!groupTagRoot || !programRoot || !groupOnlyRoot) return;
+
   const groupTags = state.data.group_tags || [];
   const programs = state.data.programs || [];
   const groups = state.data.groups || [];
@@ -92,20 +94,9 @@ function renderRequirementsSection() {
     });
   });
 
-  const summary = document.createElement('div');
-  summary.className = 'requirement-summary';
-  summary.innerHTML = `
-    <div class="summary-item">
-      <button type="button" class="ghost-btn" data-view-requirements="group_only">Group-only requirements (${groupOnlyRequirements.length})</button>
-    </div>
-    <div class="summary-item">
-      <button type="button" class="ghost-btn" data-view-requirements="group_tag">Group tag requirements (${groupTagRequirements.length})</button>
-    </div>
-    <div class="summary-item">
-      <button type="button" class="ghost-btn" data-view-requirements="program">Study program requirements (${programRequirements.length})</button>
-    </div>
-  `;
-  root.appendChild(summary);
+  groupOnlyRoot.innerHTML = `<button type="button" class="ghost-btn" data-view-requirements="group_only">Group-only requirements (${groupOnlyRequirements.length})</button>`;
+  groupTagRoot.innerHTML = `<button type="button" class="ghost-btn" data-view-requirements="group_tag">Group tag requirements (${groupTagRequirements.length})</button>`;
+  programRoot.innerHTML = `<button type="button" class="ghost-btn" data-view-requirements="program">Study program requirements (${programRequirements.length})</button>`;
 }
 
 function openViewRequirementsModal(type) {
@@ -1386,7 +1377,8 @@ function renderBoard() {
       tr.appendChild(timeTd);
 
       const rowKeys = slotRowMap[String(slot.id)]?.keys || [];
-      const rows = Math.max(1, rowKeys.length + 1);
+      const isGermanSlot = slot.label.startsWith('German');
+      const rows = isGermanSlot ? 1 : Math.max(1, rowKeys.length + 1);
 
       groups.forEach(group => {
         const td = document.createElement('td');
@@ -1412,11 +1404,12 @@ function renderBoard() {
           if (item) {
             strip.className = `strip filled ${item.color_key} ${item.kind}`;
             strip.innerHTML = renderStrip(item);
-          } else if (i === rows - 1) {
-            strip.className = 'strip empty plus';
-            strip.innerHTML = '<span class="plus-icon">+</span>';
           } else {
             strip.className = 'strip empty';
+          }
+          if (!isGermanSlot && i === rows - 1 && !item) {
+            strip.classList.add('plus');
+            strip.innerHTML = '<span class="plus-icon">+</span>';
           }
           stack.appendChild(strip);
         }
@@ -1448,7 +1441,7 @@ function renderBoard() {
       tr.appendChild(filler);
       tbody.appendChild(tr);
 
-      if (index === 0) {
+      if (slot.end === '12.00') {
         const lunch = document.createElement('tr');
         lunch.className = 'lunch-row';
         lunch.innerHTML = `<td class="slot-label lunch">Lunch break</td><td colspan="${groups.length + 1}"></td>`;
@@ -1683,6 +1676,9 @@ function openEntityModal(type, id = null) {
     if (type === 'cycle') {
       els.entityForm.elements.name.value = item.name;
       els.entityForm.elements.year_starting.value = item.year_starting;
+      if (els.entityForm.elements.german_timeslots) {
+        els.entityForm.elements.german_timeslots.checked = !!item.german_timeslots;
+      }
     } else if (type === 'timetable') {
       els.entityCycleSelect.value = String(item.cycle_id);
     } else if (type === 'group_tag') {
@@ -1752,6 +1748,7 @@ function toggleEntityFields(type) {
   show('entityNameWrap', ['cycle', 'group_tag', 'course_tag', 'program', 'room', 'teacher', 'course'].includes(type));
   show('entityCodeWrap', ['group_tag', 'program', 'room', 'course'].includes(type));
   show('entityYearWrap', type === 'cycle');
+  show('entityGermanTimeslotWrap', type === 'cycle');
   show('entityCapacityWrap', type === 'room');
   show('entityCycleWrap', type === 'timetable');
   show('entityCourseTagWrap', type === 'course');
@@ -1811,6 +1808,7 @@ function buildEntityPayload(type) {
     return {
       name: f.name.value,
       year_starting: Number(f.year_starting.value),
+      german_timeslots: !!f.german_timeslots?.checked,
     };
   }
   if (type === 'timetable') {
@@ -2291,18 +2289,20 @@ function validateClassModeSelection() {
   return true;
 }
 
-function getTimeslotOccupancy(timeslotId, ignoreCourseId = null) {
+function getTimeslotOccupancy(timeslotId) {
   const occupiedTeacherIds = new Set();
   const occupiedRoomIds = new Set();
   const teacherConflictsById = {};
   const roomConflictsById = {};
   const cells = state.data.cells || {};
   const slotMap = cells[String(timeslotId)] || {};
-  const ignoreCourseKey = ignoreCourseId != null ? String(ignoreCourseId) : null;
-  Object.values(slotMap).forEach(items => {
+  const groupMap = new Map((state.data.groups || []).map(g => [String(g.id), g.code || '']));
+  Object.entries(slotMap).forEach(([groupId, items]) => {
+    if (!Array.isArray(items)) return;
+    const groupCode = groupMap.get(groupId) || '';
     items.forEach(item => {
-      if (ignoreCourseKey && String(item.course_id) === ignoreCourseKey) return;
-      const conflictLabel = item.course_name || item.course_code || 'Unknown class';
+      const courseLabel = item.course_name || item.course_code || 'Unknown class';
+      const conflictLabel = groupCode ? `${groupCode} — ${courseLabel}` : courseLabel;
       if (item.teacher_id) {
         occupiedTeacherIds.add(item.teacher_id);
         teacherConflictsById[item.teacher_id] = teacherConflictsById[item.teacher_id] || new Set();
@@ -2328,7 +2328,7 @@ function updateRoomOptions(currentRoomId = null, timeslotId = null, courseId = n
   if (timeslotId == null && state.selected && state.selected.length) {
     timeslotId = state.selected[0].timeslotId;
   }
-  const { occupiedRoomIds, roomConflictsById } = getTimeslotOccupancy(timeslotId, courseId);
+  const { occupiedRoomIds, roomConflictsById } = getTimeslotOccupancy(timeslotId);
   fillSelect(
     els.roomSelect,
     [
@@ -2362,7 +2362,7 @@ function updateTeacherOptions(currentTeacherId = null, timeslotId = null, explic
   }
   let teacherOptions = [{ value: '', label: 'No teacher' }];
   if (timeslotId != null) {
-    const { occupiedTeacherIds, teacherConflictsById } = getTimeslotOccupancy(timeslotId, courseId);
+    const { occupiedTeacherIds, teacherConflictsById } = getTimeslotOccupancy(timeslotId);
     teacherOptions = [
       { value: '', label: 'No teacher' },
       ...teachers.map(t => {
@@ -2421,9 +2421,9 @@ async function submitClassForm(event) {
     notes: formData.get('notes') || null,
   };
   if (!validateClassModeSelection()) return;
-  // Allow teacher conflict for program classes and for require-all classes when the same teacher+room is used
+  // Allow teacher conflict only for program classes when the same teacher+room is used
   let allowTeacherConflict = false;
-  if (payload.mode === 'program' || payload.mode === 'required_all') {
+  if (payload.mode === 'program') {
     allowTeacherConflict = true;
   }
   let url = '/api/classes';
