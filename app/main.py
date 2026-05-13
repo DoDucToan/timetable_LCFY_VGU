@@ -347,7 +347,10 @@ def _build_current_data_workbook(entity: str, db: Session, timetable_id: Optiona
             query = query.options(joinedload(Course.study_program_links).joinedload(StudyProgramCourse.study_program))
         courses = db.scalars(query).unique().all()
         for course in courses:
-            programs = [link.study_program.code for link in course.study_program_links if link.study_program]
+            if tt_id is not None:
+                programs = [link.study_program.code for link in course.study_program_links if link.study_program and getattr(link, 'timetable_id', None) == tt_id]
+            else:
+                programs = [link.study_program.code for link in course.study_program_links if link.study_program]
             ws.append([course.id, course.code, course.name, course.course_tag.name if course.course_tag else '', course.require_all_student_in_group, course.elective, ', '.join(programs)])
     elif entity == 'course-tags':
         ws.append(['Id', 'Name'])
@@ -577,7 +580,7 @@ def _import_courses(file: UploadFile, db: Session, timetable_id: Optional[int] =
             setattr(course, 'course_tag_id', course_tag_id)
             setattr(course, 'require_all_student_in_group', require_all)
             setattr(course, 'elective', elective)
-        program_codes = _split_codes(row.get('Study Program Codes (comma-separated)'))
+        program_codes = list(dict.fromkeys(_split_codes(row.get('Study Program Codes (comma-separated)'))))
         db.query(StudyProgramCourse).filter(StudyProgramCourse.course_id == course.id, StudyProgramCourse.timetable_id == timetable_id).delete()
         for program_code in program_codes:
             if not program_code:
@@ -713,7 +716,7 @@ def _import_groups(file: UploadFile, db: Session, timetable_id: Optional[int] = 
             setattr(group, 'size_num', capacity)
             setattr(group, 'sort_order', sort_order if sort_order is not None else 0)
         db.query(GroupStudyProgram).filter(GroupStudyProgram.group_id == group.id).delete()
-        for program_code in _split_codes(row.get('Study Program Codes (comma-separated)')):
+        for program_code in list(dict.fromkeys(_split_codes(row.get('Study Program Codes (comma-separated)')))):
             if not program_code:
                 continue
             program_id = _find_study_program_id(db, program_code)
