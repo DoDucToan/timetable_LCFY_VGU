@@ -386,6 +386,7 @@ function cacheEls() {
     'cycleSelect',
     'timetableSelect',
     'editCycleBtn',
+    'duplicateCycleBtn',
     'deleteCycleBtn',
     'editTimetableBtn',
     'deleteTimetableBtn',
@@ -823,6 +824,29 @@ function bindGlobalActions() {
     });
   } else {
     console.warn('Missing element: editCycleBtn');
+  }
+  if (els.duplicateCycleBtn) {
+    els.duplicateCycleBtn.addEventListener('click', async () => {
+      const id = toNullableNumber(els.cycleSelect.value);
+      if (!id) return;
+      if (!confirm('Duplicate this cycle and its timetable?')) return;
+      const res = await fetch(`/api/cycles/${id}/duplicate`, { method: 'POST' });
+      const data = await safeJson(res);
+      if (!res.ok) {
+        alert(formatError(data));
+        return;
+      }
+      state.data = data;
+      state.selectedCycleId = data.selected_cycle_id;
+      state.timetableId = data.selected_timetable_id;
+      if (data.selected_cycle_id) {
+        window.location.href = `/cycle/${data.selected_cycle_id}`;
+      } else {
+        refreshData();
+      }
+    });
+  } else {
+    console.warn('Missing element: duplicateCycleBtn');
   }
   if (els.deleteCycleBtn) {
     els.deleteCycleBtn.addEventListener('click', () => {

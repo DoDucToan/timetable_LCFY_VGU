@@ -30,9 +30,10 @@ body {
 .topbar {
   display: flex;
   justify-content: space-between;
-  gap: 24px;
-  padding: 20px 0 12px;
-  align-items: flex-start;
+  gap: 20px;
+  padding: 16px 0 12px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .topbar h1 {
@@ -47,7 +48,7 @@ body {
 }
 
 .brand-logo img {
-  height: 40px;
+  height: 72px;
   width: auto;
   display: block;
 }
@@ -55,7 +56,49 @@ body {
 .topbar p {
   margin: 0;
   color: var(--muted);
-  max-width: 900px;
+  max-width: 420px;
+}
+
+.header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.topbar .header-actions > * {
+  flex-shrink: 0;
+}
+
+.topbar .primary-btn,
+.topbar .ghost-btn,
+.topbar .danger-btn {
+  padding: 8px 12px;
+  min-height: 36px;
+}
+
+.page-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0 0;
+  padding: 10px 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  align-items: center;
+}
+
+.page-nav-actions {
+  display: inline-flex;
+  margin-left: auto;
+  position: relative;
+}
+
+.page-nav-actions .ghost-btn {
+  padding: 8px 12px;
 }
 
 .page-nav {

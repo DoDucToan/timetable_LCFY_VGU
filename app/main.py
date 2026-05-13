@@ -1331,6 +1331,17 @@ def bootstrap_payload(db: Session, timetable_id: Optional[int] = None, cycle_id:
     return {**_build_timetable_payload(db, timetable_id, cycle_id), **_entity_payload(db, timetable_id, cycle_id)}
 
 
+def _delete_timetable_with_dependents(db: Session, timetable_id: int) -> None:
+    group_ids = db.scalars(select(Group.id).where(Group.timetable_id == timetable_id)).all()
+    if group_ids:
+        db.query(ScheduledClass).filter(ScheduledClass.group_id.in_(group_ids)).delete(synchronize_session=False)
+        db.query(GroupStudyProgram).filter(GroupStudyProgram.group_id.in_(group_ids)).delete(synchronize_session=False)
+        db.query(Group).filter(Group.id.in_(group_ids)).delete(synchronize_session=False)
+    db.query(CourseForGroupTag).filter(CourseForGroupTag.timetable_id == timetable_id).delete(synchronize_session=False)
+    db.query(StudyProgramCourse).filter(StudyProgramCourse.timetable_id == timetable_id).delete(synchronize_session=False)
+    db.query(Timetable).filter(Timetable.id == timetable_id).delete(synchronize_session=False)
+
+
 @app.get("/api/bootstrap")
 def api_bootstrap(
     timetable_id: Optional[int] = Query(default=None),
@@ -1390,6 +1401,98 @@ def create_cycle(payload: CycleIn, db: Session = Depends(get_db)):
     return bootstrap_payload(db)
 
 
+@app.post("/api/cycles/{cycle_id}/duplicate")
+def duplicate_cycle(cycle_id: int, db: Session = Depends(get_db)):
+    original = db.get(Cycle, cycle_id)
+    if not original:
+        raise HTTPException(status_code=404, detail="Cycle not found.")
+
+    base_name = original.name.strip()
+    existing_names = {
+        name for (name,) in db.execute(select(Cycle.name).where(Cycle.name.like(f"{base_name}%"))).all()
+    }
+    new_name = f"{base_name} copy"
+    suffix = 2
+    while new_name in existing_names:
+        new_name = f"{base_name} copy {suffix}"
+        suffix += 1
+
+    new_cycle = Cycle(name=new_name, year_starting=original.year_starting, german_timeslots=original.german_timeslots)
+    db.add(new_cycle)
+    db.flush()
+    new_cycle_id = int(getattr(new_cycle, 'id'))
+    if getattr(new_cycle, 'german_timeslots', False):
+        _ensure_german_timeslots(db)
+
+    new_timetable = Timetable(cycle_id=new_cycle_id, in_action=False)
+    db.add(new_timetable)
+    db.flush()
+    new_timetable_id = int(getattr(new_timetable, 'id'))
+
+    original_timetable = db.scalar(select(Timetable).where(Timetable.cycle_id == cycle_id).limit(1))
+    if original_timetable:
+        for req in db.scalars(select(CourseForGroupTag).where(CourseForGroupTag.timetable_id == original_timetable.id)).all():
+            db.add(CourseForGroupTag(
+                group_tag_id=req.group_tag_id,
+                course_id=req.course_id,
+                timetable_id=new_timetable_id,
+                sessions_required=req.sessions_required,
+            ))
+        for req in db.scalars(select(StudyProgramCourse).where(StudyProgramCourse.timetable_id == original_timetable.id)).all():
+            db.add(StudyProgramCourse(
+                study_program_id=req.study_program_id,
+                course_id=req.course_id,
+                timetable_id=new_timetable_id,
+                sessions_required=req.sessions_required,
+            ))
+
+        old_to_new: Dict[int, int] = {}
+        groups = db.scalars(select(Group).where(Group.timetable_id == original_timetable.id).order_by(Group.sort_order)).all()
+        for group in groups:
+            original_group_id = int(getattr(group, 'id'))
+            new_group = Group(
+                timetable_id=new_timetable_id,
+                group_tag_id=group.group_tag_id,
+                code=group.code,
+                name=group.name,
+                size_num=group.size_num,
+                sort_order=group.sort_order,
+            )
+            db.add(new_group)
+            db.flush()
+            new_group_id = int(getattr(new_group, 'id'))
+            old_to_new[original_group_id] = new_group_id
+
+            for link in group.study_program_links:
+                db.add(GroupStudyProgram(group_id=new_group_id, study_program_id=link.study_program_id))
+            for req in group.course_requirements:
+                db.add(CourseForGroup(
+                    group_id=new_group_id,
+                    course_id=req.course_id,
+                    sessions_required=req.sessions_required,
+                ))
+
+        classes = db.scalars(select(ScheduledClass).where(ScheduledClass.group_id.in_(list(old_to_new.keys())))).all()
+        for cls in classes:
+            original_group_id = int(getattr(cls, 'group_id'))
+            db.add(ScheduledClass(
+                group_id=old_to_new[original_group_id],
+                timeslot_id=cls.timeslot_id,
+                room_id=cls.room_id,
+                teacher_id=cls.teacher_id,
+                course_id=cls.course_id,
+                study_program_id=cls.study_program_id,
+                deploy=cls.deploy,
+                shared_key=cls.shared_key,
+                expected_size=cls.expected_size,
+                notes=cls.notes,
+                source=cls.source,
+            ))
+
+    db.commit()
+    return bootstrap_payload(db, None, new_cycle_id)
+
+
 @app.put("/api/cycles/{cycle_id}")
 def update_cycle(cycle_id: int, payload: CycleIn, db: Session = Depends(get_db)):
     row = db.get(Cycle, cycle_id)
@@ -1398,18 +1501,6 @@ def update_cycle(cycle_id: int, payload: CycleIn, db: Session = Depends(get_db))
     row.name = payload.name.strip()  # type: ignore
     row.year_starting = payload.year_starting  # type: ignore
     row.german_timeslots = payload.german_timeslots  # type: ignore
-    db.commit()
-    return bootstrap_payload(db)
-
-
-@app.delete("/api/cycles/{cycle_id}")
-def delete_cycle(cycle_id: int, db: Session = Depends(get_db)):
-    row = db.get(Cycle, cycle_id)
-    if not row:
-        raise HTTPException(status_code=404, detail="Cycle not found.")
-    if db.scalar(select(Timetable.id).where(Timetable.cycle_id == cycle_id).limit(1)):
-        raise HTTPException(status_code=400, detail="Delete timetables in this cycle first.")
-    db.delete(row)
     db.commit()
     return bootstrap_payload(db)
 
@@ -1459,11 +1550,19 @@ def delete_timetable(timetable_id: int, db: Session = Depends(get_db)):
     row = db.get(Timetable, timetable_id)
     if not row:
         raise HTTPException(status_code=404, detail="Timetable not found.")
-    group_ids = db.scalars(select(Group.id).where(Group.timetable_id == timetable_id)).all()
-    if group_ids:
-        db.query(ScheduledClass).filter(ScheduledClass.group_id.in_(group_ids)).delete(synchronize_session=False)
-        db.query(GroupStudyProgram).filter(GroupStudyProgram.group_id.in_(group_ids)).delete(synchronize_session=False)
-        db.query(Group).filter(Group.id.in_(group_ids)).delete(synchronize_session=False)
+    _delete_timetable_with_dependents(db, timetable_id)
+    db.commit()
+    return bootstrap_payload(db)
+
+
+@app.delete("/api/cycles/{cycle_id}")
+def delete_cycle(cycle_id: int, db: Session = Depends(get_db)):
+    row = db.get(Cycle, cycle_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Cycle not found.")
+    timetable_ids = db.scalars(select(Timetable.id).where(Timetable.cycle_id == cycle_id)).all()
+    for timetable_id in timetable_ids:
+        _delete_timetable_with_dependents(db, timetable_id)
     db.delete(row)
     db.commit()
     return bootstrap_payload(db)
