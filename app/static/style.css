@@ -350,7 +350,8 @@ body[data-active-section] .full-width {
 }
 
 #requirementsSection.full-width,
-.board-panel.full-width {
+.board-panel.full-width,
+.dashboard-grid.full-width {
   grid-column: 1 / -1;
 }
 
@@ -366,7 +367,7 @@ body[data-active-section] .full-width {
 
   .dashboard-grid {
     display: grid;
-    grid-template-columns: minmax(260px, 1fr) minmax(240px, 1fr) minmax(400px, 2fr) minmax(240px, 1fr) minmax(480px, 4fr);
+    grid-template-columns: minmax(280px, 1fr) minmax(280px, 1fr) minmax(280px, 1fr) minmax(280px, 1fr);
     grid-auto-columns: minmax(0, 1fr);
     gap: 16px;
     width: 100%;
@@ -519,12 +520,25 @@ body[data-active-section] .dashboard-card {
 .entity-row,
 .teacher-load-row {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 8px;
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 8px 10px;
   background: #fff;
+  align-items: center;
+}
+
+.teacher-load-row > span {
+  min-width: 0;
+  flex: 1;
+}
+
+.teacher-load-row > strong {
+  min-width: 30px;
+  width: 30px;
+  text-align: right;
+  display: inline-block;
 }
 
 .entity-text {
@@ -541,7 +555,14 @@ body[data-active-section] .dashboard-card {
 .entity-actions {
   display: flex;
   gap: 8px;
-  align-items: flex-start;
+  align-items: center;
+}
+
+.teacher-load-row .ghost-btn,
+.teacher-load-row .primary-btn,
+.teacher-load-row .danger-btn {
+  min-width: 96px;
+  white-space: nowrap;
 }
 
 #timetableBoard {

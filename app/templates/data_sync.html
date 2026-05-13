@@ -1,0 +1,73 @@
+{% extends "entity_base.html" %}
+
+{% block title %}Data sync{% endblock %}
+{% block subtitle %}Download current entity data and upload it back with IDs preserved for fixes.{% endblock %}
+
+{% block content %}
+<main>
+  <section class="card dashboard-card upload-card full-width" id="dataSyncSection">
+    <div class="subheader-row">
+      <h2>Data sync</h2>
+    </div>
+    <p class="muted">Export the current rows for any entity, then edit the exported file and upload it back to update existing records. The exported files include IDs so rows are replaced correctly.</p>
+    <div class="upload-grid">
+      <div class="upload-row">
+        <strong>Teachers</strong>
+        <div class="upload-actions">
+          <a class="ghost-btn small" href="/export-data/teachers.xlsx{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Export current</a>
+          <button class="ghost-btn small" id="uploadTeachersCurrentBtn">Upload current</button>
+        </div>
+      </div>
+      <div class="upload-row">
+        <strong>Study programs</strong>
+        <div class="upload-actions">
+          <a class="ghost-btn small" href="/export-data/study-programs.xlsx{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Export current</a>
+          <button class="ghost-btn small" id="uploadStudyProgramsCurrentBtn">Upload current</button>
+        </div>
+      </div>
+      <div class="upload-row">
+        <strong>Course tags</strong>
+        <div class="upload-actions">
+          <a class="ghost-btn small" href="/export-data/course-tags.xlsx{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Export current</a>
+          <button class="ghost-btn small" id="uploadCourseTagsCurrentBtn">Upload current</button>
+        </div>
+      </div>
+      <div class="upload-row">
+        <strong>Rooms</strong>
+        <div class="upload-actions">
+          <a class="ghost-btn small" href="/export-data/rooms.xlsx{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Export current</a>
+          <button class="ghost-btn small" id="uploadRoomsCurrentBtn">Upload current</button>
+        </div>
+      </div>
+      <div class="upload-row">
+        <strong>Courses</strong>
+        <div class="upload-actions">
+          <a class="ghost-btn small" href="/export-data/courses.xlsx{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Export current</a>
+          <button class="ghost-btn small" id="uploadCoursesCurrentBtn">Upload current</button>
+        </div>
+      </div>
+      <div class="upload-row">
+        <strong>Group tags</strong>
+        <div class="upload-actions">
+          <a class="ghost-btn small" href="/export-data/group-tags.xlsx{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Export current</a>
+          <button class="ghost-btn small" id="uploadGroupTagsCurrentBtn">Upload current</button>
+        </div>
+      </div>
+      <div class="upload-row">
+        <strong>Groups</strong>
+        <div class="upload-actions">
+          <a class="ghost-btn small" href="/export-data/groups.xlsx{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Export current</a>
+          <button class="ghost-btn small" id="uploadGroupsCurrentBtn">Upload current</button>
+        </div>
+      </div>
+      <div class="upload-row">
+        <strong>Requirements</strong>
+        <div class="upload-actions">
+          <a class="ghost-btn small" href="/export-data/requirements.xlsx{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Export current</a>
+          <button class="ghost-btn small" id="uploadRequirementsCurrentBtn">Upload current</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+{% endblock %}

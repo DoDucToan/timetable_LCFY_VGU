@@ -610,6 +610,23 @@ function bindGlobalActions() {
     }
   });
 
+  const currentDataUploadButtons = {
+    teachers: document.getElementById('uploadTeachersCurrentBtn'),
+    'study-programs': document.getElementById('uploadStudyProgramsCurrentBtn'),
+    'course-tags': document.getElementById('uploadCourseTagsCurrentBtn'),
+    rooms: document.getElementById('uploadRoomsCurrentBtn'),
+    courses: document.getElementById('uploadCoursesCurrentBtn'),
+    'group-tags': document.getElementById('uploadGroupTagsCurrentBtn'),
+    groups: document.getElementById('uploadGroupsCurrentBtn'),
+    requirements: document.getElementById('uploadRequirementsCurrentBtn'),
+  };
+
+  Object.entries(currentDataUploadButtons).forEach(([entity, button]) => {
+    if (button) {
+      button.addEventListener('click', () => openUploadDialog(entity));
+    }
+  });
+
   if (els.entityUploadInput) {
     els.entityUploadInput.addEventListener('change', handleEntityUpload);
   }

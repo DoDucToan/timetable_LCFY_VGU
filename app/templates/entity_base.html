@@ -28,6 +28,7 @@
             <a class="menu-item" href="/teachers{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Teachers</a>
             <a class="menu-item" href="/courses{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Courses</a>
             <a class="menu-item" href="/upload{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Upload</a>
+            <a class="menu-item" href="/data-sync{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Data sync</a>
           </div>
         </div>
       </div>
@@ -42,6 +43,7 @@
       <a class="page-nav-link{% if active_section == 'course-tags' %} active{% endif %}" href="/course-tags{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Course tags</a>
       <a class="page-nav-link{% if active_section == 'group-tags' %} active{% endif %}" href="/group-tags{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Group tags</a>
       <a class="page-nav-link{% if active_section == 'upload' %} active{% endif %}" href="/upload{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Upload</a>
+      <a class="page-nav-link{% if active_section == 'data-sync' %} active{% endif %}" href="/data-sync{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Data sync</a>
     </nav>
 
     <main class="layout">

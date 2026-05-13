@@ -143,6 +143,7 @@ def render_entity_page(request: Request, section: str, open_new: bool = False, c
         "course-tags": "course-tags.html",
         "group-tags": "group-tags.html",
         "upload": "upload.html",
+        "data-sync": "data_sync.html",
     }.get(section, "entity.html")
     return templates.TemplateResponse(
         request=request,
@@ -216,6 +217,10 @@ def group_tags_new_page(request: Request, cycle_id: Optional[int] = Query(defaul
 def upload_page(request: Request, cycle_id: Optional[int] = Query(default=None)):
     return render_entity_page(request, "upload", False, cycle_id)
 
+@app.get("/data-sync", response_class=HTMLResponse)
+def data_sync_page(request: Request, cycle_id: Optional[int] = Query(default=None)):
+    return render_entity_page(request, "data-sync", False, cycle_id)
+
 
 def _selected_timetable(db: Session, timetable_id: Optional[int], cycle_id: Optional[int] = None) -> Optional[Timetable]:
     if timetable_id:
@@ -281,6 +286,15 @@ def _parse_bool(value: Any) -> bool:
     return text in {'1', 'true', 'yes', 'y', 'on'}
 
 
+def _parse_int(value: Any) -> Optional[int]:
+    if value is None or str(value).strip() == '':
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _build_template_workbook(entity: str) -> Workbook:
     workbook = Workbook()
     ws: Worksheet = cast(Worksheet, workbook.active)
@@ -307,6 +321,80 @@ def _build_template_workbook(entity: str) -> Workbook:
     return workbook
 
 
+def _build_current_data_workbook(entity: str, db: Session, timetable_id: Optional[int] = None, cycle_id: Optional[int] = None) -> Workbook:
+    workbook = Workbook()
+    ws: Worksheet = cast(Worksheet, workbook.active)
+    title = entity.replace('-', ' ').title()
+    ws.title = title[:31]
+    tt_id = None
+    if entity in {'courses', 'groups', 'requirements'}:
+        tt_id = _current_timetable_id(db, timetable_id, cycle_id)
+    if entity == 'teachers':
+        ws.append(['Id', 'Name', 'Course Tag Names (comma-separated)'])
+        teachers = db.scalars(select(Teacher).order_by(Teacher.id)).all()
+        for teacher in teachers:
+            tags = [link.course_tag.name for link in teacher.course_tag_links if link.course_tag]
+            ws.append([teacher.id, teacher.name, ', '.join(tags)])
+    elif entity == 'study-programs':
+        ws.append(['Id', 'Code', 'Name'])
+        programs = db.scalars(select(StudyProgram).order_by(StudyProgram.id)).all()
+        for program in programs:
+            ws.append([program.id, program.code, program.name])
+    elif entity == 'courses':
+        ws.append(['Id', 'Code', 'Name', 'Course Tag Name', 'Require All (True/False)', 'Elective (True/False)', 'Study Program Codes (comma-separated)'])
+        query = select(Course).order_by(Course.id)
+        if tt_id is not None:
+            query = query.options(joinedload(Course.study_program_links).joinedload(StudyProgramCourse.study_program))
+        courses = db.scalars(query).unique().all()
+        for course in courses:
+            programs = [link.study_program.code for link in course.study_program_links if link.study_program]
+            ws.append([course.id, course.code, course.name, course.course_tag.name if course.course_tag else '', course.require_all_student_in_group, course.elective, ', '.join(programs)])
+    elif entity == 'course-tags':
+        ws.append(['Id', 'Name'])
+        tags = db.scalars(select(CourseTag).order_by(CourseTag.id)).all()
+        for tag in tags:
+            ws.append([tag.id, tag.name])
+    elif entity == 'rooms':
+        ws.append(['Id', 'Code', 'Name', 'Capacity'])
+        rooms = db.scalars(select(Room).order_by(Room.id)).all()
+        for room in rooms:
+            ws.append([room.id, room.code, room.name, room.capacity_num])
+    elif entity == 'group-tags':
+        ws.append(['Id', 'Code', 'Name'])
+        tags = db.scalars(select(GroupTag).order_by(GroupTag.id)).all()
+        for tag in tags:
+            ws.append([tag.id, tag.code, tag.name])
+    elif entity == 'groups':
+        ws.append(['Id', 'Timetable Id', 'Code', 'Name', 'Group Tag Code', 'Study Program Codes (comma-separated)', 'Capacity', 'Sort Order'])
+        query = select(Group).order_by(Group.id).options(joinedload(Group.study_program_links).joinedload(GroupStudyProgram.study_program), joinedload(Group.group_tag))
+        if tt_id is not None:
+            query = query.where(Group.timetable_id == tt_id)
+        groups = db.scalars(query).unique().all()
+        for group in groups:
+            programs = [link.study_program.code for link in group.study_program_links if link.study_program]
+            ws.append([group.id, group.timetable_id, group.code, group.name, group.group_tag.code if group.group_tag else '', ', '.join(programs), group.size_num, group.sort_order])
+    elif entity == 'requirements':
+        ws.append(['Id', 'Requirement Type (group_tag, program, or group_only)', 'Timetable Id', 'Target Code', 'Course Code', 'Sessions Required'])
+        group_requirements = cast(List[CourseForGroupTag], db.scalars(select(CourseForGroupTag).options(joinedload(CourseForGroupTag.group_tag), joinedload(CourseForGroupTag.course)).order_by(CourseForGroupTag.id)).all())
+        if tt_id is not None:
+            group_requirements = [req for req in group_requirements if cast(Optional[int], getattr(req, 'timetable_id', None)) == tt_id]
+        for req in group_requirements:
+            ws.append([req.id, 'group_tag', req.timetable_id, req.group_tag.code if req.group_tag else '', req.course.code if req.course else '', req.sessions_required])
+        program_requirements = cast(List[StudyProgramCourse], db.scalars(select(StudyProgramCourse).options(joinedload(StudyProgramCourse.study_program), joinedload(StudyProgramCourse.course)).order_by(StudyProgramCourse.id)).all())
+        if tt_id is not None:
+            program_requirements = [req for req in program_requirements if cast(Optional[int], getattr(req, 'timetable_id', None)) == tt_id]
+        for req in program_requirements:
+            ws.append([req.id, 'program', req.timetable_id, req.study_program.code if req.study_program else '', req.course.code if req.course else '', req.sessions_required])
+        group_only_requirements = cast(List[CourseForGroup], db.scalars(select(CourseForGroup).options(joinedload(CourseForGroup.group), joinedload(CourseForGroup.course)).order_by(CourseForGroup.id)).all())
+        if tt_id is not None:
+            group_only_requirements = [req for req in group_only_requirements if req.group and req.group.timetable_id == tt_id]
+        for req in group_only_requirements:
+            ws.append([req.id, 'group_only', req.group.timetable_id if req.group else '', req.group.code if req.group else '', req.course.code if req.course else '', req.sessions_required])
+    else:
+        raise HTTPException(status_code=404, detail='Export entity not found.')
+    return workbook
+
+
 def _template_response(workbook: Workbook, filename: str) -> StreamingResponse:
     buffer = io.BytesIO()
     workbook.save(buffer)
@@ -315,7 +403,20 @@ def _template_response(workbook: Workbook, filename: str) -> StreamingResponse:
         buffer,
         media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         headers={
-            'Content-Disposition': f'attachment; filename="{filename}"'
+            'Content-Disposition': f'attachment; filename="{filename}"',
+        },
+    )
+
+
+def _current_data_response(workbook: Workbook, filename: str) -> StreamingResponse:
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    buffer.seek(0)
+    return StreamingResponse(
+        buffer,
+        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={
+            'Content-Disposition': f'attachment; filename="{filename}"',
         },
     )
 
@@ -381,35 +482,60 @@ def _find_course_id_by_code(db: Session, code: str) -> int:
 def _import_teachers(file: UploadFile, db: Session) -> None:
     rows = _read_excel_rows(file)
     for row in rows:
+        teacher_id = _parse_int(row.get('Id'))
         name = _normalize_str(row.get('Name'))
-        if not name:
-            continue
-        exists = db.scalar(select(Teacher.id).where(Teacher.name == name).limit(1))
-        if exists:
-            continue
-        teacher = Teacher(name=name)
-        db.add(teacher)
-        db.flush()
         codes = _split_codes(row.get('Course Tag Names (comma-separated)'))
-        for code in codes:
-            if not code:
+        teacher = None
+        if teacher_id is not None:
+            teacher = db.get(Teacher, teacher_id)
+            if not teacher:
+                raise HTTPException(status_code=404, detail=f'Teacher not found: {teacher_id}')
+        if teacher is None and name:
+            teacher = cast(Teacher, db.scalar(select(Teacher).where(Teacher.name == name).limit(1)))
+        if teacher is None:
+            if not name:
                 continue
-            tag_id = _find_course_tag_id(db, code)
-            db.add(TeacherCourseTag(teacher_id=teacher.id, course_tag_id=tag_id))
+            teacher = Teacher(name=name)
+            db.add(teacher)
+            db.flush()
+        else:
+            teacher_name = getattr(teacher, 'name', None)
+            if name and teacher_name != name:
+                setattr(teacher, 'name', name)
+        # update teacher course tags
+        existing_tags = {link.course_tag.name for link in teacher.course_tag_links if link.course_tag}
+        requested_tags = {code for code in codes if code}
+        if existing_tags != requested_tags:
+            for link in list(teacher.course_tag_links):
+                db.delete(link)
+            for code in requested_tags:
+                tag_id = _find_course_tag_id(db, code)
+                db.add(TeacherCourseTag(teacher_id=teacher.id, course_tag_id=tag_id))
     db.commit()
 
 
 def _import_study_programs(file: UploadFile, db: Session) -> None:
     rows = _read_excel_rows(file)
     for row in rows:
+        program_id = _parse_int(row.get('Id'))
         code = _normalize_str(row.get('Code')).upper()
         name = _normalize_str(row.get('Name'))
-        if not code or not name:
-            continue
-        existing = db.scalar(select(StudyProgram.id).where(StudyProgram.code == code).limit(1))
-        if existing:
-            continue
-        db.add(StudyProgram(code=code, name=name))
+        program = None
+        if program_id is not None:
+            program = db.get(StudyProgram, program_id)
+            if not program:
+                raise HTTPException(status_code=404, detail=f'Study program not found: {program_id}')
+        if program is None and code:
+            program = cast(StudyProgram, db.scalar(select(StudyProgram).where(StudyProgram.code == code).limit(1)))
+        if program is None:
+            if not code or not name:
+                continue
+            db.add(StudyProgram(code=code, name=name))
+        else:
+            if code and getattr(program, 'code', None) != code:
+                setattr(program, 'code', code)
+            if name and getattr(program, 'name', None) != name:
+                setattr(program, 'name', name)
     db.commit()
 
 
@@ -419,26 +545,40 @@ def _import_courses(file: UploadFile, db: Session, timetable_id: Optional[int] =
         raise HTTPException(status_code=400, detail='No active timetable found for course import.')
     rows = _read_excel_rows(file)
     for row in rows:
+        course_id = _parse_int(row.get('Id'))
         code = _normalize_str(row.get('Code')).upper()
         name = _normalize_str(row.get('Name'))
         course_tag_name = _normalize_str(row.get('Course Tag Name'))
         if not code or not name or not course_tag_name:
             continue
-        if db.scalar(select(Course.id).where(Course.code == code).limit(1)):
-            continue
+        course = None
+        if course_id is not None:
+            course = db.get(Course, course_id)
+            if not course:
+                raise HTTPException(status_code=404, detail=f'Course not found: {course_id}')
+        if course is None:
+            course = db.scalar(select(Course).where(Course.code == code).limit(1))
         course_tag_id = _find_course_tag_id(db, course_tag_name)
         require_all = _parse_bool(row.get('Require All (True/False)'))
         elective = _parse_bool(row.get('Elective (True/False)'))
-        course = Course(
-            code=code,
-            name=name,
-            course_tag_id=course_tag_id,
-            require_all_student_in_group=require_all,
-            elective=elective,
-        )
-        db.add(course)
-        db.flush()
+        if course is None:
+            course = Course(
+                code=code,
+                name=name,
+                course_tag_id=course_tag_id,
+                require_all_student_in_group=require_all,
+                elective=elective,
+            )
+            db.add(course)
+            db.flush()
+        else:
+            setattr(course, 'code', code)
+            setattr(course, 'name', name)
+            setattr(course, 'course_tag_id', course_tag_id)
+            setattr(course, 'require_all_student_in_group', require_all)
+            setattr(course, 'elective', elective)
         program_codes = _split_codes(row.get('Study Program Codes (comma-separated)'))
+        db.query(StudyProgramCourse).filter(StudyProgramCourse.course_id == course.id, StudyProgramCourse.timetable_id == timetable_id).delete()
         for program_code in program_codes:
             if not program_code:
                 continue
@@ -450,43 +590,72 @@ def _import_courses(file: UploadFile, db: Session, timetable_id: Optional[int] =
 def _import_course_tags(file: UploadFile, db: Session) -> None:
     rows = _read_excel_rows(file)
     for row in rows:
+        tag_id = _parse_int(row.get('Id'))
         name = _normalize_str(row.get('Name'))
-        if not name:
-            continue
-        if db.scalar(select(CourseTag.id).where(CourseTag.name == name).limit(1)):
-            continue
-        db.add(CourseTag(name=name))
+        course_tag = None
+        if tag_id is not None:
+            course_tag = db.get(CourseTag, tag_id)
+            if not course_tag:
+                raise HTTPException(status_code=404, detail=f'Course tag not found: {tag_id}')
+        if course_tag is None and name:
+            course_tag = cast(CourseTag, db.scalar(select(CourseTag).where(CourseTag.name == name).limit(1)))
+        if course_tag is None:
+            if not name:
+                continue
+            db.add(CourseTag(name=name))
+        else:
+            if name and getattr(course_tag, 'name', None) != name:
+                setattr(course_tag, 'name', name)
     db.commit()
 
 
 def _import_rooms(file: UploadFile, db: Session) -> None:
     rows = _read_excel_rows(file)
     for row in rows:
+        room_id = _parse_int(row.get('Id'))
         code = _normalize_str(row.get('Code')).upper()
         name = _normalize_str(row.get('Name'))
         capacity = int(row.get('Capacity') or 0)
         if not code or not name or capacity <= 0:
             continue
-        if db.scalar(select(Room.id).where(Room.code == code).limit(1)):
-            continue
-        db.add(Room(code=code, name=name, capacity_num=capacity))
+        room = None
+        if room_id is not None:
+            room = db.get(Room, room_id)
+            if not room:
+                raise HTTPException(status_code=404, detail=f'Room not found: {room_id}')
+        if room is None:
+            room = db.scalar(select(Room).where(Room.code == code).limit(1))
+        if room is None:
+            db.add(Room(code=code, name=name, capacity_num=capacity))
+        else:
+            setattr(room, 'code', code)
+            setattr(room, 'name', name)
+            setattr(room, 'capacity_num', capacity)
     db.commit()
 
 
 def _import_group_tags(file: UploadFile, db: Session) -> None:
     rows = _read_excel_rows(file)
     for row in rows:
+        group_tag_id = _parse_int(row.get('Id'))
         code = _normalize_str(row.get('Code')).upper()
         name = _normalize_str(row.get('Name'))
-        if not code or not name:
-            continue
-        existing = db.scalar(select(GroupTag).where(GroupTag.code == code).limit(1))
-        if existing is not None:
-            existing_row = existing
-            if getattr(existing_row, 'name', None) != name:
-                setattr(existing_row, 'name', name)
-            continue
-        db.add(GroupTag(code=code, name=name))
+        group_tag = None
+        if group_tag_id is not None:
+            group_tag = db.get(GroupTag, group_tag_id)
+            if not group_tag:
+                raise HTTPException(status_code=404, detail=f'Group tag not found: {group_tag_id}')
+        if group_tag is None and code:
+            group_tag = db.scalar(select(GroupTag).where(GroupTag.code == code).limit(1))
+        if group_tag is None:
+            if not code or not name:
+                continue
+            db.add(GroupTag(code=code, name=name))
+        else:
+            if code and getattr(group_tag, 'code', None) != code:
+                setattr(group_tag, 'code', code)
+            if name and getattr(group_tag, 'name', None) != name:
+                setattr(group_tag, 'name', name)
     db.commit()
 
 
@@ -502,8 +671,8 @@ def _import_groups(file: UploadFile, db: Session, timetable_id: Optional[int] = 
             try:
                 timetable_id = int(timetable_value)
             except (TypeError, ValueError):
-                # Non-numeric timetable values are ignored and the current timetable is used.
                 timetable_id = default_timetable_id
+        group_id = _parse_int(row.get('Id'))
         code = _normalize_str(row.get('Code')).upper()
         name = _normalize_str(row.get('Name')) or code
         group_tag_code = _normalize_str(row.get('Group Tag Code')).upper()
@@ -518,19 +687,32 @@ def _import_groups(file: UploadFile, db: Session, timetable_id: Optional[int] = 
                 sort_order = int(sort_value)
             except (TypeError, ValueError):
                 sort_order = None
-        existing = db.scalar(select(Group.id).where(Group.timetable_id == timetable_id, Group.code == code).limit(1))
-        if existing:
-            continue
-        group = Group(
-            timetable_id=timetable_id,
-            code=code,
-            name=name,
-            group_tag_id=group_tag_id,
-            size_num=capacity,
-            sort_order=sort_order if sort_order is not None else 0,
-        )
-        db.add(group)
-        db.flush()
+        group = None
+        if group_id is not None:
+            group = db.get(Group, group_id)
+            if not group:
+                raise HTTPException(status_code=404, detail=f'Group not found: {group_id}')
+        if group is None:
+            group = db.scalar(select(Group).where(Group.timetable_id == timetable_id, Group.code == code).limit(1))
+        if group is None:
+            group = Group(
+                timetable_id=timetable_id,
+                code=code,
+                name=name,
+                group_tag_id=group_tag_id,
+                size_num=capacity,
+                sort_order=sort_order if sort_order is not None else 0,
+            )
+            db.add(group)
+            db.flush()
+        else:
+            setattr(group, 'timetable_id', timetable_id)
+            setattr(group, 'code', code)
+            setattr(group, 'name', name)
+            setattr(group, 'group_tag_id', group_tag_id)
+            setattr(group, 'size_num', capacity)
+            setattr(group, 'sort_order', sort_order if sort_order is not None else 0)
+        db.query(GroupStudyProgram).filter(GroupStudyProgram.group_id == group.id).delete()
         for program_code in _split_codes(row.get('Study Program Codes (comma-separated)')):
             if not program_code:
                 continue
@@ -556,6 +738,7 @@ def _import_requirements(file: UploadFile, db: Session, timetable_id: Optional[i
     if timetable_id is None:
         raise HTTPException(status_code=400, detail='No active timetable found for requirements import.')
     for row in rows:
+        requirement_id = _parse_int(row.get('Id'))
         req_type = _normalize_str(row.get('Requirement Type (group_tag, program, or group_only)')).lower()
         if not req_type:
             req_type = _normalize_str(row.get('Requirement Type (group_tag or program)')).lower()
@@ -565,6 +748,33 @@ def _import_requirements(file: UploadFile, db: Session, timetable_id: Optional[i
             continue
         course_id = _find_course_id_by_code(db, course_code)
         sessions = int(row.get('Sessions Required') or 1)
+        if requirement_id is not None:
+            if req_type in {'group_tag', 'group tag'}:
+                req = db.get(CourseForGroupTag, requirement_id)
+                if not req:
+                    raise HTTPException(status_code=404, detail=f'Requirement not found: {requirement_id}')
+                setattr(req, 'timetable_id', timetable_id)
+                setattr(req, 'group_tag_id', _find_group_tag_id(db, target_code))
+                setattr(req, 'course_id', course_id)
+                setattr(req, 'sessions_required', sessions)
+                continue
+            if req_type in {'program', 'study_program', 'study program'}:
+                req = db.get(StudyProgramCourse, requirement_id)
+                if not req:
+                    raise HTTPException(status_code=404, detail=f'Requirement not found: {requirement_id}')
+                setattr(req, 'timetable_id', timetable_id)
+                setattr(req, 'study_program_id', _find_study_program_id(db, target_code))
+                setattr(req, 'course_id', course_id)
+                setattr(req, 'sessions_required', sessions)
+                continue
+            if req_type in {'group_only', 'group-only', 'group only'}:
+                req = db.get(CourseForGroup, requirement_id)
+                if not req:
+                    raise HTTPException(status_code=404, detail=f'Requirement not found: {requirement_id}')
+                setattr(req, 'group_id', _find_group_id(db, target_code, timetable_id))
+                setattr(req, 'course_id', course_id)
+                setattr(req, 'sessions_required', sessions)
+                continue
         if req_type in {'group_tag', 'group tag'}:
             group_tag_id = _find_group_tag_id(db, target_code)
             _upsert_group_tag_requirement(db, timetable_id, group_tag_id, course_id, sessions)
@@ -591,6 +801,12 @@ def download_template(entity: str):
     workbook = _build_template_workbook(entity)
     filename = f'{entity.replace('-', '_')}_template.xlsx'
     return _template_response(workbook, filename)
+
+@app.get('/export-data/{entity}.xlsx')
+def export_current_data(entity: str, db: Session = Depends(get_db), timetable_id: Optional[int] = Query(default=None), cycle_id: Optional[int] = Query(default=None)):
+    workbook = _build_current_data_workbook(entity, db, timetable_id, cycle_id)
+    filename = f'{entity.replace('-', '_')}_current_data.xlsx'
+    return _current_data_response(workbook, filename)
 
 @app.post('/api/import/teachers')
 def import_teachers(file: UploadFile = File(...), db: Session = Depends(get_db)):
