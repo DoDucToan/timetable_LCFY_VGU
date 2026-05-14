@@ -2260,11 +2260,14 @@ def export_file(
     program_id: Optional[int] = Query(default=None),
     program_ids: Optional[List[int]] = Query(default=None),
     group_ids: Optional[List[int]] = Query(default=None),
+    group_tag_ids: Optional[List[int]] = Query(default=None),
     teacher_ids: Optional[List[int]] = Query(default=None),
     db: Session = Depends(get_db),
 ):
-    if (group_ids or teacher_ids) and (program_id is not None or program_ids is not None):
+    if (group_ids or teacher_ids or group_tag_ids) and (program_id is not None or program_ids is not None):
         raise HTTPException(status_code=400, detail="Cannot combine study program and group/teacher export filters.")
+    if group_tag_ids is not None and (group_ids is not None or teacher_ids is not None):
+        raise HTTPException(status_code=400, detail="Cannot combine group tag export filters with other export filters.")
 
     timetable = _selected_timetable(db, timetable_id)
     if not timetable:
@@ -2299,6 +2302,16 @@ def export_file(
         if not found_group_ids:
             raise HTTPException(status_code=404, detail="No deployed groups found for the selected teacher(s) in this timetable.")
         selected_group_ids = found_group_ids
+    elif group_tag_ids is not None:
+        found_group_tag_ids = [int(gtid) for gtid in db.scalars(select(GroupTag.id).where(GroupTag.id.in_(group_tag_ids))).all()]
+        if not found_group_tag_ids:
+            raise HTTPException(status_code=404, detail="No matching group tags found.")
+        selected_group_ids = [int(gid) for gid in db.scalars(
+            select(Group.id)
+            .where(Group.timetable_id == timetable.id, Group.group_tag_id.in_(found_group_tag_ids))
+        ).all()]
+        if not selected_group_ids:
+            raise HTTPException(status_code=404, detail="No groups found for the selected group tags in this timetable.")
     elif program_ids is not None:
         selected_programs = list(db.scalars(select(StudyProgram).where(StudyProgram.id.in_(program_ids))).all())
         if not selected_programs:
@@ -2506,6 +2519,13 @@ def export_file(
     if group_ids is not None:
         suffix_codes = make_export_suffix([str(group.code) for group in groups], 'groups')
         program_suffix = f"_{suffix_codes}"
+    elif group_tag_ids is not None:
+        group_tag_codes = [
+            str(gt.code)
+            for gt in db.scalars(select(GroupTag).where(GroupTag.id.in_(group_tag_ids))).all()
+        ]
+        suffix_codes = make_export_suffix(group_tag_codes, 'group-tags')
+        program_suffix = f"_{suffix_codes}"
     elif teacher_ids is not None:
         teacher_names = [
             str(t.name)
@@ -2534,6 +2554,7 @@ def export_file(
         timetable_id=timetable_id,
         study_program_ids=selected_program_ids,
         group_ids=selected_group_ids,
+        group_tag_ids=group_tag_ids,
         teacher_ids=selected_teacher_ids,
     )
     return FileResponse(

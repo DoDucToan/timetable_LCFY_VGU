@@ -33,7 +33,8 @@
         <div class="menu-dropdown hidden" id="manageMenuDropdown">
           <a class="menu-item" id="exportBtn" href="/export.xlsx" download="timetable.xlsx">Export Excel</a>
           <button class="menu-item" type="button" id="exportProgramBtn">Export by program</button>
-          <button class="menu-item" type="button" id="exportGroupBtn">Export by group</button>
+          <button class="menu-item" type="button" id="exportGroupBtn">Export for group</button>
+          <button class="menu-item" type="button" id="exportGroupTagBtn">Export by group tags</button>
           <button class="menu-item" type="button" id="exportAllGroupBtn">Export all groups</button>
           <button class="menu-item" type="button" id="exportTeacherBtn">Export by teacher</button>
           <button class="menu-item" type="button" id="exportAllTeacherBtn">Export all teachers</button>
@@ -271,6 +272,25 @@
           </div>
           <div class="full-span form-actions between-actions">
             <button type="button" class="ghost-btn" data-close="exportGroupModal">Cancel</button>
+            <button type="submit" class="primary-btn">Export</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal hidden" id="exportGroupTagModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2>Export group tags</h2>
+          <button class="icon-btn" data-close="exportGroupTagModal">×</button>
+        </div>
+        <form id="exportGroupTagForm" class="form-grid">
+          <div class="full-span">
+            <span>Select group tags</span>
+            <div id="exportGroupTagOptions" class="checkbox-grid"></div>
+          </div>
+          <div class="full-span form-actions between-actions">
+            <button type="button" class="ghost-btn" data-close="exportGroupTagModal">Cancel</button>
             <button type="submit" class="primary-btn">Export</button>
           </div>
         </form>

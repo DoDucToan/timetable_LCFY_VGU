@@ -403,6 +403,10 @@ function cacheEls() {
     'exportGroupModal',
     'exportGroupForm',
     'exportGroupOptions',
+    'exportGroupTagBtn',
+    'exportGroupTagModal',
+    'exportGroupTagForm',
+    'exportGroupTagOptions',
     'exportTeacherModal',
     'exportTeacherForm',
     'exportTeacherOptions',
@@ -539,6 +543,9 @@ function bindGlobalActions() {
   if (els.exportGroupBtn) {
     els.exportGroupBtn.addEventListener('click', openExportGroupModal);
   }
+  if (els.exportGroupTagBtn) {
+    els.exportGroupTagBtn.addEventListener('click', openExportGroupTagModal);
+  }
   if (els.exportAllGroupBtn) {
     els.exportAllGroupBtn.addEventListener('click', openExportAllGroup);
   }
@@ -553,6 +560,9 @@ function bindGlobalActions() {
   }
   if (els.exportGroupForm) {
     els.exportGroupForm.addEventListener('submit', submitExportGroupForm);
+  }
+  if (els.exportGroupTagForm) {
+    els.exportGroupTagForm.addEventListener('submit', submitExportGroupTagForm);
   }
   if (els.exportTeacherForm) {
     els.exportTeacherForm.addEventListener('submit', submitExportTeacherForm);
@@ -2559,6 +2569,48 @@ function renderGroupCheckboxesByTag(container, groups, groupName) {
     section.appendChild(sectionGrid);
     container.appendChild(section);
   });
+}
+
+function renderGroupTagCheckboxes(container, groupTags, groupName) {
+  if (!container) return;
+  container.innerHTML = '';
+  groupTags.forEach(tag => {
+    const label = document.createElement('label');
+    label.className = 'checkbox-card';
+    label.innerHTML = `
+      <input type="checkbox" name="${groupName}" value="${tag.id}" />
+      <span>${escapeHtml(tag.code || tag.name || 'Group tag')}</span>
+      ${tag.name && tag.name !== tag.code ? `<small>${escapeHtml(tag.name)}</small>` : ''}
+    `;
+    container.appendChild(label);
+  });
+}
+
+function openExportGroupTagModal() {
+  if (!els.exportGroupTagModal || !els.exportGroupTagOptions) return;
+  if (!(state.data.group_tags || []).length) {
+    alert('No group tags available to export.');
+    return;
+  }
+  renderGroupTagCheckboxes(els.exportGroupTagOptions, state.data.group_tags || [], 'exportGroupTags');
+  openModal('exportGroupTagModal');
+}
+
+async function submitExportGroupTagForm(e) {
+  e.preventDefault();
+  if (!state.timetableId) {
+    alert('Select a timetable first.');
+    return;
+  }
+  const groupTagIds = collectCheckedValues(els.exportGroupTagOptions);
+  if (!groupTagIds.length) {
+    alert('Select at least one group tag.');
+    return;
+  }
+  const params = groupTagIds.map(id => `group_tag_ids=${id}`).join('&');
+  const url = `/export.xlsx?timetable_id=${state.timetableId}&${params}`;
+  closeModal('exportGroupTagModal');
+  await downloadExcel(url, 'Exporting group tags...');
 }
 
 function renderTeacherCheckboxesByCourseTag(container, teachers, groupName) {

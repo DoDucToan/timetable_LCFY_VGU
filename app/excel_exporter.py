@@ -1,8 +1,9 @@
 from __future__ import annotations
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, cast
+from typing import Any, Dict, List, Optional, Set, Tuple, TypedDict, cast
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
+import textwrap
 
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image as OpenpyxlImage
@@ -26,22 +27,22 @@ FILL_MAP = {
 }
 
 PROGRAM_FILL_VARIANTS = [
-    "C9DAF8",
-    "F4B183",
-    "D9D2E9",
-    "B6D7A8",
-    "EAD1DC",
-    "FFF2CC",
-    "D0E0E3",
-    "FCE4D6",
-    "E2EFDA",
-    "F9CB9C",
-    "FFEB9C",
-    "B4C6E7",
-    "EAD1E7",
-    "D9EBCF",
-    "F7D9A6",
-    "CFE2FF",
+    "7389D8",
+    "6CB4A0",
+    "D09B8F",
+    "A16DCB",
+    "96C53D",
+    "E78E8E",
+    "6797C6",
+    "D8A53F",
+    "5B9EA0",
+    "C06AA7",
+    "8FC0D4",
+    "D99866",
+    "7BB16F",
+    "B9695F",
+    "A581B9",
+    "8C8C8C",
 ]
 
 TAG_FILL_VARIANTS = [
@@ -58,10 +59,11 @@ TAG_FILL_VARIANTS = [
 ]
 
 BLANK_FILL = "D9D9D9"
-REQUIRED_ROW_HEIGHT = 117
+REQUIRED_ROW_HEIGHT = 32
 OVERLAY_ROW_HEIGHT = 40
-_LINE_HEIGHT_PTS = 22    # ← add this
-_OVERLAY_MIN_HEIGHT = 24  # ← add this
+_LINE_HEIGHT_PTS = 15
+_OVERLAY_MIN_HEIGHT = 18
+
 
 def _format_item(item: Dict[str, Any]) -> str:
     course_name = str(item["course_name"])
@@ -91,49 +93,41 @@ def _format_item(item: Dict[str, Any]) -> str:
 
 
 def _estimate_line_count(text: str, width_cols: int) -> int:
-    line_width = max(12, int(18 * width_cols))
+    max_chars = int(width_cols) if width_cols > 10 else max(12, int(24 * width_cols))
     total_lines = 0
-    paragraphs = text.split("\n")  # ← NEW: honour hard newlines
-    separators = [" ", "_", "-", "/", ",", "(", ")", "["]
+    paragraphs = text.split("\n")
 
     for paragraph in paragraphs:
-        words: List[str] = [paragraph]
-        for sep in separators:
-            parts: List[str] = []
-            for word in words:
-                parts.extend(word.split(sep))
-            words = [part for part in parts if part]
-
-        if not words:
+        if paragraph.strip() == "":
             total_lines += 1
             continue
 
-        line_count = 0
-        current_len = 0
-        for word in words:
-            word_len = len(word)
-            if current_len == 0:
-                current_len = word_len
-            elif current_len + 1 + word_len <= line_width:
-                current_len += 1 + word_len
-            else:
-                line_count += 1
-                current_len = word_len
-            if word_len >= line_width:
-                line_count += word_len // line_width
-                current_len = word_len % line_width
-        if current_len > 0:
-            line_count += 1
-        total_lines += max(1, line_count)
+        wrapped = textwrap.wrap(paragraph, width=max_chars, break_long_words=True, break_on_hyphens=False)
+        total_lines += max(1, len(wrapped))
 
     return max(1, total_lines)
 
 
 
 
-def _row_height_for_text(text: str, width_cols: int = 1, min_height: int = 24) -> int:
-    line_count = _estimate_line_count(text, width_cols)
-    return max(min_height, line_count * _LINE_HEIGHT_PTS + 10)  # ← uses constant
+def _column_range_width_chars(ws: Worksheet, start_col: int, end_col: int) -> int:
+    total_width = 0.0
+    for col_idx in range(start_col, end_col + 1):
+        letter = get_column_letter(col_idx)
+        width = getattr(ws.column_dimensions[letter], "width", None)
+        total_width += float(width) if width not in (None, 0) else 10.0
+    # Use a slightly smaller effective width to ensure enough wrap height.
+    return int(max(8, total_width * 0.88))
+
+
+def _row_height_for_text(text: str, width_cols: int = 1, min_height: int = 24, font_size: int = 11) -> int:
+    effective_width = width_cols
+    if effective_width < 10:
+        effective_width = max(8, int(effective_width * 24))
+    estimated_chars = max(8, int(effective_width * 0.88))
+    line_count = _estimate_line_count(text, estimated_chars)
+    line_height = max(font_size * 1.35, float(_LINE_HEIGHT_PTS))
+    return max(min_height, int(line_count * line_height + 10))
 
 
 def _program_fill_color(program_codes: List[str]) -> str:
@@ -159,6 +153,8 @@ def _get_fill_color(item: Dict[str, Any]) -> str:
 
 def _assign_program_colors_for_slot(overlays: List[Dict[str, Any]], program_color_map: Dict[str, str]) -> None:
     used: set[str] = set(program_color_map.values())
+    used.update(FILL_MAP.values())
+    used.update(TAG_FILL_VARIANTS)
     for item in overlays:
         if item.get("kind") != "program":
             continue
@@ -267,8 +263,28 @@ def _same_overlay_connectable(a: Dict[str, Any], b: Dict[str, Any]) -> bool:
     )
 
 
+class _RowEntry(TypedDict):
+    text: str
+    fill_color: str
+
+
 def _cell(ws: Worksheet, row: int, column: int, value: Any | None = None) -> Cell:
     return cast(Cell, ws.cell(row=row, column=column, value=value))
+
+
+def _parse_time_minutes(value: Any | None) -> Optional[int]:
+    if value is None:
+        return None
+    text = str(value).strip().replace('.', ':')
+    parts = [p.strip() for p in text.split(':') if p.strip()]
+    if not parts:
+        return None
+    try:
+        hours = int(parts[0])
+        minutes = int(parts[1]) if len(parts) > 1 else 0
+        return hours * 60 + minutes
+    except ValueError:
+        return None
 
 
 def _write_overlay_merge(
@@ -309,12 +325,21 @@ def _write_group_timetable_sheet(
         title += f" ({', '.join(program_codes)})"
     ws.title = _sanitize_sheet_title(title)
 
+    timeslots_by_day: Dict[str, List[Dict[str, Any]]] = {}
+    for ts in timeslots:
+        timeslots_by_day.setdefault(ts["weekday"], []).append(ts)
+
+    active_days: List[Tuple[int, str]] = sorted({(t["day_index"], t["weekday"]) for t in timeslots}, key=lambda d: d[0])
+    active_day_slots: List[Dict[str, Any]] = [ts for ts in timeslots if (ts["day_index"], ts["weekday"]) in active_days]
+
     time_labels: List[str] = []
-    for timeslot in timeslots:
+    label_to_slot: Dict[str, Dict[str, Any]] = {}
+    for timeslot in sorted(active_day_slots, key=lambda t: (t["day_index"], t["sort_order"])):
         if timeslot["label"] not in time_labels:
             time_labels.append(timeslot["label"])
+            label_to_slot[timeslot["label"]] = timeslot
 
-    days = sorted({(t["day_index"], t["weekday"]) for t in timeslots}, key=lambda d: d[0])
+    days = active_days
 
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=1 + len(days))
     title_cell = _cell(ws, 1, 1, title)
@@ -337,15 +362,22 @@ def _write_group_timetable_sheet(
 
     elective_items: List[Dict[str, Any]] = []
     row = 3
-    for label in time_labels:
+    for idx, label in enumerate(time_labels):
         day_cells: Dict[int, List[Dict[str, Any]]] = {}
         for day_index, weekday in days:
             day_slots = [ts for ts in timeslots if ts["day_index"] == day_index and ts["label"] == label]
             if not day_slots:
                 day_cells[day_index] = []
                 continue
-            timeslot = day_slots[0]
-            slot_items = payload["cells"].get(str(timeslot["id"]), {}).get(str(group_id), [])
+            slot_items: List[Dict[str, Any]] = []
+            for timeslot in day_slots:
+                candidate_items = cast(List[Dict[str, Any]], payload["cells"].get(str(timeslot["id"]), {}).get(str(group_id), []))
+                if candidate_items:
+                    slot_items = candidate_items
+                    break
+            if not slot_items:
+                timeslot = day_slots[0]
+                slot_items = cast(List[Dict[str, Any]], payload["cells"].get(str(timeslot["id"]), {}).get(str(group_id), []))
             expanded_items: List[Dict[str, Any]] = []
             for item in slot_items:
                 if item.get("kind") == "elective":
@@ -372,12 +404,11 @@ def _write_group_timetable_sheet(
                 merged_time_cell = _cell(ws, current_row, 1, None)
                 merged_time_cell.border = border
             row_height = _OVERLAY_MIN_HEIGHT
-            for col_idx, (day_index, weekday) in enumerate(days, start=2):
-                cell = _cell(ws, current_row, col_idx)
-                cell.border = border
+            row_entries: List[Optional[_RowEntry]] = []
+            for day_index, weekday in days:
                 items = day_cells.get(day_index, [])
                 if row_offset >= len(items):
-                    cell.fill = blank_fill
+                    row_entries.append(None)
                     continue
 
                 item = items[row_offset]
@@ -387,18 +418,104 @@ def _write_group_timetable_sheet(
                         item["fill_color"] = program_color_map[program_key]
                 text = _format_item(item)
                 fill_color = _get_fill_color(item)
-                cell.value = text
-                cell.fill = PatternFill("solid", fgColor=fill_color)
-                cell.alignment = Alignment(horizontal="center", vertical="top", wrap_text=True)
+                row_entries.append({"text": text, "fill_color": fill_color})
+
+            for col_idx, entry in enumerate(row_entries, start=2):
+                cell = _cell(ws, current_row, col_idx)
+                cell.border = border
+                if entry is None:
+                    cell.fill = blank_fill
+                    continue
+                cell.value = entry["text"]
+                cell.fill = PatternFill("solid", fgColor=str(entry["fill_color"]))
+                cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
                 cell.font = Font(bold=True, size=12)
-                needed_height = _row_height_for_text(text, width_cols=1, min_height=_OVERLAY_MIN_HEIGHT)
+                column_width = _column_range_width_chars(ws, col_idx, col_idx)
+                needed_height = _row_height_for_text(entry["text"], width_cols=column_width, min_height=_OVERLAY_MIN_HEIGHT, font_size=12)
                 row_height = max(row_height, needed_height)
+
+            if label.startswith("German") and len(days) > 1:
+                segment_start = None
+                segment_entry = None
+                for idx_day, entry in enumerate(row_entries):
+                    if entry is None:
+                        if segment_start is not None and idx_day - segment_start > 1:
+                            assert segment_entry is not None
+                            start_col = 2 + segment_start
+                            end_col = 2 + idx_day - 1
+                            ws.merge_cells(start_row=current_row, start_column=start_col, end_row=current_row, end_column=end_col)
+                            merged_cell = _cell(ws, current_row, start_col)
+                            merged_cell.value = segment_entry["text"]
+                            merged_cell.fill = PatternFill("solid", fgColor=str(segment_entry["fill_color"]))
+                            merged_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                            merged_cell.font = Font(bold=True, size=12)
+                            for c in range(start_col, end_col + 1):
+                                ws.cell(row=current_row, column=c).border = border
+                                if c != start_col:
+                                    _cell(ws, current_row, c).value = None
+                        segment_start = None
+                        segment_entry = None
+                        continue
+
+                    if segment_start is None:
+                        segment_start = idx_day
+                        segment_entry = entry
+                        continue
+
+                    if segment_entry is not None and (entry["text"] != segment_entry["text"] or entry["fill_color"] != segment_entry["fill_color"]):
+                        if idx_day - segment_start > 1:
+                            segment_entry_value = segment_entry
+                            start_col = 2 + segment_start
+                            end_col = 2 + idx_day - 1
+                            ws.merge_cells(start_row=current_row, start_column=start_col, end_row=current_row, end_column=end_col)
+                            merged_cell = _cell(ws, current_row, start_col)
+                            merged_cell.value = segment_entry_value["text"]
+                            merged_cell.fill = PatternFill("solid", fgColor=str(segment_entry_value["fill_color"]))
+                            merged_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                            merged_cell.font = Font(bold=True, size=12)
+                            for c in range(start_col, end_col + 1):
+                                ws.cell(row=current_row, column=c).border = border
+                                if c != start_col:
+                                    _cell(ws, current_row, c).value = None
+                        segment_start = idx_day
+                        segment_entry = entry
+
+                if segment_start is not None and len(row_entries) - segment_start > 1:
+                    assert segment_entry is not None
+                    segment_entry_value = segment_entry
+                    start_col = 2 + segment_start
+                    end_col = 2 + len(row_entries) - 1
+                    ws.merge_cells(start_row=current_row, start_column=start_col, end_row=current_row, end_column=end_col)
+                    merged_cell = _cell(ws, current_row, start_col)
+                    merged_cell.value = segment_entry_value["text"]
+                    merged_cell.fill = PatternFill("solid", fgColor=str(segment_entry_value["fill_color"]))
+                    merged_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                    merged_cell.font = Font(bold=True, size=12)
+                    for c in range(start_col, end_col + 1):
+                        ws.cell(row=current_row, column=c).border = border
+                        if c != start_col:
+                            _cell(ws, current_row, c).value = None
 
             row_dimension = ws.row_dimensions[current_row]
             current_height = float(getattr(row_dimension, "height", 0) or 0)
             row_dimension.height = float(max(current_height, row_height))
 
         row += rows_for_label
+        if idx < len(time_labels) - 1:
+            current_slot = label_to_slot.get(label)
+            next_slot = label_to_slot.get(time_labels[idx + 1])
+            current_end = _parse_time_minutes(current_slot.get("end") if current_slot else None)
+            next_start = _parse_time_minutes(next_slot.get("start") if next_slot else None)
+            if current_end is not None and next_start is not None and current_end <= 12 * 60 and next_start >= 13 * 60:
+                lunch_row = row
+                ws.merge_cells(start_row=lunch_row, start_column=1, end_row=lunch_row, end_column=1 + len(days))
+                lunch_cell = _cell(ws, lunch_row, 1, "Lunch break")
+                lunch_cell.fill = PatternFill("solid", fgColor="F2F2F2")
+                lunch_cell.alignment = Alignment(horizontal="center", vertical="center")
+                lunch_cell.font = Font(italic=True)
+                for c in range(1, 2 + len(days)):
+                    ws.cell(row=lunch_row, column=c).border = border
+                row += 1
 
     if elective_items:
         row += 1
@@ -420,10 +537,11 @@ def _write_group_timetable_sheet(
             ws.cell(row=row, column=2, value=elective["time"]) .border = border
             detail = _format_item(elective["item"])
             detail_cell = _cell(ws, row, 3, detail)
-            detail_cell.alignment = Alignment(wrap_text=True, vertical="top")
+            detail_cell.alignment = Alignment(wrap_text=True, vertical="center")
             detail_cell.border = border
             detail_cell.font = Font(bold=True, size=12)
-            ws.row_dimensions[row].height = _row_height_for_text(detail, width_cols=3, min_height=_OVERLAY_MIN_HEIGHT)
+            detail_width = _column_range_width_chars(ws, 3, 3)
+            ws.row_dimensions[row].height = _row_height_for_text(detail, width_cols=detail_width, min_height=_OVERLAY_MIN_HEIGHT, font_size=12)
             row += 1
 
 
@@ -640,7 +758,7 @@ def _write_timetable_sheet(
         cell.font = Font(bold=True, size=15)
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         cell.border = border
-        ws.column_dimensions[get_column_letter(idx)].width = float(24)
+        ws.column_dimensions[get_column_letter(idx)].width = float(22)
     ws.row_dimensions[4].height = 72
 
     row = 5
@@ -649,12 +767,34 @@ def _write_timetable_sheet(
     for ts in timeslots:
         day_to_slots.setdefault(ts["weekday"], []).append(ts)
 
+    active_days: List[Tuple[int, str]] = []
     for day_idx in range(1, 6):
         weekday = weekday_names[day_idx]
+        day_slots = day_to_slots.get(weekday, [])
+        if not day_slots:
+            continue
+        has_class = any(
+            any(
+                cell_map.get(str(slot["id"]), {}).get(str(group["id"]), [])
+                for group in groups
+            )
+            for slot in day_slots
+        )
+        if has_class:
+            active_days.append((day_idx, weekday))
+
+    if not active_days:
+        active_days = [(day_idx, weekday_names[day_idx]) for day_idx in range(1, 6) if day_to_slots.get(weekday_names[day_idx])]
+
+    first_active_day = True
+    german_rows: List[int] = []
+    for day_idx, weekday in active_days:
         day_slots: List[Dict[str, Any]] = sorted(day_to_slots.get(weekday, []), key=lambda item: item["sort_order"])
+        if not day_slots:
+            continue
         day_start_row = row
 
-        if day_slots and day_idx != 1:
+        if not first_active_day:
             group_header_row = row
             for idx, group in enumerate(groups, start=3):
                 program_codes = ", ".join([p["code"] for p in group.get("programs", [])])
@@ -670,8 +810,13 @@ def _write_timetable_sheet(
             ws.row_dimensions[group_header_row].height = 72
             row += 1
 
-        for slot in day_slots:
+        first_active_day = False
+
+        prev_german_row: Optional[int] = None
+        prev_german_slot_items: Optional[Dict[int, Tuple[str, str]]] = None
+        for slot_index, slot in enumerate(day_slots):
             slot_items = cell_map.get(str(slot["id"]), {})
+            next_slot = day_slots[slot_index + 1] if slot_index + 1 < len(day_slots) else None
             is_german_slot = str(slot.get("label", "")).startswith("German")
             if is_german_slot:
                 slot_start_row = row
@@ -683,6 +828,8 @@ def _write_timetable_sheet(
                 time_cell.border = border
 
                 row_height = _OVERLAY_MIN_HEIGHT
+                current_items: Dict[int, Tuple[str, str]] = {}
+                visible_items: Dict[int, Tuple[str, str]] = {}
                 for col_idx2, group in enumerate(groups, start=3):
                     items = slot_items.get(str(group["id"]), [])
                     cell = _cell(ws, required_row, col_idx2)
@@ -692,15 +839,172 @@ def _write_timetable_sheet(
                         continue
                     text = "\n".join(_format_item(item) for item in items)
                     first_item = items[0]
+                    fill_color = _get_fill_color(first_item)
+                    current_items[group["id"]] = (text, fill_color)
+                    if prev_german_slot_items is not None and prev_german_slot_items.get(group["id"]) == current_items[group["id"]]:
+                        cell.fill = blank_fill
+                        cell.border = border
+                        continue
+
+                    visible_items[group["id"]] = (text, fill_color)
                     cell.value = text
-                    cell.fill = PatternFill("solid", fgColor=_get_fill_color(first_item))
-                    cell.alignment = Alignment(horizontal="center", vertical="top", wrap_text=True)
+                    cell.fill = PatternFill("solid", fgColor=fill_color)
+                    cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
                     cell.font = Font(bold=True, size=15)
                     cell.border = border
-                    needed_height = _row_height_for_text(text, width_cols=1, min_height=_OVERLAY_MIN_HEIGHT)
+                    column_width = _column_range_width_chars(ws, col_idx2, col_idx2)
+                    needed_height = _row_height_for_text(text, width_cols=column_width, min_height=_OVERLAY_MIN_HEIGHT, font_size=15)
                     row_height = max(row_height, needed_height)
+
+                segment_start: Optional[int] = None
+                segment_text: Optional[str] = None
+                segment_fill: Optional[str] = None
+                for col_idx2, group in enumerate(groups, start=3):
+                    entry = visible_items.get(group["id"])
+                    if entry is None:
+                        if segment_start is not None:
+                            segment_end = col_idx2 - 1
+                            if segment_end > segment_start:
+                                assert segment_text is not None and segment_fill is not None
+                                merged_width = _column_range_width_chars(ws, segment_start, segment_end)
+                                row_height = max(
+                                    row_height,
+                                    _row_height_for_text(
+                                        segment_text,
+                                        width_cols=merged_width,
+                                        min_height=_OVERLAY_MIN_HEIGHT,
+                                        font_size=15,
+                                    ),
+                                )
+                                ws.merge_cells(
+                                    start_row=required_row,
+                                    start_column=segment_start,
+                                    end_row=required_row,
+                                    end_column=segment_end,
+                                )
+                                merged_cell = _cell(ws, required_row, segment_start)
+                                merged_cell.value = segment_text
+                                merged_cell.fill = PatternFill("solid", fgColor=segment_fill)
+                                merged_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                                merged_cell.font = Font(bold=True, size=15)
+                                for c in range(segment_start, segment_end + 1):
+                                    ws.cell(row=required_row, column=c).border = border
+                            segment_start = None
+                            segment_text = None
+                            segment_fill = None
+                        continue
+
+                    text, fill_color = entry
+                    if segment_start is None:
+                        segment_start = col_idx2
+                        segment_text = text
+                        segment_fill = fill_color
+                        continue
+                    if text == segment_text and fill_color == segment_fill:
+                        continue
+
+                    segment_end = col_idx2 - 1
+                    if segment_end > segment_start:
+                        assert segment_text is not None and segment_fill is not None
+                        merged_width = _column_range_width_chars(ws, segment_start, segment_end)
+                        row_height = max(
+                            row_height,
+                            _row_height_for_text(
+                                segment_text,
+                                width_cols=merged_width,
+                                min_height=_OVERLAY_MIN_HEIGHT,
+                                font_size=15,
+                            ),
+                        )
+                        ws.merge_cells(
+                            start_row=required_row,
+                            start_column=segment_start,
+                            end_row=required_row,
+                            end_column=segment_end,
+                        )
+                        merged_cell = _cell(ws, required_row, segment_start)
+                        merged_cell.value = segment_text
+                        merged_cell.fill = PatternFill("solid", fgColor=segment_fill)
+                        merged_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                        merged_cell.font = Font(bold=True, size=15)
+                        for c in range(segment_start, segment_end + 1):
+                            ws.cell(row=required_row, column=c).border = border
+                    segment_start = col_idx2
+                    segment_text = text
+                    segment_fill = fill_color
+
+                if segment_start is not None:
+                    segment_end = len(groups) + 2
+                    if segment_end > segment_start:
+                        assert segment_text is not None and segment_fill is not None
+                        merged_width = _column_range_width_chars(ws, segment_start, segment_end)
+                        row_height = max(
+                            row_height,
+                            _row_height_for_text(
+                                segment_text,
+                                width_cols=merged_width,
+                                min_height=_OVERLAY_MIN_HEIGHT,
+                                font_size=15,
+                            ),
+                        )
+                        ws.merge_cells(
+                            start_row=required_row,
+                            start_column=segment_start,
+                            end_row=required_row,
+                            end_column=segment_end,
+                        )
+                        merged_cell = _cell(ws, required_row, segment_start)
+                        merged_cell.value = segment_text
+                        merged_cell.fill = PatternFill("solid", fgColor=segment_fill)
+                        merged_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                        merged_cell.font = Font(bold=True, size=15)
+                        for c in range(segment_start, segment_end + 1):
+                            ws.cell(row=required_row, column=c).border = border
+
+                if prev_german_slot_items is not None and prev_german_row is not None:
+                    for col_idx2, group in enumerate(groups, start=3):
+                        prev_item = prev_german_slot_items.get(group["id"])
+                        curr_item = current_items.get(group["id"])
+                        if prev_item is not None and curr_item is not None and prev_item == curr_item:
+                            ws.merge_cells(
+                                start_row=prev_german_row,
+                                start_column=col_idx2,
+                                end_row=required_row,
+                                end_column=col_idx2,
+                            )
+                            merged_cell = _cell(ws, prev_german_row, col_idx2)
+                            merged_cell.value = curr_item[0]
+                            merged_cell.fill = PatternFill("solid", fgColor=curr_item[1])
+                            merged_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                            merged_cell.font = Font(bold=True, size=15)
+                            for r in range(prev_german_row, required_row + 1):
+                                cell = _cell(ws, r, col_idx2)
+                                cell.border = border
+                                if r != prev_german_row:
+                                    cell.fill = blank_fill
+
                 ws.row_dimensions[required_row].height = row_height
+                german_rows.append(required_row)
                 row += 1
+
+                current_end = _parse_time_minutes(slot.get("end"))
+                next_start = _parse_time_minutes(next_slot.get("start") if next_slot else None)
+                lunch_needed = False
+                if current_end is not None and next_start is not None and current_end <= 12 * 60 and next_start >= 13 * 60:
+                    lunch_row = row
+                    ws.merge_cells(start_row=lunch_row, start_column=2, end_row=lunch_row, end_column=total_cols)
+                    lunch = ws.cell(row=lunch_row, column=2, value="Lunch break")
+                    lunch.fill = lunch_fill
+                    lunch.alignment = Alignment(horizontal="center")
+                    lunch.font = Font(italic=True)
+                    for c in range(2, total_cols + 1):
+                        ws.cell(row=lunch_row, column=c).border = border
+                    row += 1
+                    prev_german_slot_items = None
+                    prev_german_row = None
+                else:
+                    prev_german_slot_items = current_items
+                    prev_german_row = required_row
                 continue
 
             overlay_rows_content: List[List[Dict[str, Any]]] = []
@@ -777,10 +1081,12 @@ def _write_timetable_sheet(
                     next_col += 1
                 if end_col > col_idx:
                     _write_overlay_merge(ws, required_row, col_idx, end_col, req, border)
+                    req_width = _column_range_width_chars(ws, col_idx, end_col)
                     req_height = _row_height_for_text(
                         _format_item(req),
-                        width_cols=end_col - col_idx + 1,
+                        req_width,
                         min_height=REQUIRED_ROW_HEIGHT,
+                        font_size=15,
                     )
                     required_row_height = max(required_row_height, req_height)
                     col_idx = end_col + 1
@@ -791,10 +1097,12 @@ def _write_timetable_sheet(
                     req_cell.border = border
                     req_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
                     req_cell.font = Font(bold=True, size=15)
+                    req_width = _column_range_width_chars(ws, col_idx, col_idx)
                     req_height = _row_height_for_text(
                         _format_item(req),
-                        width_cols=1,
+                        req_width,
                         min_height=REQUIRED_ROW_HEIGHT,
+                        font_size=15,
                     )
                     required_row_height = max(required_row_height, req_height)
                     col_idx += 1
@@ -821,18 +1129,26 @@ def _write_timetable_sheet(
                 # Compute height based on each contiguous merged segment, not on total present columns.
                 needed_height = _OVERLAY_MIN_HEIGHT
                 segment_width = 0
-                for has in row_has_overlay + [False]:
+                segment_start: Optional[int] = None
+                for idx, has in enumerate(row_has_overlay + [False]):
                     if has:
+                        if segment_start is None:
+                            segment_start = idx
                         segment_width += 1
                         continue
-                    if segment_width:
+                    if segment_width and segment_start is not None:
+                        start_col = 3 + segment_start
+                        end_col = 3 + segment_start + segment_width - 1
+                        segment_chars = _column_range_width_chars(ws, start_col, end_col)
                         segment_height = _row_height_for_text(
                             _format_item(overlay_item),
-                            width_cols=segment_width,
+                            segment_chars,
                             min_height=_OVERLAY_MIN_HEIGHT,
+                            font_size=15,
                         )
                         needed_height = max(needed_height, segment_height)
                         segment_width = 0
+                        segment_start = None
                 row_dimension: RowDimension = ws.row_dimensions[overlay_row]
                 current_height = float(getattr(row_dimension, "height", 0) or 0)
                 setattr(row_dimension, "height", float(max(current_height, needed_height)))
@@ -870,7 +1186,12 @@ def _write_timetable_sheet(
 
             row = slot_end_row + 1
 
-            if slot.get("end") == "12.00":
+            next_start = _parse_time_minutes(next_slot.get("start") if next_slot else None)
+            slot_end = _parse_time_minutes(slot.get("end"))
+            lunch_needed = False
+            if slot_end is not None and next_start is not None:
+                lunch_needed = slot_end <= 12 * 60 and next_start >= 13 * 60
+            if lunch_needed:
                 lunch_row = row
                 ws.merge_cells(start_row=lunch_row, start_column=2, end_row=lunch_row, end_column=total_cols)
                 lunch = ws.cell(row=lunch_row, column=2, value="Lunch break")
@@ -903,6 +1224,16 @@ def _write_timetable_sheet(
     timetable_end_row = row - 1
     last_group_col = 2 + len(groups)
     max_col = ws.max_column
+
+    if german_rows:
+        max_german_height = max(
+            float(getattr(ws.row_dimensions[r], "height", 0) or 0)
+            for r in german_rows
+        )
+        if max_german_height > 0:
+            for r in german_rows:
+                ws.row_dimensions[r].height = max_german_height
+
     white_fill = PatternFill("solid", fgColor="FFFFFF")
     for r in range(5, timetable_end_row + 1):
         for c in range(last_group_col + 1, max_col + 1):
@@ -929,6 +1260,7 @@ def export_timetable_xlsx(
     timetable_id: Optional[int] = None,
     study_program_ids: Optional[List[int]] = None,
     group_ids: Optional[List[int]] = None,
+    group_tag_ids: Optional[List[int]] = None,
     teacher_ids: Optional[List[int]] = None,
 ) -> Path:
     output_path = Path(output_path)
@@ -976,7 +1308,7 @@ def export_timetable_xlsx(
         wb.save(output_path)
         return output_path
 
-    if group_ids is not None:
+    if group_ids is not None and group_tag_ids is None:
         group_sheets = payload["groups"]
         program_color_map = _build_program_color_map(payload)
         sheet_titles = _unique_sheet_titles([str(group["code"]) for group in group_sheets])
