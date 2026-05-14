@@ -2262,12 +2262,15 @@ def export_file(
     group_ids: Optional[List[int]] = Query(default=None),
     group_tag_ids: Optional[List[int]] = Query(default=None),
     teacher_ids: Optional[List[int]] = Query(default=None),
+    course_ids: Optional[List[int]] = Query(default=None),
     db: Session = Depends(get_db),
 ):
-    if (group_ids or teacher_ids or group_tag_ids) and (program_id is not None or program_ids is not None):
-        raise HTTPException(status_code=400, detail="Cannot combine study program and group/teacher export filters.")
-    if group_tag_ids is not None and (group_ids is not None or teacher_ids is not None):
+    if (group_ids or teacher_ids or group_tag_ids or course_ids) and (program_id is not None or program_ids is not None):
+        raise HTTPException(status_code=400, detail="Cannot combine study program and group/teacher/course export filters.")
+    if group_tag_ids is not None and (group_ids is not None or teacher_ids is not None or course_ids is not None):
         raise HTTPException(status_code=400, detail="Cannot combine group tag export filters with other export filters.")
+    if course_ids is not None and (group_ids is not None or teacher_ids is not None or group_tag_ids is not None):
+        raise HTTPException(status_code=400, detail="Cannot combine course export with group, teacher, or group tag export filters.")
 
     timetable = _selected_timetable(db, timetable_id)
     if not timetable:
@@ -2275,6 +2278,7 @@ def export_file(
 
     selected_group_ids: Optional[List[int]] = None
     selected_teacher_ids: Optional[List[int]] = None
+    selected_course_ids: Optional[List[int]] = None
     selected_program = None
     selected_programs: Optional[List[StudyProgram]] = None
     if group_ids is not None:
@@ -2301,6 +2305,24 @@ def export_file(
         ]
         if not found_group_ids:
             raise HTTPException(status_code=404, detail="No deployed groups found for the selected teacher(s) in this timetable.")
+        selected_group_ids = found_group_ids
+    elif course_ids is not None:
+        selected_course_ids = course_ids
+        found_group_ids = [
+            int(gid)
+            for gid in db.scalars(
+                select(Group.id)
+                .join(ScheduledClass, ScheduledClass.group_id == Group.id)
+                .where(
+                    Group.timetable_id == timetable.id,
+                    ScheduledClass.deploy.is_(True),
+                    ScheduledClass.course_id.in_(course_ids),
+                )
+                .distinct()
+            ).all()
+        ]
+        if not found_group_ids:
+            raise HTTPException(status_code=404, detail="No deployed groups found for the selected course(s) in this timetable.")
         selected_group_ids = found_group_ids
     elif group_tag_ids is not None:
         found_group_tag_ids = [int(gtid) for gtid in db.scalars(select(GroupTag.id).where(GroupTag.id.in_(group_tag_ids))).all()]
@@ -2352,6 +2374,8 @@ def export_file(
         class_count_query = class_count_query.where(ScheduledClass.group_id.in_(selected_group_ids))
     if selected_teacher_ids is not None:
         class_count_query = class_count_query.where(ScheduledClass.teacher_id.in_(selected_teacher_ids))
+    if selected_course_ids is not None:
+        class_count_query = class_count_query.where(ScheduledClass.course_id.in_(selected_course_ids))
     existing_class_count = db.scalar(class_count_query)
     if not existing_class_count:
         raise HTTPException(status_code=400, detail="No deployed classes found for selected timetable.")
@@ -2372,6 +2396,8 @@ def export_file(
         class_count_query = class_count_query.where(ScheduledClass.teacher_id.in_(selected_teacher_ids))
     if selected_program_export_ids is not None:
         class_count_query = class_count_query.where(ScheduledClass.study_program_id.in_(selected_program_export_ids))
+    if selected_course_ids is not None:
+        class_count_query = class_count_query.where(ScheduledClass.course_id.in_(selected_course_ids))
     existing_class_count = db.scalar(class_count_query)
     if not existing_class_count:
         raise HTTPException(status_code=400, detail="No deployed classes found for selected timetable.")
@@ -2387,6 +2413,8 @@ def export_file(
         missing_assignment_query = missing_assignment_query.where(ScheduledClass.teacher_id.in_(selected_teacher_ids))
     if selected_program_export_ids is not None:
         missing_assignment_query = missing_assignment_query.where(ScheduledClass.study_program_id.in_(selected_program_export_ids))
+    if selected_course_ids is not None:
+        missing_assignment_query = missing_assignment_query.where(ScheduledClass.course_id.in_(selected_course_ids))
     if db.scalar(missing_assignment_query):
         raise HTTPException(status_code=400, detail="Cannot export: some deployed classes are missing teacher or room assignment.")
 
@@ -2533,6 +2561,13 @@ def export_file(
         ]
         suffix_codes = make_export_suffix(teacher_names, 'teachers')
         program_suffix = f"_{suffix_codes}"
+    elif course_ids is not None:
+        course_names = [
+            str(c.name)
+            for c in db.scalars(select(Course).where(Course.id.in_(selected_course_ids or [])))
+        ]
+        suffix_codes = make_export_suffix(course_names, 'courses')
+        program_suffix = f"_{suffix_codes}"
     elif program_ids is not None and selected_programs:
         suffix_codes = make_export_suffix([str(prog.code) for prog in selected_programs], 'programs')
         program_suffix = f"_{suffix_codes}"
@@ -2556,6 +2591,7 @@ def export_file(
         group_ids=selected_group_ids,
         group_tag_ids=group_tag_ids,
         teacher_ids=selected_teacher_ids,
+        course_ids=selected_course_ids,
     )
     return FileResponse(
         out_path,

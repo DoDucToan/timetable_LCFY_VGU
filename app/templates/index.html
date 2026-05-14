@@ -36,6 +36,8 @@
           <button class="menu-item" type="button" id="exportGroupBtn">Export for group</button>
           <button class="menu-item" type="button" id="exportGroupTagBtn">Export by group tags</button>
           <button class="menu-item" type="button" id="exportAllGroupBtn">Export all groups</button>
+          <button class="menu-item" type="button" id="exportCourseBtn">Export by course</button>
+          <button class="menu-item" type="button" id="exportAllCourseBtn">Export all courses</button>
           <button class="menu-item" type="button" id="exportTeacherBtn">Export by teacher</button>
           <button class="menu-item" type="button" id="exportAllTeacherBtn">Export all teachers</button>
         </div>
@@ -310,6 +312,25 @@
           </div>
           <div class="full-span form-actions between-actions">
             <button type="button" class="ghost-btn" data-close="exportTeacherModal">Cancel</button>
+            <button type="submit" class="primary-btn">Export</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal hidden" id="exportCourseModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2>Export courses</h2>
+          <button class="icon-btn" data-close="exportCourseModal">×</button>
+        </div>
+        <form id="exportCourseForm" class="form-grid">
+          <div class="full-span">
+            <span>Select courses</span>
+            <div id="exportCourseOptions" class="checkbox-grid"></div>
+          </div>
+          <div class="full-span form-actions between-actions">
+            <button type="button" class="ghost-btn" data-close="exportCourseModal">Cancel</button>
             <button type="submit" class="primary-btn">Export</button>
           </div>
         </form>

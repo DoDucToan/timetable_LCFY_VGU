@@ -655,6 +655,121 @@ def _write_teacher_schedule_sheet(
         ws.row_dimensions[idx].height = 24
 
 
+def _build_course_schedule_rows(
+    db: Session,
+    timetable_id: Optional[int],
+    course_id: int,
+    group_ids: Optional[List[int]] = None,
+    study_program_ids: Optional[List[int]] = None,
+) -> List[Dict[str, Any]]:
+    query = select(ScheduledClass).options(
+        joinedload(ScheduledClass.group),
+        joinedload(ScheduledClass.timeslot),
+        joinedload(ScheduledClass.room),
+        joinedload(ScheduledClass.teacher),
+        joinedload(ScheduledClass.course),
+        joinedload(ScheduledClass.study_program),
+    ).where(
+        ScheduledClass.deploy.is_(True),
+        ScheduledClass.course_id == course_id,
+    )
+    if timetable_id is not None:
+        query = query.join(Group).where(Group.timetable_id == timetable_id)
+    if group_ids is not None:
+        query = query.where(ScheduledClass.group_id.in_(group_ids))
+    if study_program_ids is not None:
+        query = query.where(ScheduledClass.study_program_id.in_(study_program_ids))
+    classes = db.execute(query).unique().scalars().all()
+
+    grouped: Dict[Tuple[str, int, int, str, str, str], Dict[str, Set[str]]] = {}
+    for cls in classes:
+        if not cls.timeslot:
+            continue
+        key = (
+            cls.timeslot.weekday,
+            cls.timeslot.day_index,
+            cls.timeslot.sort_order,
+            cls.timeslot.label,
+            cls.teacher.name if cls.teacher else "",
+            cls.room.code if cls.room else "",
+        )
+        entry = grouped.setdefault(
+            key,
+            {
+                "group_codes": set(),
+                "program_codes": set(),
+            },
+        )
+        if cls.group and cls.group.code:
+            entry["group_codes"].add(cls.group.code)
+        if cls.study_program and cls.study_program.code:
+            entry["program_codes"].add(cls.study_program.code)
+
+    rows: List[Dict[str, Any]] = []
+    for key in sorted(grouped.keys(), key=lambda k: (k[1], k[2], k[3], k[0])):
+        weekday, day_index, sort_order, timeslot_label, teacher_name, room_name = key
+        entry = grouped[key]
+        rows.append(
+            {
+                "weekday": weekday,
+                "day_index": day_index,
+                "sort_order": sort_order,
+                "timeslot": timeslot_label,
+                "teacher_name": teacher_name,
+                "group_code": ", ".join(sorted(entry["group_codes"])),
+                "program_code": ", ".join(sorted(entry["program_codes"])),
+                "room_name": room_name,
+            }
+        )
+    return rows
+
+
+def _write_course_schedule_sheet(
+    ws: Worksheet,
+    course_name: str,
+    rows: List[Dict[str, Any]],
+    border: Border,
+) -> None:
+    ws.title = _sanitize_sheet_title(course_name)
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=6)
+    title_cell = _cell(ws, 1, 1, f"Course: {course_name}")
+    title_cell.font = Font(bold=True, size=15)
+    title_cell.alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[1].height = 30
+
+    headers = ["Day", "Timeslot", "Teacher", "Class", "Program", "Room"]
+    for idx, label in enumerate(headers, start=1):
+        cell = ws.cell(row=2, column=idx, value=label)
+        cell.font = Font(bold=True, size=11)
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = border
+
+    ws.column_dimensions["A"].width = float(12)
+    ws.column_dimensions["B"].width = float(18)
+    ws.column_dimensions["C"].width = float(20)
+    ws.column_dimensions["D"].width = float(20)
+    ws.column_dimensions["E"].width = float(18)
+    ws.column_dimensions["F"].width = float(12)
+
+    if not rows:
+        cell = _cell(ws, 3, 1, "No scheduled classes for this course.")
+        cell.font = Font(italic=True)
+        return
+
+    for idx, row_info in enumerate(rows, start=3):
+        ws.cell(row=idx, column=1, value=row_info["weekday"]).border = border
+        ws.cell(row=idx, column=2, value=row_info["timeslot"]).border = border
+        ws.cell(row=idx, column=3, value=row_info["teacher_name"]).border = border
+        class_cell = ws.cell(row=idx, column=4, value=row_info["group_code"])
+        class_cell.border = border
+        room_cell = ws.cell(row=idx, column=5, value=row_info["program_code"])
+        room_cell.border = border
+        ws.cell(row=idx, column=6, value=row_info["room_name"]).border = border
+        class_cell.alignment = Alignment(wrap_text=True, horizontal="left", vertical="center")
+        room_cell.alignment = Alignment(wrap_text=True, horizontal="left", vertical="center")
+        ws.row_dimensions[idx].height = 24
+
+
 def _sanitize_sheet_title(title: str, max_length: int = 31) -> str:
     clean = re.sub(r"[\[\]\*:/\\\?']", "", title).strip()
     if not clean:
@@ -1262,6 +1377,7 @@ def export_timetable_xlsx(
     group_ids: Optional[List[int]] = None,
     group_tag_ids: Optional[List[int]] = None,
     teacher_ids: Optional[List[int]] = None,
+    course_ids: Optional[List[int]] = None,
 ) -> Path:
     output_path = Path(output_path)
     title_fill = PatternFill("solid", fgColor="1F4E78")
@@ -1284,6 +1400,29 @@ def export_timetable_xlsx(
         group_ids=group_ids,
         teacher_ids=teacher_ids,
     )
+
+    if course_ids is not None:
+        from .models import Course
+        course_query = select(Course).where(Course.id.in_(course_ids)).order_by(Course.name)
+        if timetable_id is not None:
+            course_query = (
+                course_query.join(ScheduledClass, ScheduledClass.course_id == Course.id)
+                .join(Group, Group.id == ScheduledClass.group_id)
+                .where(ScheduledClass.deploy.is_(True), Group.timetable_id == timetable_id)
+                .distinct()
+            )
+        course_sheets = list(db.scalars(course_query).all())
+        sheet_titles = _unique_sheet_titles([str(c.name or c.id) for c in course_sheets])
+        for idx, (course, sheet_title) in enumerate(zip(course_sheets, sheet_titles)):
+            if idx == 0:
+                ws.title = sheet_title
+            else:
+                ws = wb.create_sheet(title=sheet_title)
+            rows = _build_course_schedule_rows(db, timetable_id, cast(int, getattr(course, 'id')), group_ids=group_ids, study_program_ids=study_program_ids)
+            _write_course_schedule_sheet(ws, str(course.name), rows, border)
+            _insert_logo(ws)
+        wb.save(output_path)
+        return output_path
 
     if teacher_ids is not None:
         from .models import Teacher

@@ -395,6 +395,8 @@ function cacheEls() {
     'exportProgramBtn',
     'exportGroupBtn',
     'exportAllGroupBtn',
+    'exportCourseBtn',
+    'exportAllCourseBtn',
     'exportTeacherBtn',
     'exportAllTeacherBtn',
     'exportProgramModal',
@@ -410,6 +412,9 @@ function cacheEls() {
     'exportTeacherModal',
     'exportTeacherForm',
     'exportTeacherOptions',
+    'exportCourseModal',
+    'exportCourseForm',
+    'exportCourseOptions',
     'teacherScheduleModal',
     'teacherScheduleModalTitle',
     'teacherScheduleTableWrapper',
@@ -549,6 +554,12 @@ function bindGlobalActions() {
   if (els.exportAllGroupBtn) {
     els.exportAllGroupBtn.addEventListener('click', openExportAllGroup);
   }
+  if (els.exportCourseBtn) {
+    els.exportCourseBtn.addEventListener('click', openExportCourseModal);
+  }
+  if (els.exportAllCourseBtn) {
+    els.exportAllCourseBtn.addEventListener('click', openExportAllCourse);
+  }
   if (els.exportTeacherBtn) {
     els.exportTeacherBtn.addEventListener('click', openExportTeacherModal);
   }
@@ -566,6 +577,9 @@ function bindGlobalActions() {
   }
   if (els.exportTeacherForm) {
     els.exportTeacherForm.addEventListener('submit', submitExportTeacherForm);
+  }
+  if (els.exportCourseForm) {
+    els.exportCourseForm.addEventListener('submit', submitExportCourseForm);
   }
 
   const importButtons = {
@@ -962,6 +976,12 @@ function renderContextSelectors() {
   }
   if (els.exportAllGroupBtn) {
     els.exportAllGroupBtn.disabled = !state.timetableId || !(state.data.groups || []).length;
+  }
+  if (els.exportCourseBtn) {
+    els.exportCourseBtn.disabled = !state.timetableId || !(state.data.courses || []).length;
+  }
+  if (els.exportAllCourseBtn) {
+    els.exportAllCourseBtn.disabled = !state.timetableId || !(state.data.courses || []).length;
   }
   if (els.exportTeacherBtn) {
     els.exportTeacherBtn.disabled = !state.timetableId || !(state.data.teachers || []).length;
@@ -2653,6 +2673,40 @@ function renderTeacherCheckboxesByCourseTag(container, teachers, groupName) {
   });
 }
 
+function renderCourseCheckboxesByTag(container, courses, groupName) {
+  if (!container) return;
+  container.innerHTML = '';
+  const tagMap = new Map((state.data.course_tags || []).map(tag => [tag.id, tag.name]));
+  const coursesByTag = new Map();
+
+  courses.forEach(course => {
+    const tagName = course.course_tag ? `${course.course_tag.code || ''}${course.course_tag.name ? ` — ${course.course_tag.name}` : ''}`.trim() : (tagMap.get(course.course_tag_id) || 'No course tag');
+    const normalizedTag = tagName || 'No course tag';
+    if (!coursesByTag.has(normalizedTag)) coursesByTag.set(normalizedTag, []);
+    coursesByTag.get(normalizedTag).push(course);
+  });
+
+  coursesByTag.forEach((tagCourses, tagName) => {
+    const section = document.createElement('section');
+    section.className = 'checkbox-section';
+    section.innerHTML = `<h4>${escapeHtml(tagName)}</h4>`;
+    const sectionGrid = document.createElement('div');
+    sectionGrid.className = 'checkbox-grid';
+    tagCourses.forEach(course => {
+      const label = document.createElement('label');
+      label.className = 'checkbox-card';
+      label.innerHTML = `
+        <input type="checkbox" name="${groupName}" value="${course.id}" />
+        <span>${escapeHtml(`${course.code || course.name || 'Course'}`)}</span>
+        ${course.name && course.code ? `<small>${escapeHtml(course.name)}</small>` : ''}
+      `;
+      sectionGrid.appendChild(label);
+    });
+    section.appendChild(sectionGrid);
+    container.appendChild(section);
+  });
+}
+
 function precheckPrograms(container, ids) {
   if (!container) return;
   const set = new Set(ids);
@@ -2829,6 +2883,54 @@ function openExportTeacherModal() {
   }
   renderTeacherCheckboxesByCourseTag(els.exportTeacherOptions, state.data.teachers || [], 'exportTeachers');
   openModal('exportTeacherModal');
+}
+
+function openExportCourseModal() {
+  if (!els.exportCourseModal || !els.exportCourseOptions) return;
+  if (!(state.data.courses || []).length) {
+    alert('No courses available to export.');
+    return;
+  }
+  renderCourseCheckboxesByTag(els.exportCourseOptions, state.data.courses || [], 'exportCourses');
+  openModal('exportCourseModal');
+}
+
+function openExportAllCourse() {
+  if (!state.timetableId) {
+    alert('Select a timetable first.');
+    return;
+  }
+  const courses = state.data.courses || [];
+  if (!courses.length) {
+    alert('No courses available to export.');
+    return;
+  }
+  const courseIds = [...new Set(courses.map(c => Number(c.id)).filter(Boolean))];
+  if (!courseIds.length) {
+    alert('No courses available to export.');
+    return;
+  }
+  const params = courseIds.map(id => `course_ids=${id}`).join('&');
+  const url = `/export.xlsx?timetable_id=${state.timetableId}&${params}`;
+  downloadExcel(url, 'Exporting all courses...');
+}
+
+async function submitExportCourseForm(e) {
+  e.preventDefault();
+  if (!state.timetableId) {
+    alert('Select a timetable first.');
+    return;
+  }
+  let courseIds = collectCheckedValues(els.exportCourseOptions);
+  if (!courseIds.length) {
+    alert('Select at least one course.');
+    return;
+  }
+  courseIds = [...new Set(courseIds)];
+  const params = courseIds.map(id => `course_ids=${id}`).join('&');
+  const url = `/export.xlsx?timetable_id=${state.timetableId}&${params}`;
+  closeModal('exportCourseModal');
+  await downloadExcel(url, 'Exporting courses...');
 }
 
 async function submitExportProgramForm(e) {
