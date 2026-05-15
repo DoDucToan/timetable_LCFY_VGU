@@ -319,16 +319,26 @@ COLOR_MAP = {
 }
 
 PROGRAM_FILL_VARIANTS = [
-    "C9DAF8",
-    "F4B183",
-    "D9D2E9",
-    "B6D7A8",
-    "EAD1DC",
     "FFF2CC",
-    "D0E0E3",
-    "FCE4D6",
-    "E2EFDA",
-    "F9CB9C",
+    "E8F0D9",
+    "D9E8F8",
+    "F9E2E6",
+    "EDE7F5",
+    "F7EED9",
+    "E8F2E8",
+    "F8E7F2",
+    "DFF0EB",
+    "FAE9D3",
+    "E9E8F3",
+    "F3F0E8",
+    "DDE8F0",
+    "F8ECEA",
+    "E9F1EF",
+    "F8F2DA",
+    "EDE9EC",
+    "DDE9E4",
+    "FDF3D8",
+    "E8E8F0",
 ]
 
 

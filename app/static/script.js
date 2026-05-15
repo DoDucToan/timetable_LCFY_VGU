@@ -1427,7 +1427,9 @@ function renderBoard() {
 
       const timeTd = document.createElement('td');
       timeTd.className = 'slot-label time-cell';
-      timeTd.textContent = slot.label;
+      timeTd.textContent = slot.label.startsWith('German')
+        ? slot.label.replace(/^German/, 'GER')
+        : slot.label;
       tr.appendChild(timeTd);
 
       const rowKeys = slotRowMap[String(slot.id)]?.keys || [];
@@ -1447,9 +1449,9 @@ function renderBoard() {
         const stack = document.createElement('div');
         stack.className = 'strip-stack';
         stack.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
-        const totalPadding = 32; // 16px top + 16px bottom
-        const totalGaps = 16 * Math.max(0, rows - 1);
-        stack.style.height = `${rows * 180 + totalPadding + totalGaps}px`;
+        const totalPadding = 12; // 6px top + 6px bottom
+        const totalGaps = 6 * Math.max(0, rows - 1);
+        stack.style.height = `${rows * 160 + totalPadding + totalGaps}px`;
         stack.style.minHeight = stack.style.height;
         const itemsByKey = slotRowMap[String(slot.id)]?.groupItemsByKey[String(group.id)] || {};
         for (let i = 0; i < rows; i += 1) {
@@ -1621,8 +1623,12 @@ function renderStrip(item) {
   const groupHtml = item.group_codes?.length ? `<div class="strip-groups">${escapeHtml(item.group_codes.join(', '))}</div>` : '';
   const teacherHtml = item.teacher_name ? `<span class="strip-meta">${escapeHtml(item.teacher_name)}</span>` : '';
   const roomHtml = item.room_name ? `<span class="strip-meta">${escapeHtml(item.room_name)}</span>` : '';
-  const mergedNote = item.kind === 'program' && item.class_ids?.length > 1
-    ? `<div class="strip-note">Merged program classes — edit/delete may affect the merged block.</div>`
+  const indicators = [];
+  if (item.kind === 'elective') indicators.push('E');
+  if (item.kind === 'program' && item.class_ids?.length > 1) indicators.push('Ps');
+  if (item.shared) indicators.push('Gs');
+  const indicatorHtml = indicators.length > 0
+    ? `<div class="strip-indicators">${indicators.map(code => `<span class="strip-indicator">${escapeHtml(code)}</span>`).join('')}</div>`
     : '';
   const buttonHtml = item.class_ids?.length
     ? `<div class="strip-footer"><button type="button" class="danger-btn small inline-delete" data-delete-class="${item.class_ids[0]}" data-merged-count="${item.class_ids.length}">Delete</button><button type="button" class="ghost-btn small inline-edit" data-edit-class="${item.class_ids[0]}" data-merged-count="${item.class_ids.length}">Edit</button></div>`
@@ -1632,13 +1638,14 @@ function renderStrip(item) {
     <div class="strip-header">
       ${courseHtml}
       ${programHtml}
+      ${indicatorHtml}
     </div>
   `;
 
   return `
     ${headerHtml}
     <div class="strip-top">
-      <div class="strip-main">${groupHtml}${mergedNote}</div>
+      <div class="strip-main">${groupHtml}</div>
       <div class="strip-side">${teacherHtml}${roomHtml}</div>
     </div>
     ${buttonHtml}
