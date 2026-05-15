@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple, TypedDict, cast
 from sqlalchemy import select
@@ -94,6 +95,54 @@ def _format_item(item: Dict[str, Any]) -> str:
     if item.get("kind") == "required":
         return "\n".join(parts)
     return " ".join(parts)
+
+
+def _format_german_item(item: Dict[str, Any]) -> str:
+    """Format German class blocks without repeating the course name."""
+    parts: List[str] = []
+    if item.get("kind") == "elective":
+        parts.append("(Elective)")
+    group_codes: List[str] = cast(List[str], item.get("group_codes") or [])
+    if item.get("kind") == "required":
+        if len(group_codes) > 1:
+            parts.append(f"({', '.join(group_codes)})")
+    elif item.get("kind") != "elective" and group_codes:
+        parts.append(f"({', '.join(group_codes)})")
+    if item.get("all_group"):
+        parts.append("(all group)")
+    if item["program_codes"]:
+        parts.append(f"[{', '.join(item['program_codes'])}]")
+    if item["notes"]:
+        parts.append(item["notes"])
+    if item["teacher_name"]:
+        parts.append(item["teacher_name"])
+    if item["room_name"]:
+        parts.append(f"Room: {item['room_name']}")
+    if item.get("kind") == "required":
+        return "\n".join(parts)
+    return " ".join(parts)
+
+
+def _german_group_summary(timeslots: List[Dict[str, Any]], cell_map: Dict[str, Any], groups: List[Dict[str, Any]]) -> Dict[int, str]:
+    counts: Dict[int, Counter[str]] = {group['id']: Counter() for group in groups}
+    for slot in timeslots:
+        if not str(slot.get("label", "")).startswith("German"):
+            continue
+        slot_items = cell_map.get(str(slot["id"]), {})
+        for group in groups:
+            items = slot_items.get(str(group["id"]), [])
+            for item in items:
+                course_name = str(item.get("course_name") or "").strip()
+                if course_name:
+                    counts[group['id']][course_name] += 1
+    result: Dict[int, str] = {}
+    for group_id, counter in counts.items():
+        if not counter:
+            result[group_id] = ""
+            continue
+        common, _ = sorted(counter.items(), key=lambda kv: (-kv[1], kv[0]))[0]
+        result[group_id] = common
+    return result
 
 
 def _estimate_line_count(text: str, width_cols: int) -> int:
@@ -859,6 +908,16 @@ def _write_timetable_sheet(
     subtitle_cell.alignment = Alignment(horizontal="center")
     subtitle_cell.font = Font(italic=True)
 
+    has_german_schedule = any(str(ts.get("label", "")).startswith("German") for ts in timeslots)
+    if has_german_schedule:
+        german_summaries = _german_group_summary(timeslots, cell_map, groups)
+        for idx, group in enumerate(groups, start=3):
+            summary_cell = _cell(ws, 3, idx, german_summaries.get(group["id"], ""))
+            summary_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            summary_cell.font = Font(bold=False, size=11)
+            summary_cell.border = border
+        ws.row_dimensions[3].height = 24
+
     ws["A4"] = "Day"
     ws["B4"] = "Time"
     for cell in [ws["A4"], ws["B4"]]:
@@ -956,7 +1015,7 @@ def _write_timetable_sheet(
                         cell.fill = blank_fill
                         cell.border = border
                         continue
-                    text = "\n".join(_format_item(item) for item in items)
+                    text = "\n".join(_format_german_item(item) for item in items)
                     first_item = items[0]
                     fill_color = _get_fill_color(first_item)
                     current_items[group["id"]] = (text, fill_color)
