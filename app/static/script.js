@@ -275,6 +275,7 @@ const state = {
   selectedCycleId: null,
   selected: [],
   selectedGroupIds: new Set(),
+  selectedTeacherCourseTagIds: new Set(),
   editingGroupId: null,
   openMenuGroupId: null,
   selectedProgramGroupId: null,
@@ -299,6 +300,7 @@ window.addEventListener('DOMContentLoaded', () => {
   cacheEls();
   bindGlobalActions();
   bindExportWarning();
+  initTeacherFilterFromQuery();
   const pathMatch = window.location.pathname.match(/^\/cycle\/(\d+)\/?$/);
   if (pathMatch) {
     state.selectedCycleId = Number(pathMatch[1]);
@@ -422,6 +424,8 @@ function cacheEls() {
     'courseTagList',
     'programList',
     'roomList',
+    'teacherFilterWrapper',
+    'teacherCourseTagFilter',
     'teacherList',
     'courseList',
     'groupProgramPanel',
@@ -1017,8 +1021,85 @@ function renderEntityLists() {
   renderEntityList('courseTagList', state.data.course_tags || [], 'course_tag', item => item.name);
   renderEntityList('programList', state.data.programs || [], 'program', item => `${item.code} — ${item.name}`);
   renderEntityList('roomList', state.data.rooms || [], 'room', item => `${item.code} — ${item.name}`, item => `Cap ${item.capacity}`);
-  renderEntityList('teacherList', state.data.teachers || [], 'teacher', item => item.name, item => `Tags: ${item.course_tag_ids.length}`);
-  renderEntityList('courseList', state.data.courses || [], 'course', item => `${item.code} — ${item.name}`, item => item.require_all ? 'Require all' : (item.elective ? 'Elective' : 'Program class'));
+  renderTeacherFilterByCourseTags();
+  const courseTagMap = new Map((state.data.course_tags || []).map(tag => [tag.id, tag.name]));
+  renderEntityList('teacherList', getFilteredTeachers(), 'teacher', item => item.name, item => {
+    const tags = (item.course_tag_ids || []).map(id => courseTagMap.get(id)).filter(Boolean);
+    return tags.length ? `Course tags: ${tags.join(', ')}` : 'No course tags';
+  });
+  const sortedCourses = (state.data.courses || []).slice().sort((a, b) => String(a.code || a.name || '').localeCompare(String(b.code || b.name || '')));
+  renderEntityList('courseList', sortedCourses, 'course', item => `${item.code} — ${item.name}`, item => item.require_all ? 'Require all' : (item.elective ? 'Elective' : 'Program class'));
+}
+
+function getFilteredTeachers() {
+  const teachers = state.data?.teachers || [];
+  const selectedTagIds = Array.from(state.selectedTeacherCourseTagIds);
+  if (!selectedTagIds.length) return teachers;
+  return teachers.filter(teacher => {
+    const teacherTags = teacher.course_tag_ids || [];
+    return selectedTagIds.some(tagId => teacherTags.includes(tagId));
+  });
+}
+
+function renderTeacherFilterByCourseTags() {
+  if (!els.teacherCourseTagFilter) return;
+  const courseTags = (state.data?.course_tags || []).slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+  els.teacherCourseTagFilter.innerHTML = '';
+  if (!courseTags.length) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = 'No course tags available';
+    els.teacherCourseTagFilter.appendChild(opt);
+    els.teacherCourseTagFilter.disabled = true;
+    return;
+  }
+
+  const defaultOption = document.createElement('option');
+  defaultOption.value = '';
+  defaultOption.textContent = 'All tags';
+  els.teacherCourseTagFilter.appendChild(defaultOption);
+
+  courseTags.forEach(tag => {
+    const opt = document.createElement('option');
+    opt.value = String(tag.id);
+    opt.textContent = tag.name;
+    if (state.selectedTeacherCourseTagIds.has(tag.id)) {
+      opt.selected = true;
+    }
+    els.teacherCourseTagFilter.appendChild(opt);
+  });
+
+  els.teacherCourseTagFilter.addEventListener('change', () => {
+    const value = els.teacherCourseTagFilter.value;
+    state.selectedTeacherCourseTagIds.clear();
+    if (value) {
+      state.selectedTeacherCourseTagIds.add(Number(value));
+    }
+    updateTeacherFilterQueryString();
+    renderEntityLists();
+  });
+}
+
+function updateTeacherFilterQueryString() {
+  const query = new URLSearchParams(window.location.search);
+  query.delete('course_tag_id');
+  query.delete('course_tag_ids');
+  state.selectedTeacherCourseTagIds.forEach(id => query.append('course_tag_ids', id));
+  const newUrl = `${window.location.pathname}${query.toString() ? `?${query.toString()}` : ''}`;
+  window.history.replaceState({}, '', newUrl);
+}
+
+function initTeacherFilterFromQuery() {
+  if (!window.location.pathname.startsWith('/teachers')) return;
+  const query = new URLSearchParams(window.location.search);
+  query.getAll('course_tag_ids').forEach(value => {
+    const id = Number(value);
+    if (id) state.selectedTeacherCourseTagIds.add(id);
+  });
+  const singleTagId = Number(query.get('course_tag_id'));
+  if (singleTagId) {
+    state.selectedTeacherCourseTagIds.add(singleTagId);
+  }
 }
 
 function renderEntityList(containerId, items, type, labelFn, metaFn = null) {
@@ -2300,7 +2381,11 @@ function syncClassFormVisibility(currentCourseId = null) {
   }
 
   const allowProgramMode = selectedProgramIds.length > 0;
-  fillSelect(els.courseSelect, courses.map(c => ({ value: c.id, label: c.name })), true);
+  const courseOptions = courses
+    .slice()
+    .sort((a, b) => String(a.code || a.name || '').localeCompare(String(b.code || b.name || '')))
+    .map(c => ({ value: c.id, label: c.code ? `${c.code} — ${c.name}` : c.name }));
+  fillSelect(els.courseSelect, courseOptions, true);
 
   const showProgramSelection = effectiveMode !== 'required_all';
   els.programSelectionBox.classList.toggle('hidden', !showProgramSelection);
@@ -3139,11 +3224,15 @@ function openGroupOnlyRequirementModal() {
     els.groupOnlyRequirementGroupSelect.appendChild(opt);
   });
   els.groupOnlyRequirementCourseSelect.innerHTML = '';
-  (state.data.courses || []).filter(c => !c.elective).forEach(course => {
-    const opt = document.createElement('option');
-    opt.value = course.id;
-    opt.textContent = course.name;
-    els.groupOnlyRequirementCourseSelect.appendChild(opt);
+  (state.data.courses || [])
+    .filter(c => !c.elective)
+    .slice()
+    .sort((a, b) => String(a.code || a.name || '').localeCompare(String(b.code || b.name || '')))
+    .forEach(course => {
+      const opt = document.createElement('option');
+      opt.value = course.id;
+      opt.textContent = course.code ? `${course.code} — ${course.name}` : course.name;
+      els.groupOnlyRequirementCourseSelect.appendChild(opt);
   });
   setSelectValues(els.groupOnlyRequirementGroupSelect, []);
   els.groupOnlyRequirementCourseSelect.value = '';
@@ -3220,11 +3309,14 @@ function openAddRequirementModal(type) {
     els.requirementTagOrProgramSelect.appendChild(opt);
   });
   els.requirementCourseSelect.innerHTML = '';
-  (state.data.courses || []).forEach(course => {
-    const opt = document.createElement('option');
-    opt.value = course.id;
-    opt.textContent = course.name;
-    els.requirementCourseSelect.appendChild(opt);
+  (state.data.courses || [])
+    .slice()
+    .sort((a, b) => String(a.code || a.name || '').localeCompare(String(b.code || b.name || '')))
+    .forEach(course => {
+      const opt = document.createElement('option');
+      opt.value = course.id;
+      opt.textContent = course.code ? `${course.code} — ${course.name}` : course.name;
+      els.requirementCourseSelect.appendChild(opt);
   });
   setSelectValues(els.requirementTagOrProgramSelect, []);
   els.requirementCourseSelect.value = '';

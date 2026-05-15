@@ -28,20 +28,6 @@
       <a class="page-nav-link{% if active_section == 'group-tags' %} active{% endif %}" href="/group-tags{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Group tags</a>
       <a class="page-nav-link{% if active_section == 'upload' %} active{% endif %}" href="/upload{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Upload</a>
       <a class="page-nav-link{% if active_section == 'data-sync' %} active{% endif %}" href="/data-sync{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Data sync</a>
-      <div class="page-nav-actions toolbar-menu">
-        <button type="button" class="ghost-btn small" id="manageMenuBtn">Export</button>
-        <div class="menu-dropdown hidden" id="manageMenuDropdown">
-          <a class="menu-item" id="exportBtn" href="/export.xlsx" download="timetable.xlsx">Export Excel</a>
-          <button class="menu-item" type="button" id="exportProgramBtn">Export by program</button>
-          <button class="menu-item" type="button" id="exportGroupBtn">Export for group</button>
-          <button class="menu-item" type="button" id="exportGroupTagBtn">Export by group tags</button>
-          <button class="menu-item" type="button" id="exportAllGroupBtn">Export all groups</button>
-          <button class="menu-item" type="button" id="exportCourseBtn">Export by course</button>
-          <button class="menu-item" type="button" id="exportAllCourseBtn">Export all courses</button>
-          <button class="menu-item" type="button" id="exportTeacherBtn">Export by teacher</button>
-          <button class="menu-item" type="button" id="exportAllTeacherBtn">Export all teachers</button>
-        </div>
-      </div>
     </nav>
 
 
@@ -61,6 +47,22 @@
           <label>Timetable</label>
           <div class="inline controls-row">
             <select id="timetableSelect"></select>
+          </div>
+        </div>
+        <div class="filter-block export-block">
+          <div class="toolbar-menu">
+            <button type="button" class="ghost-btn small" id="manageMenuBtn">Export</button>
+            <div class="menu-dropdown hidden" id="manageMenuDropdown">
+              <a class="menu-item" id="exportBtn" href="/export.xlsx" download="timetable.xlsx">Export Excel</a>
+              <button class="menu-item" type="button" id="exportProgramBtn">Export by program</button>
+              <button class="menu-item" type="button" id="exportGroupBtn">Export for group</button>
+              <button class="menu-item" type="button" id="exportGroupTagBtn">Export by group tags</button>
+              <button class="menu-item" type="button" id="exportAllGroupBtn">Export all groups</button>
+              <button class="menu-item" type="button" id="exportCourseBtn">Export by course</button>
+              <button class="menu-item" type="button" id="exportAllCourseBtn">Export all courses</button>
+              <button class="menu-item" type="button" id="exportTeacherBtn">Export by teacher</button>
+              <button class="menu-item" type="button" id="exportAllTeacherBtn">Export all teachers</button>
+            </div>
           </div>
         </div>
       </div>

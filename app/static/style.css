@@ -22,9 +22,10 @@ body {
 }
 
 .page {
-  width: min(1680px, calc(100vw - 32px));
+  width: 100vw;
+  max-width: 100%;
   margin: 0 auto;
-  padding-bottom: 24px;
+  padding: 0 16px 24px;
 }
 
 .topbar {
@@ -53,6 +54,29 @@ body {
   display: block;
 }
 
+.brand-group {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.filter-panel {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+.filter-header {
+  margin-bottom: 12px;
+}
+
+.filter-header .filter-subtitle {
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
 .topbar p {
   margin: 0;
   color: var(--muted);
@@ -65,11 +89,7 @@ body {
   gap: 10px;
   align-items: center;
   justify-content: flex-end;
-  width: 100%;
-}
-
-.topbar .header-actions > * {
-  flex-shrink: 0;
+  width: auto;
 }
 
 .topbar .primary-btn,
@@ -1243,6 +1263,71 @@ body[data-active-section] .dashboard-card {
   align-items: center;
   gap: 8px;
   margin-bottom: 10px;
+}
+
+.teacher-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.teacher-header-left {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.teacher-header-left h2 {
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.teacher-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  flex: 1 1 auto;
+}
+
+.filter-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px 12px;
+}
+
+.filter-label span {
+  font-size: 0.95rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.filter-label select {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  min-width: 140px;
+  background: white;
+  font: inherit;
+}
+
+.teacher-header-row > button {
+  flex: 0 0 auto;
+}
+
+.export-block {
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: 4px;
 }
 
 .requirement-list {

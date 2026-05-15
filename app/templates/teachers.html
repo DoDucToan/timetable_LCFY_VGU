@@ -6,8 +6,16 @@
 {% block content %}
 <main>
   <section class="card dashboard-card full-width" id="teachersSection">
-    <div class="subheader-row">
-      <h2>Teachers</h2>
+    <div class="subheader-row teacher-header-row">
+      <div class="teacher-header-left">
+        <h2>Teachers</h2>
+        <div class="teacher-filter-row">
+          <label class="filter-label">
+            <span>Filter by tag</span>
+            <select id="teacherCourseTagFilter"></select>
+          </label>
+        </div>
+      </div>
       <button class="ghost-btn" data-open-entity="teacher">Add</button>
     </div>
     <div id="teacherList" class="entity-list"></div>
