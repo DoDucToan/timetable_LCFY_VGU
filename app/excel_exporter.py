@@ -1385,7 +1385,7 @@ def _write_timetable_sheet(
             left=Side(style="thin", color="000000"),
             right=Side(style="thin", color="000000"),
             top=Side(style="thin", color="000000"),
-            bottom=Side(style="medium", color="000000"),
+            bottom=Side(style="thick", color="000000"),
         )
         for c in range(1, total_cols + 1):
             cell = _cell(ws, day_end_row, c)
