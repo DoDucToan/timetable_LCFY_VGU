@@ -420,6 +420,9 @@ function cacheEls() {
     'teacherScheduleModal',
     'teacherScheduleModalTitle',
     'teacherScheduleTableWrapper',
+    'groupScheduleModal',
+    'groupScheduleModalTitle',
+    'groupScheduleTableWrapper',
     'groupTagList',
     'courseTagList',
     'programList',
@@ -1206,6 +1209,15 @@ function openTeacherScheduleModal(item) {
   openModal('teacherScheduleModal');
 }
 
+function openGroupScheduleModal(item) {
+  if (!els.groupScheduleModal || !els.groupScheduleModalTitle || !els.groupScheduleTableWrapper) return;
+  const groupCode = item.group_code || item.groupCode || 'Group';
+  const groupId = item.group_id ?? null;
+  els.groupScheduleModalTitle.textContent = `Group schedule: ${groupCode}`;
+  renderGroupScheduleTable(groupId, groupCode);
+  openModal('groupScheduleModal');
+}
+
 function renderTeacherScheduleTable(teacherId, teacherName) {
   if (!els.teacherScheduleTableWrapper) return;
   els.teacherScheduleTableWrapper.innerHTML = '';
@@ -1247,6 +1259,103 @@ function renderTeacherScheduleTable(teacherId, teacherName) {
   });
   table.appendChild(tbody);
   els.teacherScheduleTableWrapper.appendChild(table);
+}
+
+function renderGroupScheduleTable(groupId, groupCode) {
+  if (!els.groupScheduleTableWrapper) return;
+  els.groupScheduleTableWrapper.innerHTML = '';
+  const rows = buildGroupScheduleRows(groupId, groupCode);
+  if (!rows.length) {
+    const msg = document.createElement('div');
+    msg.className = 'muted';
+    msg.textContent = 'No scheduled classes found for this group.';
+    els.groupScheduleTableWrapper.appendChild(msg);
+    return;
+  }
+
+  const table = document.createElement('table');
+  table.className = 'requirements-modal-table';
+  const thead = document.createElement('thead');
+  thead.innerHTML = `
+    <tr>
+      <th>Day</th>
+      <th>Timeslot</th>
+      <th>Teacher</th>
+      <th>Program</th>
+      <th>Room</th>
+      <th>Course</th>
+    </tr>
+  `;
+  table.appendChild(thead);
+  const tbody = document.createElement('tbody');
+  rows.forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(row.weekday)}</td>
+      <td>${escapeHtml(row.timeslot)}</td>
+      <td>${escapeHtml(row.teacher_name)}</td>
+      <td>${escapeHtml(row.program_code)}</td>
+      <td>${escapeHtml(row.room_name)}</td>
+      <td>${escapeHtml(row.course_name)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  els.groupScheduleTableWrapper.appendChild(table);
+}
+
+function buildGroupScheduleRows(groupId, groupCode) {
+  const timeslotMap = new Map((state.data.timeslots || []).map(ts => [String(ts.id), ts]));
+  const cells = state.data.cells || {};
+  const grouped = new Map();
+
+  Object.entries(cells).forEach(([timeslotId, groups]) => {
+    const timeslot = timeslotMap.get(timeslotId);
+    if (!timeslot || typeof groups !== 'object' || groups === null) return;
+    Object.entries(groups).forEach(([cellGroupId, items]) => {
+      if (!Array.isArray(items) || String(cellGroupId) !== String(groupId)) return;
+      items.forEach(item => {
+        const rowKey = [
+          String(timeslot.weekday || ''),
+          Number(timeslot.sort_order) || 0,
+          String(timeslot.label || ''),
+          String(item.teacher_name || ''),
+          String(item.room_name || ''),
+          String(item.course_name || ''),
+        ].join('||');
+
+        const existing = grouped.get(rowKey) || {
+          weekday: timeslot.weekday || '',
+          sort_order: Number(timeslot.sort_order) || 0,
+          timeslot: timeslot.label || '',
+          teacher_name: item.teacher_name || '',
+          room_name: item.room_name || '',
+          course_name: item.course_name || '',
+          program_codes: new Set(),
+        };
+
+        if (Array.isArray(item.program_codes)) {
+          item.program_codes.forEach(code => {
+            if (code) existing.program_codes.add(code);
+          });
+        }
+        grouped.set(rowKey, existing);
+      });
+    });
+  });
+
+  const rows = Array.from(grouped.values()).map(entry => ({
+    weekday: entry.weekday,
+    sort_order: entry.sort_order,
+    timeslot: entry.timeslot,
+    teacher_name: entry.teacher_name,
+    program_code: Array.from(entry.program_codes).sort().join(', '),
+    room_name: entry.room_name,
+    course_name: entry.course_name,
+  }));
+
+  rows.sort((a, b) => a.sort_order - b.sort_order || a.weekday.localeCompare(b.weekday) || a.timeslot.localeCompare(b.timeslot));
+  return rows;
 }
 
 function buildTeacherScheduleRows(teacherId, teacherName) {
@@ -1353,10 +1462,13 @@ function renderBoard() {
     const isOpen = state.openMenuGroupId === group.id;
     const checked = state.selectedGroupIds.has(group.id) ? 'checked' : '';
     th.innerHTML = `
-      <div class="group-header-top" style="display:flex;align-items:center;gap:8px;">
-        <label class="group-select-label" style="display:flex;align-items:center;">
-          <input type="checkbox" class="group-select-checkbox" data-group-id="${group.id}" ${checked} />
-        </label>
+      <div class="group-header-top" style="display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <label class="group-select-label" style="display:flex;align-items:center;">
+            <input type="checkbox" class="group-select-checkbox" data-group-id="${group.id}" ${checked} />
+          </label>
+          <button type="button" class="ghost-btn small" data-view-group-schedule="${group.id}" title="View schedule">View schedule</button>
+        </div>
         <div class="group-title-wrap">
           <div class="group-code">${escapeHtml(group.code)}</div>
           <small>${escapeHtml(group.programs.map(p => p.code).join('/'))}</small>
@@ -1383,6 +1495,13 @@ function renderBoard() {
       e.preventDefault();
       th.classList.add('drag-over');
     });
+    const scheduleBtn = th.querySelector('[data-view-group-schedule]');
+    if (scheduleBtn) {
+      scheduleBtn.addEventListener('click', event => {
+        event.stopPropagation();
+        openGroupScheduleModal({ group_id: group.id, group_code: group.code });
+      });
+    }
     th.addEventListener('dragleave', () => {
       th.classList.remove('drag-over');
     });

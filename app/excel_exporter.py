@@ -15,6 +15,26 @@ from openpyxl.worksheet.dimensions import RowDimension
 from openpyxl.worksheet.worksheet import Worksheet
 from .scheduler import build_timetable_payload, teacher_load_rows
 from .models import Group, GroupStudyProgram, StudyProgram, ScheduledClass
+
+def default_font(
+    *,
+    name: str = 'Times New Roman',
+    size: Optional[int] = None,
+    bold: bool = False,
+    italic: bool = False,
+    underline: Optional[str] = None,
+    color: Optional[str] = None,
+) -> Font:
+    kwargs: Dict[str, Any] = {'name': name, 'bold': bold, 'italic': italic}
+    if size is not None:
+        kwargs['size'] = size
+    if underline is not None:
+        kwargs['underline'] = underline
+    if color is not None:
+        kwargs['color'] = color
+    return Font(**kwargs)
+
+
 import re
 
 FILL_MAP = {
@@ -357,7 +377,7 @@ def _write_overlay_merge(
     cell = _cell(ws, row_idx, start_col, _format_item(item))
     cell.fill = PatternFill("solid", fgColor=_get_fill_color(item))
     cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-    cell.font = Font(bold=True, size=15)
+    cell.font = default_font(bold=True, size=15)
     for c in range(start_col, end_col + 1):
         ws.cell(row=row_idx, column=c).border = border
 
@@ -396,19 +416,19 @@ def _write_group_timetable_sheet(
 
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=1 + len(days))
     title_cell = _cell(ws, 1, 1, title)
-    title_cell.font = Font(bold=True, size=15)
+    title_cell.font = default_font(bold=True, size=15)
     title_cell.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[1].height = 32
 
     header_cell = ws.cell(row=2, column=1, value="Time")
-    header_cell.font = Font(bold=True, size=11)
+    header_cell.font = default_font(bold=True, size=11)
     header_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
     header_cell.border = border
     ws.column_dimensions["A"].width = float(18)
 
     for idx, (_day_index, weekday) in enumerate(days, start=2):
         cell = ws.cell(row=2, column=idx, value=weekday)
-        cell.font = Font(bold=True, size=11)
+        cell.font = default_font(bold=True, size=11)
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         cell.border = border
         ws.column_dimensions[get_column_letter(idx)].width = float(26)
@@ -447,7 +467,7 @@ def _write_group_timetable_sheet(
         if rows_for_label > 1:
             ws.merge_cells(start_row=row, start_column=1, end_row=row + rows_for_label - 1, end_column=1)
         time_cell = _cell(ws, row, 1, label)
-        time_cell.font = Font(bold=True)
+        time_cell.font = default_font(bold=True)
         time_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         time_cell.border = border
 
@@ -482,7 +502,7 @@ def _write_group_timetable_sheet(
                 cell.value = entry["text"]
                 cell.fill = PatternFill("solid", fgColor=str(entry["fill_color"]))
                 cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-                cell.font = Font(bold=True, size=12)
+                cell.font = default_font(bold=True, size=12)
                 column_width = _column_range_width_chars(ws, col_idx, col_idx)
                 needed_height = _row_height_for_text(entry["text"], width_cols=column_width, min_height=_OVERLAY_MIN_HEIGHT, font_size=12)
                 row_height = max(row_height, needed_height)
@@ -501,7 +521,7 @@ def _write_group_timetable_sheet(
                             merged_cell.value = segment_entry["text"]
                             merged_cell.fill = PatternFill("solid", fgColor=str(segment_entry["fill_color"]))
                             merged_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-                            merged_cell.font = Font(bold=True, size=12)
+                            merged_cell.font = default_font(bold=True, size=12)
                             for c in range(start_col, end_col + 1):
                                 ws.cell(row=current_row, column=c).border = border
                                 if c != start_col:
@@ -525,7 +545,7 @@ def _write_group_timetable_sheet(
                             merged_cell.value = segment_entry_value["text"]
                             merged_cell.fill = PatternFill("solid", fgColor=str(segment_entry_value["fill_color"]))
                             merged_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-                            merged_cell.font = Font(bold=True, size=12)
+                            merged_cell.font = default_font(bold=True, size=12)
                             for c in range(start_col, end_col + 1):
                                 ws.cell(row=current_row, column=c).border = border
                                 if c != start_col:
@@ -543,7 +563,7 @@ def _write_group_timetable_sheet(
                     merged_cell.value = segment_entry_value["text"]
                     merged_cell.fill = PatternFill("solid", fgColor=str(segment_entry_value["fill_color"]))
                     merged_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-                    merged_cell.font = Font(bold=True, size=12)
+                    merged_cell.font = default_font(bold=True, size=12)
                     for c in range(start_col, end_col + 1):
                         ws.cell(row=current_row, column=c).border = border
                         if c != start_col:
@@ -565,7 +585,7 @@ def _write_group_timetable_sheet(
                 lunch_cell = _cell(ws, lunch_row, 1, "Lunch break")
                 lunch_cell.fill = PatternFill("solid", fgColor="F2F2F2")
                 lunch_cell.alignment = Alignment(horizontal="center", vertical="center")
-                lunch_cell.font = Font(italic=True)
+                lunch_cell.font = default_font(italic=True)
                 for c in range(1, 2 + len(days)):
                     ws.cell(row=lunch_row, column=c).border = border
                 row += 1
@@ -575,13 +595,13 @@ def _write_group_timetable_sheet(
         header_row = row
         ws.merge_cells(start_row=header_row, start_column=1, end_row=header_row, end_column=1 + len(days))
         header_cell = _cell(ws, header_row, 1, "Elective classes")
-        header_cell.font = Font(bold=True, size=12)
+        header_cell.font = default_font(bold=True, size=12)
         header_cell.alignment = Alignment(horizontal="left", vertical="center")
         row += 1
 
-        ws.cell(row=row, column=1, value="Day").font = Font(bold=True)
-        ws.cell(row=row, column=2, value="Time").font = Font(bold=True)
-        ws.cell(row=row, column=3, value="Class details").font = Font(bold=True)
+        ws.cell(row=row, column=1, value="Day").font = default_font(bold=True)
+        ws.cell(row=row, column=2, value="Time").font = default_font(bold=True)
+        ws.cell(row=row, column=3, value="Class details").font = default_font(bold=True)
         ws.row_dimensions[row].height = 24
         row += 1
 
@@ -592,7 +612,7 @@ def _write_group_timetable_sheet(
             detail_cell = _cell(ws, row, 3, detail)
             detail_cell.alignment = Alignment(wrap_text=True, vertical="center")
             detail_cell.border = border
-            detail_cell.font = Font(bold=True, size=12)
+            detail_cell.font = default_font(bold=True, size=12)
             detail_width = _column_range_width_chars(ws, 3, 3)
             ws.row_dimensions[row].height = _row_height_for_text(detail, width_cols=detail_width, min_height=_OVERLAY_MIN_HEIGHT, font_size=12)
             row += 1
@@ -673,14 +693,14 @@ def _write_teacher_schedule_sheet(
     ws.title = _sanitize_sheet_title(teacher_name)
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=6)
     title_cell = _cell(ws, 1, 1, f"Teacher: {teacher_name}")
-    title_cell.font = Font(bold=True, size=15)
+    title_cell.font = default_font(bold=True, size=15)
     title_cell.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[1].height = 30
 
     headers = ["Day", "Timeslot", "Group", "Program", "Room", "Course"]
     for idx, label in enumerate(headers, start=1):
         cell = ws.cell(row=2, column=idx, value=label)
-        cell.font = Font(bold=True, size=11)
+        cell.font = default_font(bold=True, size=11)
         cell.alignment = Alignment(horizontal="center", vertical="center")
         cell.border = border
 
@@ -693,7 +713,7 @@ def _write_teacher_schedule_sheet(
 
     if not rows:
         cell = _cell(ws, 3, 1, "No scheduled classes for this teacher.")
-        cell.font = Font(italic=True)
+        cell.font = default_font(italic=True)
         return
 
     for idx, row_info in enumerate(rows, start=3):
@@ -786,14 +806,14 @@ def _write_course_schedule_sheet(
     ws.title = _sanitize_sheet_title(course_name)
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=6)
     title_cell = _cell(ws, 1, 1, f"Course: {course_name}")
-    title_cell.font = Font(bold=True, size=15)
+    title_cell.font = default_font(bold=True, size=15)
     title_cell.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[1].height = 30
 
     headers = ["Day", "Timeslot", "Teacher", "Class", "Program", "Room"]
     for idx, label in enumerate(headers, start=1):
         cell = ws.cell(row=2, column=idx, value=label)
-        cell.font = Font(bold=True, size=11)
+        cell.font = default_font(bold=True, size=11)
         cell.alignment = Alignment(horizontal="center", vertical="center")
         cell.border = border
 
@@ -806,7 +826,7 @@ def _write_course_schedule_sheet(
 
     if not rows:
         cell = _cell(ws, 3, 1, "No scheduled classes for this course.")
-        cell.font = Font(italic=True)
+        cell.font = default_font(italic=True)
         return
 
     for idx, row_info in enumerate(rows, start=3):
@@ -897,7 +917,7 @@ def _write_timetable_sheet(
         title_text += f" - {', '.join(selected_program_codes)}"
     title_cell = _cell(ws, 1, 1, title_text)
     # title_cell.fill = title_fill
-    title_cell.font = Font(bold=True, size=24)
+    title_cell.font = default_font(bold=True, size=24)
     title_cell.alignment = Alignment(horizontal="center", vertical="center")
 
     ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=total_cols)
@@ -906,7 +926,7 @@ def _write_timetable_sheet(
         subtitle_text += f" (Study programs: {', '.join(selected_program_codes)})"
     subtitle_cell = _cell(ws, 2, 1, subtitle_text)
     subtitle_cell.alignment = Alignment(horizontal="center")
-    subtitle_cell.font = Font(italic=True)
+    subtitle_cell.font = default_font(italic=True)
 
     has_german_schedule = any(str(ts.get("label", "")).startswith("German") for ts in timeslots)
     if has_german_schedule:
@@ -914,7 +934,7 @@ def _write_timetable_sheet(
         for idx, group in enumerate(groups, start=3):
             summary_cell = _cell(ws, 3, idx, german_summaries.get(group["id"], ""))
             summary_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-            summary_cell.font = Font(bold=False, size=11)
+            summary_cell.font = default_font(bold=False, size=11)
             summary_cell.border = border
         ws.row_dimensions[3].height = 24
 
@@ -922,7 +942,7 @@ def _write_timetable_sheet(
     ws["B4"] = "Time"
     for cell in [ws["A4"], ws["B4"]]:
         cell.fill = header_fill
-        cell.font = Font(bold=True, size=15)
+        cell.font = default_font(bold=True, size=15)
         cell.alignment = Alignment(horizontal="center", vertical="center")
         cell.border = border
 
@@ -933,7 +953,7 @@ def _write_timetable_sheet(
             group_label += f" ({program_codes})"
         cell = ws.cell(row=4, column=idx, value=group_label)
         cell.fill = header_fill
-        cell.font = Font(bold=True, size=15)
+        cell.font = default_font(bold=True, size=15)
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         cell.border = border
         ws.column_dimensions[get_column_letter(idx)].width = float(22)
@@ -981,7 +1001,7 @@ def _write_timetable_sheet(
                     group_label += f" ({program_codes})"
                 cell = ws.cell(row=group_header_row, column=idx, value=group_label)
                 cell.fill = header_fill
-                cell.font = Font(bold=True, size=15)
+                cell.font = default_font(bold=True, size=15)
                 cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
                 cell.border = border
             ws.cell(row=group_header_row, column=2).border = border
@@ -1028,7 +1048,7 @@ def _write_timetable_sheet(
                     cell.value = text
                     cell.fill = PatternFill("solid", fgColor=fill_color)
                     cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-                    cell.font = Font(bold=True, size=15)
+                    cell.font = default_font(bold=True, size=15)
                     cell.border = border
                     column_width = _column_range_width_chars(ws, col_idx2, col_idx2)
                     needed_height = _row_height_for_text(text, width_cols=column_width, min_height=_OVERLAY_MIN_HEIGHT, font_size=15)
@@ -1064,7 +1084,7 @@ def _write_timetable_sheet(
                                 merged_cell.value = segment_text
                                 merged_cell.fill = PatternFill("solid", fgColor=segment_fill)
                                 merged_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-                                merged_cell.font = Font(bold=True, size=15)
+                                merged_cell.font = default_font(bold=True, size=15)
                                 for c in range(segment_start, segment_end + 1):
                                     ws.cell(row=required_row, column=c).border = border
                             segment_start = None
@@ -1104,7 +1124,7 @@ def _write_timetable_sheet(
                         merged_cell.value = segment_text
                         merged_cell.fill = PatternFill("solid", fgColor=segment_fill)
                         merged_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-                        merged_cell.font = Font(bold=True, size=15)
+                        merged_cell.font = default_font(bold=True, size=15)
                         for c in range(segment_start, segment_end + 1):
                             ws.cell(row=required_row, column=c).border = border
                     segment_start = col_idx2
@@ -1135,7 +1155,7 @@ def _write_timetable_sheet(
                         merged_cell.value = segment_text
                         merged_cell.fill = PatternFill("solid", fgColor=segment_fill)
                         merged_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-                        merged_cell.font = Font(bold=True, size=15)
+                        merged_cell.font = default_font(bold=True, size=15)
                         for c in range(segment_start, segment_end + 1):
                             ws.cell(row=required_row, column=c).border = border
 
@@ -1154,7 +1174,7 @@ def _write_timetable_sheet(
                             merged_cell.value = curr_item[0]
                             merged_cell.fill = PatternFill("solid", fgColor=curr_item[1])
                             merged_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-                            merged_cell.font = Font(bold=True, size=15)
+                            merged_cell.font = default_font(bold=True, size=15)
                             for r in range(prev_german_row, required_row + 1):
                                 cell = _cell(ws, r, col_idx2)
                                 cell.border = border
@@ -1174,7 +1194,7 @@ def _write_timetable_sheet(
                     lunch = ws.cell(row=lunch_row, column=2, value="Lunch break")
                     lunch.fill = lunch_fill
                     lunch.alignment = Alignment(horizontal="center")
-                    lunch.font = Font(italic=True)
+                    lunch.font = default_font(italic=True)
                     for c in range(2, total_cols + 1):
                         ws.cell(row=lunch_row, column=c).border = border
                     row += 1
@@ -1274,7 +1294,7 @@ def _write_timetable_sheet(
                     req_cell.fill = PatternFill("solid", fgColor=FILL_MAP.get(req["color_key"], "D9D2E9"))
                     req_cell.border = border
                     req_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-                    req_cell.font = Font(bold=True, size=15)
+                    req_cell.font = default_font(bold=True, size=15)
                     req_width = _column_range_width_chars(ws, col_idx, col_idx)
                     req_height = _row_height_for_text(
                         _format_item(req),
@@ -1298,7 +1318,7 @@ def _write_timetable_sheet(
                     cell = _cell(ws, overlay_row, col_idx2)
                     cell.border = border
                     cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-                    cell.font = Font(bold=True, size=15)
+                    cell.font = default_font(bold=True, size=15)
 
             for overlay_idx, overlay_item in enumerate(unique_overlays):
                 overlay_row = required_row + 1 + overlay_idx
@@ -1375,7 +1395,7 @@ def _write_timetable_sheet(
                 lunch = ws.cell(row=lunch_row, column=2, value="Lunch break")
                 lunch.fill = lunch_fill
                 lunch.alignment = Alignment(horizontal="center")
-                lunch.font = Font(italic=True)
+                lunch.font = default_font(italic=True)
                 for c in range(2, total_cols + 1):
                     ws.cell(row=lunch_row, column=c).border = border
                 row += 1
@@ -1393,7 +1413,7 @@ def _write_timetable_sheet(
         ws.merge_cells(start_row=day_start_row, start_column=1, end_row=day_end_row, end_column=1)
         dcell = ws.cell(row=day_start_row, column=1, value=weekday)
         dcell.alignment = Alignment(horizontal="center", vertical="center", text_rotation=90)
-        dcell.font = Font(bold=True)
+        dcell.font = default_font(bold=True)
         dcell.fill = PatternFill("solid", fgColor="E2EFDA")
         dcell.border = border
         for rr in range(day_start_row, day_end_row + 1):
@@ -1421,9 +1441,9 @@ def _write_timetable_sheet(
             cell.border = Border()
 
     start_teacher = row + 2
-    ws.cell(row=start_teacher, column=1, value="Teacher load summary").font = Font(bold=True, size=12)
-    ws.cell(row=start_teacher + 1, column=1, value="Teacher").font = Font(bold=True)
-    ws.cell(row=start_teacher + 1, column=2, value="Taught timeslots").font = Font(bold=True)
+    ws.cell(row=start_teacher, column=1, value="Teacher load summary").font = default_font(bold=True, size=12)
+    ws.cell(row=start_teacher + 1, column=1, value="Teacher").font = default_font(bold=True)
+    ws.cell(row=start_teacher + 1, column=2, value="Taught timeslots").font = default_font(bold=True)
     for idx, item in enumerate(teacher_load_rows(db, timetable_id, study_program_ids, group_ids=group_ids, teacher_ids=teacher_ids), start=start_teacher + 2):
         ws.cell(row=idx, column=1, value=item["teacher"])
         ws.cell(row=idx, column=2, value=item["timeslot_count"])
