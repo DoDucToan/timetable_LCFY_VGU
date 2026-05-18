@@ -1321,16 +1321,18 @@ function buildGroupScheduleRows(groupId, groupCode) {
           String(timeslot.label || ''),
           String(item.teacher_name || ''),
           String(item.room_name || ''),
+          String(item.kind || ''),
           String(item.course_name || ''),
         ].join('||');
 
+        const courseLabel = item.course_name || '';
         const existing = grouped.get(rowKey) || {
           weekday: timeslot.weekday || '',
           sort_order: Number(timeslot.sort_order) || 0,
           timeslot: timeslot.label || '',
           teacher_name: item.teacher_name || '',
           room_name: item.room_name || '',
-          course_name: item.course_name || '',
+          course_name: item.kind === 'elective' ? `(Elective) ${courseLabel}` : courseLabel,
           program_codes: new Set(),
         };
 
