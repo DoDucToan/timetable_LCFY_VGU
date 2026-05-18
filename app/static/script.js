@@ -2444,8 +2444,8 @@ function validateClassModeSelection() {
 function getTimeslotOccupancy(timeslotId) {
   const occupiedTeacherIds = new Set();
   const occupiedRoomIds = new Set();
-  const teacherConflictsById = {};
-  const roomConflictsById = {};
+  const teacherConflictGroupsById = {};
+  const roomConflictGroupsById = {};
   const cells = state.data.cells || {};
   const slotMap = cells[String(timeslotId)] || {};
   const groupMap = new Map((state.data.groups || []).map(g => [String(g.id), g.code || '']));
@@ -2454,24 +2454,48 @@ function getTimeslotOccupancy(timeslotId) {
     const groupCode = groupMap.get(groupId) || '';
     items.forEach(item => {
       const courseLabel = item.course_name || item.course_code || 'Unknown class';
-      const conflictLabel = groupCode ? `${groupCode} — ${courseLabel}` : courseLabel;
-      if (item.teacher_id) {
-        occupiedTeacherIds.add(item.teacher_id);
-        teacherConflictsById[item.teacher_id] = teacherConflictsById[item.teacher_id] || new Set();
-        teacherConflictsById[item.teacher_id].add(conflictLabel);
+      const roomKey = item.room_id != null ? String(item.room_id) : '';
+      const teacherId = item.teacher_id;
+      if (teacherId) {
+        occupiedTeacherIds.add(teacherId);
+        teacherConflictGroupsById[teacherId] = teacherConflictGroupsById[teacherId] || new Map();
+        const teacherKey = `${roomKey}||${courseLabel}`;
+        const teacherEntry = teacherConflictGroupsById[teacherId].get(teacherKey) || { groupCodes: new Set(), courseLabel };
+        if (groupCode) teacherEntry.groupCodes.add(groupCode);
+        teacherConflictGroupsById[teacherId].set(teacherKey, teacherEntry);
       }
       if (item.room_id) {
         occupiedRoomIds.add(item.room_id);
-        roomConflictsById[item.room_id] = roomConflictsById[item.room_id] || new Set();
-        roomConflictsById[item.room_id].add(conflictLabel);
+        roomConflictGroupsById[item.room_id] = roomConflictGroupsById[item.room_id] || new Map();
+        const roomKey = `${courseLabel}`;
+        const roomEntry = roomConflictGroupsById[item.room_id].get(roomKey) || { groupCodes: new Set(), courseLabel };
+        if (groupCode) roomEntry.groupCodes.add(groupCode);
+        roomConflictGroupsById[item.room_id].set(roomKey, roomEntry);
       }
     });
   });
+
+  const teacherConflictsById = Object.fromEntries(Object.entries(teacherConflictGroupsById).map(([id, map]) => {
+    const labels = Array.from(map.values()).map(entry => {
+      const groups = entry.groupCodes.size ? Array.from(entry.groupCodes).sort().join('/') : '';
+      return groups ? `${groups} — ${entry.courseLabel}` : entry.courseLabel;
+    });
+    return [id, labels];
+  }));
+
+  const roomConflictsById = Object.fromEntries(Object.entries(roomConflictGroupsById).map(([id, map]) => {
+    const labels = Array.from(map.values()).map(entry => {
+      const groups = entry.groupCodes.size ? Array.from(entry.groupCodes).sort().join('/') : '';
+      return groups ? `${groups} — ${entry.courseLabel}` : entry.courseLabel;
+    });
+    return [id, labels];
+  }));
+
   return {
     occupiedTeacherIds,
     occupiedRoomIds,
-    teacherConflictsById: Object.fromEntries(Object.entries(teacherConflictsById).map(([id, set]) => [id, Array.from(set)])),
-    roomConflictsById: Object.fromEntries(Object.entries(roomConflictsById).map(([id, set]) => [id, Array.from(set)])),
+    teacherConflictsById,
+    roomConflictsById,
   };
 }
 
@@ -2912,8 +2936,6 @@ function buildTeacherScheduleSummaries() {
       items.forEach(item => {
         const teacherId = item.teacher_id;
         if (teacherId == null) return;
-        const isGermanTimeslot = String(timeslot.label || '').startsWith('German');
-        if (isGermanTimeslot && item.kind === 'elective') return;
         const entries = teacherEntries.get(teacherId) || [];
         entries.push({
           weekday: String(timeslot.weekday || ''),
@@ -2946,10 +2968,26 @@ function buildTeacherScheduleSummaries() {
       const wb = weekdaySortOrder[b.weekday] ?? 99;
       return wa - wb || a.sort_order - b.sort_order || a.timeslot.localeCompare(b.timeslot) || a.room_name.localeCompare(b.room_name);
     });
+    const grouped = new Map();
+    entries.forEach(entry => {
+      const key = `${entry.weekday}||${entry.timeslot}||${entry.room_name}`;
+      const existing = grouped.get(key) || {
+        weekday: entry.weekday,
+        sort_order: entry.sort_order,
+        timeslot: entry.timeslot,
+        room_name: entry.room_name,
+        courses: new Set(),
+        groups: new Set(),
+      };
+      if (entry.course_name) existing.courses.add(entry.course_name);
+      if (entry.group_code) existing.groups.add(entry.group_code);
+      grouped.set(key, existing);
+    });
+
     const header = 'Day | Time | Course | Group | Room';
-    const lines = entries.map(entry => {
-      const course = entry.course_name || '-';
-      const group = entry.group_code || '-';
+    const lines = Array.from(grouped.values()).map(entry => {
+      const course = entry.courses.size ? Array.from(entry.courses).sort().join(', ') : '-';
+      const group = entry.groups.size ? Array.from(entry.groups).sort().join(', ') : '-';
       const room = entry.room_name || '-';
       return `${weekdayShort(entry.weekday)} | ${shortenTimeslot(entry.timeslot)} | ${course} | ${group} | ${room}`;
     });
