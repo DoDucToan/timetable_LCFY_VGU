@@ -1461,10 +1461,12 @@ function renderBoard() {
   timeslots.forEach(slot => {
     const rowKeys = [];
     const groupItemsByKey = {};
+    const isGermanSlot = String(slot.label || '').startsWith('German');
     groups.forEach(group => {
       const items = (cells[String(slot.id)] || {})[String(group.id)] || [];
       const map = {};
       items.forEach(item => {
+        if (isGermanSlot && item.kind === 'elective') return;
         const key = itemRowKey(item);
         if (!rowKeys.includes(key)) {
           rowKeys.push(key);
@@ -1513,9 +1515,9 @@ function renderBoard() {
         : slot.label;
       tr.appendChild(timeTd);
 
+        const isGermanSlot = slot.label.startsWith('German');
       const rowKeys = slotRowMap[String(slot.id)]?.keys || [];
-      const isGermanSlot = slot.label.startsWith('German');
-      const rows = isGermanSlot ? 1 : Math.max(1, rowKeys.length + 1);
+      const rows = Math.max(1, rowKeys.length);
 
       groups.forEach(group => {
         const td = document.createElement('td');
@@ -1544,7 +1546,7 @@ function renderBoard() {
           } else {
             strip.className = 'strip empty';
           }
-          if (!isGermanSlot && i === rows - 1 && !item) {
+          if (!isGermanSlot && rowKeys.length === 0 && i === rows - 1 && !item) {
             strip.classList.add('plus');
             strip.innerHTML = '<span class="plus-icon">+</span>';
           }
@@ -2187,11 +2189,15 @@ async function openClassModal(classId = null) {
     if (res.ok) {
       editingClass = await res.json();
       // Set up selection for editing
+      const timeslot = (state.data.timeslots || []).find(ts => ts.id === editingClass.timeslot_id);
+      const slotLabel = timeslot
+        ? `${timeslot.weekday || ''} ${editingClass.timeslot_label || ''}`
+        : (editingClass.timeslot_label || '');
       selected = [{
         groupId: editingClass.group_id,
         groupCode: editingClass.group_code || '',
         timeslotId: editingClass.timeslot_id,
-        slotLabel: editingClass.timeslot_label || ''
+        slotLabel,
       }];
       state.editingClassId = classId;
     } else {
@@ -2507,6 +2513,7 @@ function updateTeacherOptions(currentTeacherId = null, timeslotId = null, explic
     timeslotId = state.selected[0].timeslotId;
   }
   let teacherOptions = [{ value: '', label: 'No teacher' }];
+  const teacherScheduleSummaries = buildTeacherScheduleSummaries();
   if (timeslotId != null) {
     const { occupiedTeacherIds, teacherConflictsById } = getTimeslotOccupancy(timeslotId);
     teacherOptions = [
@@ -2517,12 +2524,17 @@ function updateTeacherOptions(currentTeacherId = null, timeslotId = null, explic
         return {
           value: t.id,
           label: `${t.name}${conflicts.length ? ` — occupied by ${conflicts.join(', ')}` : ''}`,
+          title: teacherScheduleSummaries[t.id] || 'No scheduled classes for this teacher.',
           disabled: occupied,
         };
       }),
     ];
   } else {
-    teacherOptions = [{ value: '', label: 'No teacher' }, ...teachers.map(t => ({ value: t.id, label: t.name }))];
+    teacherOptions = [{ value: '', label: 'No teacher' }, ...teachers.map(t => ({
+      value: t.id,
+      label: t.name,
+      title: teacherScheduleSummaries[t.id] || 'No scheduled classes for this teacher.',
+    }))];
   }
   fillSelect(els.teacherSelect, teacherOptions, false);
 }
@@ -2878,8 +2890,73 @@ function fillSelect(selectEl, options, includePlaceholder = false) {
     if (option.selected) {
       opt.selected = true;
     }
+    if (option.title) {
+      opt.title = option.title;
+    }
     selectEl.appendChild(opt);
   });
+}
+
+function buildTeacherScheduleSummaries() {
+  const timeslotMap = new Map((state.data.timeslots || []).map(ts => [String(ts.id), ts]));
+  const groupMap = new Map((state.data.groups || []).map(g => [String(g.id), g]));
+  const teacherEntries = new Map();
+  const cells = state.data.cells || {};
+
+  Object.entries(cells).forEach(([timeslotId, groups]) => {
+    const timeslot = timeslotMap.get(timeslotId);
+    if (!timeslot || typeof groups !== 'object' || groups === null) return;
+    Object.entries(groups).forEach(([groupId, items]) => {
+      if (!Array.isArray(items)) return;
+      const groupCode = groupMap.get(groupId)?.code || '';
+      items.forEach(item => {
+        const teacherId = item.teacher_id;
+        if (teacherId == null) return;
+        const isGermanTimeslot = String(timeslot.label || '').startsWith('German');
+        if (isGermanTimeslot && item.kind === 'elective') return;
+        const entries = teacherEntries.get(teacherId) || [];
+        entries.push({
+          weekday: String(timeslot.weekday || ''),
+          sort_order: Number(timeslot.sort_order) || 0,
+          timeslot: String(timeslot.label || ''),
+          course_name: String(item.course_name || item.course_code || ''),
+          group_code: groupCode,
+          room_name: String(item.room_name || ''),
+        });
+        teacherEntries.set(teacherId, entries);
+      });
+    });
+  });
+
+  const summaries = {};
+  const weekdayShort = weekday => {
+    const mapping = { MONDAY: 'Mon', TUESDAY: 'Tue', WEDNESDAY: 'Wed', THURSDAY: 'Thu', FRIDAY: 'Fri' };
+    return mapping[weekday] || weekday;
+  };
+
+  const shortenTimeslot = label => String(label || '')
+    .replace(/^German\s*/i, '')
+    .replace(/\s*-\s*/g, '-')
+    .trim();
+
+  const weekdaySortOrder = { MONDAY: 0, TUESDAY: 1, WEDNESDAY: 2, THURSDAY: 3, FRIDAY: 4 };
+  teacherEntries.forEach((entries, teacherId) => {
+    entries.sort((a, b) => {
+      const wa = weekdaySortOrder[a.weekday] ?? 99;
+      const wb = weekdaySortOrder[b.weekday] ?? 99;
+      return wa - wb || a.sort_order - b.sort_order || a.timeslot.localeCompare(b.timeslot) || a.room_name.localeCompare(b.room_name);
+    });
+    const header = 'Day | Time | Course | Group | Room';
+    const lines = entries.map(entry => {
+      const course = entry.course_name || '-';
+      const group = entry.group_code || '-';
+      const room = entry.room_name || '-';
+      return `${weekdayShort(entry.weekday)} | ${shortenTimeslot(entry.timeslot)} | ${course} | ${group} | ${room}`;
+    });
+    summaries[teacherId] = [header, ...lines].join('\n');
+  });
+
+  return summaries;
 }
 
 function collectCheckedValues(container) {
