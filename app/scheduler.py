@@ -350,6 +350,7 @@ COLOR_MAP = {
     "IELTS": "ielts",
     "German": "german",
     "AE": "ae",
+    "EAP": "ae",
     "Elective": "elective",
     "Business": "core",
     "Science": "shared",

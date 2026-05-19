@@ -1141,20 +1141,36 @@ function getProgramColor(code) {
   return PROGRAM_FILL_VARIANTS[_stableHashCode(normalizedCode) % PROGRAM_FILL_VARIANTS.length];
 }
 
+function blendHexColors(colors) {
+  const normalized = colors
+    .map(color => normalizeCssColor(color))
+    .filter(color => /^#[0-9A-F]{6}$/i.test(color))
+    .map(color => color.slice(1).toUpperCase());
+  if (!normalized.length) {
+    return PROGRAM_FILL_VARIANTS[0];
+  }
+  const totals = [0, 0, 0];
+  normalized.forEach(hex => {
+    totals[0] += parseInt(hex.slice(0, 2), 16);
+    totals[1] += parseInt(hex.slice(2, 4), 16);
+    totals[2] += parseInt(hex.slice(4, 6), 16);
+  });
+  const count = normalized.length;
+  const blended = totals.map(total => Math.round(total / count).toString(16).padStart(2, '0')).join('').toUpperCase();
+  return `#${blended}`;
+}
+
 function getItemFillColor(item) {
   if (!item) return '';
   if (item.fill_color) {
     return normalizeCssColor(item.fill_color);
   }
   if (item.kind === 'program' && Array.isArray(item.program_codes) && item.program_codes.length) {
-    if (item.program_codes.length === 1) {
-      return getProgramColor(item.program_codes[0]);
-    }
     const colors = [...new Set(item.program_codes.map(code => getProgramColor(code)).filter(Boolean))];
     if (colors.length === 1) {
       return colors[0];
     }
-    return '';
+    return blendHexColors(colors);
   }
   return '';
 }
@@ -1168,7 +1184,7 @@ function renderColorLegend() {
 
   const entries = [];
   if (courseTags.length) {
-    entries.push('<div class="legend-group-title">Course tag colors</div>');
+    entries.push('<div class="legend-color-group"><div class="legend-group-title">Course tag colors</div>');
     courseTags.forEach(tag => {
       const swatch = normalizeCssColor(tag.fill_color);
       entries.push(`
@@ -1178,9 +1194,10 @@ function renderColorLegend() {
         </div>
       `);
     });
+    entries.push('</div>');
   }
   if (programs.length) {
-    entries.push('<div class="legend-group-title">Study program colors</div>');
+    entries.push('<div class="legend-color-group"><div class="legend-group-title">Study program colors</div>');
     programs.forEach(prog => {
       const displayColor = getProgramColor(prog.code);
       entries.push(`
@@ -1190,11 +1207,24 @@ function renderColorLegend() {
         </div>
       `);
     });
+    entries.push('</div>');
   }
   legendRoot.innerHTML = entries.join('');
 }
 
+function setSaveColorStatus(message, type = 'info') {
+  const status = document.getElementById('saveColorStatus');
+  if (!status) return;
+  status.textContent = message;
+  status.className = `save-color-status ${type}`;
+}
+
 async function saveColorSettings() {
+  const status = document.getElementById('saveColorStatus');
+  if (status) {
+    status.textContent = '';
+    status.className = 'save-color-status';
+  }
   const updates = [];
   document.querySelectorAll('input[data-entity-type][data-entity-id]').forEach(input => {
     const entityType = input.dataset.entityType;
@@ -1208,7 +1238,7 @@ async function saveColorSettings() {
     }
   });
   if (!updates.length) {
-    alert('No color changes detected.');
+    setSaveColorStatus('No color changes detected.', 'info');
     return;
   }
   const errors = [];
@@ -1231,7 +1261,9 @@ async function saveColorSettings() {
     }
   }
   if (errors.length) {
-    alert('Some colors could not be saved:\n' + errors.join('\n'));
+    setSaveColorStatus('Some colors could not be saved.', 'error');
+  } else {
+    setSaveColorStatus('Color settings saved successfully.', 'success');
   }
   await refreshData(state.timetableId, state.selectedCycleId);
 }
@@ -1917,7 +1949,8 @@ function renderBoard() {
           } else if (e.target.matches('[data-edit-class]')) {
             e.stopPropagation();
             const classId = e.target.getAttribute('data-edit-class');
-            openClassModal(classId);
+            const mergedClassIds = e.target.getAttribute('data-merged-class-ids');
+            openClassModal(classId, mergedClassIds ? mergedClassIds.split(',').map(id => Number(id)) : null);
           }
         });
       });
@@ -2062,7 +2095,7 @@ function renderStrip(item) {
     ? `<div class="strip-indicators">${indicators.map(code => `<span class="strip-indicator">${escapeHtml(code)}</span>`).join('')}</div>`
     : '';
   const buttonHtml = item.class_ids?.length
-    ? `<div class="strip-footer"><button type="button" class="danger-btn small inline-delete" data-delete-class="${item.class_ids[0]}" data-merged-count="${item.class_ids.length}">Delete</button><button type="button" class="ghost-btn small inline-edit" data-edit-class="${item.class_ids[0]}" data-merged-count="${item.class_ids.length}">Edit</button></div>`
+    ? `<div class="strip-footer"><button type="button" class="danger-btn small inline-delete" data-delete-class="${item.class_ids[0]}" data-merged-count="${item.class_ids.length}">Delete</button><button type="button" class="ghost-btn small inline-edit" data-edit-class="${item.class_ids[0]}" data-merged-count="${item.class_ids.length}"${item.class_ids.length > 1 ? ` data-merged-class-ids="${item.class_ids.join(',')}"` : ''}>Edit</button></div>`
     : '';
 
   const headerHtml = `
@@ -2529,7 +2562,7 @@ async function deleteGroupById(groupId) {
   window.location.reload();
 }
 
-async function openClassModal(classId = null) {
+async function openClassModal(classId = null, mergedClassIds = null) {
   els.classForm.reset();
   els.classErrors.innerHTML = '';
   let selected = state.selected;
@@ -2544,12 +2577,37 @@ async function openClassModal(classId = null) {
       const slotLabel = timeslot
         ? `${timeslot.weekday || ''} ${editingClass.timeslot_label || ''}`
         : (editingClass.timeslot_label || '');
-      selected = [{
-        groupId: editingClass.group_id,
-        groupCode: editingClass.group_code || '',
-        timeslotId: editingClass.timeslot_id,
-        slotLabel,
-      }];
+      if (mergedClassIds?.length > 1) {
+        const selections = [];
+        for (const mergedId of mergedClassIds) {
+          const mergedRes = await fetch(`/api/classes/${mergedId}`);
+          if (!mergedRes.ok) continue;
+          const mergedClass = await mergedRes.json();
+          selections.push({
+            groupId: mergedClass.group_id,
+            groupCode: mergedClass.group_code || '',
+            timeslotId: mergedClass.timeslot_id,
+            slotLabel,
+          });
+        }
+        if (selections.length) {
+          selected = selections;
+        } else {
+          selected = [{
+            groupId: editingClass.group_id,
+            groupCode: editingClass.group_code || '',
+            timeslotId: editingClass.timeslot_id,
+            slotLabel,
+          }];
+        }
+      } else {
+        selected = [{
+          groupId: editingClass.group_id,
+          groupCode: editingClass.group_code || '',
+          timeslotId: editingClass.timeslot_id,
+          slotLabel,
+        }];
+      }
       state.editingClassId = classId;
     } else {
       state.editingClassId = null;
@@ -2671,7 +2729,11 @@ function syncClassFormVisibility(currentCourseId = null) {
         if (programRequiredCourseIds.size > 0) {
           courses = courses.filter(c => programRequiredCourseIds.has(c.id));
         } else if (programCourseIds.size > 0) {
-          courses = courses.filter(c => programCourseIds.has(c.id));
+          if (currentCourseId != null && programCourseIds.has(currentCourseId)) {
+            courses = courses.filter(c => c.id === currentCourseId);
+          } else {
+            courses = [];
+          }
         } else {
           courses = [];
         }
@@ -3648,6 +3710,7 @@ async function handleEntityUpload(event) {
   const formData = new FormData();
   formData.append('file', file);
   if (els.entityUploadMessage) {
+    els.entityUploadMessage.className = 'upload-message info';
     els.entityUploadMessage.textContent = `Uploading ${currentImportEntity.replace('-', ' ')}...`;
   }
   const params = [];
@@ -3664,10 +3727,15 @@ async function handleEntityUpload(event) {
     });
     const data = await safeJson(res);
     if (!res.ok) {
+      if (els.entityUploadMessage) {
+        els.entityUploadMessage.className = 'upload-message error';
+        els.entityUploadMessage.textContent = `Import failed for ${currentImportEntity.replace('-', ' ')}.`;
+      }
       alert('Import failed: ' + formatError(data));
       return;
     }
     if (els.entityUploadMessage) {
+      els.entityUploadMessage.className = 'upload-message success';
       els.entityUploadMessage.textContent = `Imported ${currentImportEntity.replace('-', ' ')} successfully.`;
     }
     await refreshData(state.timetableId, state.selectedCycleId);
