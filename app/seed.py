@@ -170,11 +170,34 @@ def _ensure_cycle_german_column() -> None:
         conn.close()
 
 
+def _ensure_fill_color_columns() -> None:
+    conn = sqlite3.connect(str(DB_PATH))
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='course_tag'")
+        if cur.fetchone() is not None:
+            cur.execute("PRAGMA table_info(course_tag)")
+            columns = [row[1] for row in cur.fetchall()]
+            if 'fill_color' not in columns:
+                cur.execute('ALTER TABLE course_tag ADD COLUMN fill_color VARCHAR(7)')
+                conn.commit()
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='study_program'")
+        if cur.fetchone() is not None:
+            cur.execute("PRAGMA table_info(study_program)")
+            columns = [row[1] for row in cur.fetchall()]
+            if 'fill_color' not in columns:
+                cur.execute('ALTER TABLE study_program ADD COLUMN fill_color VARCHAR(7)')
+                conn.commit()
+    finally:
+        conn.close()
+
+
 def ensure_database() -> None:
     _migrate_course_for_group_table()
     _ensure_group_sort_order_column()
     _ensure_requirement_unique_constraints()
     _ensure_cycle_german_column()
+    _ensure_fill_color_columns()
     Base.metadata.create_all(bind=engine)
 
 

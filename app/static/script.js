@@ -52,6 +52,8 @@ async function refreshData(timetableId = null, cycleId = null) {
     }
     renderContextSelectors();
     renderEntityLists();
+    renderColorSettings();
+    renderColorLegend();
     renderBoard();
     renderTeacherLoad();
     populateStaticInputs();
@@ -446,6 +448,7 @@ function cacheEls() {
     'entityErrors',
     'entityCycleSelect',
     'entityCourseTagSelect',
+    'entityFillColorInput',
     'entityTeacherTags',
     'entityCoursePrograms',
     'entityRequirementRows',
@@ -739,6 +742,7 @@ function bindGlobalActions() {
       'study-programs': '#programsSection',
       'course-tags': '#courseTagsSection',
       'group-tags': '#groupTagsSection',
+      'colors': '#colorsSection',
       'upload': '#uploadSection',
     };
     const target = document.querySelector(sectionMap[initialPage.activeSection]);
@@ -1032,6 +1036,204 @@ function renderEntityLists() {
   });
   const sortedCourses = (state.data.courses || []).slice().sort((a, b) => String(a.code || a.name || '').localeCompare(String(b.code || b.name || '')));
   renderEntityList('courseList', sortedCourses, 'course', item => `${item.code} — ${item.name}`, item => item.require_all ? 'Require all' : (item.elective ? 'Elective' : 'Program class'));
+}
+
+function renderColorSettings() {
+  const courseTagRoot = document.getElementById('courseTagColors');
+  const programRoot = document.getElementById('programColors');
+  const saveBtn = document.getElementById('saveColorSettingsBtn');
+  if (!courseTagRoot && !programRoot) return;
+
+  if (courseTagRoot) {
+    courseTagRoot.innerHTML = '';
+    (state.data.course_tags || []).forEach(tag => {
+      const row = document.createElement('div');
+      row.className = 'entity-row';
+      const inputId = `course-tag-color-${tag.id}`;
+      row.innerHTML = `
+        <div class="entity-text">
+          <div>${escapeHtml(tag.name)}</div>
+          <small>${escapeHtml(tag.fill_color || 'Default color')}</small>
+        </div>
+        <input type="color" id="${inputId}" data-entity-type="course_tag" data-entity-id="${tag.id}" value="${escapeHtml(tag.fill_color || '#ffffff')}" />
+      `;
+      courseTagRoot.appendChild(row);
+    });
+  }
+
+  if (programRoot) {
+    programRoot.innerHTML = '';
+    (state.data.programs || []).forEach(program => {
+      const row = document.createElement('div');
+      row.className = 'entity-row';
+      const inputId = `program-color-${program.id}`;
+      row.innerHTML = `
+        <div class="entity-text">
+          <div>${escapeHtml(program.code)} — ${escapeHtml(program.name)}</div>
+          <small>${escapeHtml(program.fill_color || 'Default color')}</small>
+        </div>
+        <input type="color" id="${inputId}" data-entity-type="program" data-entity-id="${program.id}" value="${escapeHtml(program.fill_color || '#ffffff')}" />
+      `;
+      programRoot.appendChild(row);
+    });
+  }
+
+  if (saveBtn) {
+    saveBtn.removeEventListener('click', saveColorSettings);
+    saveBtn.addEventListener('click', saveColorSettings);
+  }
+}
+
+const PROGRAM_FILL_VARIANTS = [
+  '#FFF2CC',
+  '#E8F0D9',
+  '#D9E8F8',
+  '#F9E2E6',
+  '#EDE7F5',
+  '#F7EED9',
+  '#E8F2E8',
+  '#F8E7F2',
+  '#DFF0EB',
+  '#FAE9D3',
+  '#E9E8F3',
+  '#F3F0E8',
+  '#DDE8F0',
+  '#F8ECEA',
+  '#E9F1EF',
+  '#F8F2DA',
+  '#EDE9EC',
+  '#DDE9E4',
+  '#FDF3D8',
+  '#E8E8F0',
+];
+
+function _stableHashCode(value) {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return hash;
+}
+
+function normalizeCssColor(value) {
+  const color = String(value || '').trim();
+  if (!color) return '';
+  if (color.startsWith('#')) {
+    return color;
+  }
+  if (/^[0-9A-Fa-f]{6}$/.test(color)) {
+    return `#${color}`;
+  }
+  return color;
+}
+
+function getProgramColor(code) {
+  const normalizedCode = String(code || '').trim().toUpperCase();
+  const programs = state.data?.programs || [];
+  const program = programs.find(p => String(p.code || '').trim().toUpperCase() === normalizedCode);
+  if (program && program.fill_color) {
+    return normalizeCssColor(program.fill_color);
+  }
+  if (!normalizedCode) {
+    return PROGRAM_FILL_VARIANTS[0];
+  }
+  return PROGRAM_FILL_VARIANTS[_stableHashCode(normalizedCode) % PROGRAM_FILL_VARIANTS.length];
+}
+
+function getItemFillColor(item) {
+  if (!item) return '';
+  if (item.fill_color) {
+    return normalizeCssColor(item.fill_color);
+  }
+  if (item.kind === 'program' && Array.isArray(item.program_codes) && item.program_codes.length) {
+    if (item.program_codes.length === 1) {
+      return getProgramColor(item.program_codes[0]);
+    }
+    const colors = [...new Set(item.program_codes.map(code => getProgramColor(code)).filter(Boolean))];
+    if (colors.length === 1) {
+      return colors[0];
+    }
+    return '';
+  }
+  return '';
+}
+
+function renderColorLegend() {
+  const legendRoot = document.getElementById('timetableColorLegend');
+  if (!legendRoot) return;
+
+  const courseTags = (state.data?.course_tags || []).filter(tag => tag.fill_color);
+  const programs = state.data?.programs || [];
+
+  const entries = [];
+  if (courseTags.length) {
+    entries.push('<div class="legend-group-title">Course tag colors</div>');
+    courseTags.forEach(tag => {
+      const swatch = normalizeCssColor(tag.fill_color);
+      entries.push(`
+        <div class="legend-color-entry">
+          <span class="legend-color-swatch" style="background:${escapeHtml(swatch)}"></span>
+          <span>${escapeHtml(tag.name)}</span>
+        </div>
+      `);
+    });
+  }
+  if (programs.length) {
+    entries.push('<div class="legend-group-title">Study program colors</div>');
+    programs.forEach(prog => {
+      const displayColor = getProgramColor(prog.code);
+      entries.push(`
+        <div class="legend-color-entry">
+          <span class="legend-color-swatch" style="background:${escapeHtml(displayColor)}"></span>
+          <span>${escapeHtml(prog.code)}</span>
+        </div>
+      `);
+    });
+  }
+  legendRoot.innerHTML = entries.join('');
+}
+
+async function saveColorSettings() {
+  const updates = [];
+  document.querySelectorAll('input[data-entity-type][data-entity-id]').forEach(input => {
+    const entityType = input.dataset.entityType;
+    const entityId = Number(input.dataset.entityId);
+    const value = input.value || null;
+    if (!entityType || !entityId) return;
+    const existing = (entityType === 'course_tag' ? state.data.course_tags : state.data.programs || []).find(item => item.id === entityId);
+    if (!existing) return;
+    if (existing.fill_color !== value) {
+      updates.push({ entityType, entityId, value, existing });
+    }
+  });
+  if (!updates.length) {
+    alert('No color changes detected.');
+    return;
+  }
+  const errors = [];
+  for (const update of updates) {
+    const payload = { fill_color: update.value };
+    if (update.entityType === 'course_tag') {
+      payload.name = update.existing.name;
+    } else {
+      payload.code = update.existing.code;
+      payload.name = update.existing.name;
+    }
+    const res = await fetch(`${CRUD[update.entityType]}/${update.entityId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      errors.push(`${update.entityType} ${update.entityId}: ${data.detail || res.statusText}`);
+    }
+  }
+  if (errors.length) {
+    alert('Some colors could not be saved:\n' + errors.join('\n'));
+  }
+  await refreshData(state.timetableId, state.selectedCycleId);
 }
 
 function getFilteredTeachers() {
@@ -1663,6 +1865,30 @@ function renderBoard() {
           const item = itemsByKey[rowKeys[i]];
           if (item) {
             strip.className = `strip filled ${item.color_key} ${item.kind}`;
+              const fillColor = getItemFillColor(item);
+            if (fillColor) {
+              strip.style.backgroundImage = '';
+              strip.style.backgroundColor = fillColor;
+              strip.style.borderColor = fillColor;
+            } else {
+              const isProgram = item.kind === 'program' && Array.isArray(item.program_codes) && item.program_codes.length > 1;
+              if (isProgram) {
+                const colors = [...new Set(item.program_codes.map(code => getProgramColor(code)).filter(Boolean))];
+                if (colors.length > 1) {
+                  const stops = colors.map((color, index) => {
+                    const start = (index * 100) / colors.length;
+                    const end = ((index + 1) * 100) / colors.length;
+                    return `${color} ${start}% ${end}%`;
+                  }).join(', ');
+                  strip.style.backgroundImage = `linear-gradient(90deg, ${stops})`;
+                  strip.style.backgroundColor = colors[0];
+                  strip.style.borderColor = colors[0];
+                } else if (colors.length === 1) {
+                  strip.style.backgroundColor = colors[0];
+                  strip.style.borderColor = colors[0];
+                }
+              }
+            }
             strip.innerHTML = renderStrip(item);
           } else {
             strip.className = 'strip empty';
@@ -1712,6 +1938,7 @@ function renderBoard() {
 
   els.timetableBoard.appendChild(tbody);
   renderGroupProgramPanel();
+  renderColorLegend();
 }
 
 function toggleGroupSelection(groupId, checked) {
@@ -1952,9 +2179,11 @@ function openEntityModal(type, id = null) {
       (item.requirements || []).forEach(req => addEntityRequirementRow(req.course_id, req.sessions_required));
     } else if (type === 'course_tag') {
       els.entityForm.elements.name.value = item.name;
+      if (els.entityFillColorInput) els.entityFillColorInput.value = item.fill_color || '#ffffff';
     } else if (type === 'program') {
       els.entityForm.elements.code.value = item.code;
       els.entityForm.elements.name.value = item.name;
+      if (els.entityFillColorInput) els.entityFillColorInput.value = item.fill_color || '#ffffff';
     } else if (type === 'room') {
       els.entityForm.elements.code.value = item.code;
       els.entityForm.elements.name.value = item.name;
@@ -2017,6 +2246,7 @@ function toggleEntityFields(type) {
   show('entityCapacityWrap', type === 'room');
   show('entityCycleWrap', type === 'timetable');
   show('entityCourseTagWrap', type === 'course');
+  show('entityFillColorWrap', type === 'course_tag' || type === 'program');
   show('entityInActionWrap', false);
   show('entityTeacherTagsWrap', type === 'teacher');
   show('entityCourseProgramsWrap', false);
@@ -2094,10 +2324,10 @@ function buildEntityPayload(type) {
     };
   }
   if (type === 'course_tag') {
-    return { name: f.name.value };
+    return { name: f.name.value, fill_color: f.fill_color?.value || null };
   }
   if (type === 'program') {
-    return { code: f.code.value, name: f.name.value };
+    return { code: f.code.value, name: f.name.value, fill_color: f.fill_color?.value || null };
   }
   if (type === 'course') {
     return {

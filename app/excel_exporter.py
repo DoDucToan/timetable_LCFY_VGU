@@ -210,10 +210,27 @@ def _program_fill_color(program_codes: List[str]) -> str:
     return PROGRAM_FILL_VARIANTS[abs(hash(key)) % len(PROGRAM_FILL_VARIANTS)]
 
 
+def _normalize_excel_color(value: Optional[str]) -> str:
+    if not value:
+        return "FFFFFFFF"
+    color = str(value).strip()
+    if color.startswith("#"):
+        color = color[1:]
+    if len(color) == 3:
+        color = ''.join(ch * 2 for ch in color)
+    color = color.upper()
+    if re.fullmatch(r'[0-9A-F]{6}', color):
+        return f"FF{color}"
+    if re.fullmatch(r'[0-9A-F]{8}', color):
+        return color
+    return "FFFFFFFF"
+
+
 def _get_fill_color(item: Dict[str, Any]) -> str:
+    if item.get("fill_color"):
+        return _normalize_excel_color(item["fill_color"])
+
     if item.get("kind") == "program":
-        if item.get("fill_color"):
-            return item["fill_color"]
         program_codes = item.get("program_codes", [])
         return _program_fill_color([str(code) for code in program_codes])
 
@@ -230,6 +247,8 @@ def _assign_program_colors_for_slot(overlays: List[Dict[str, Any]], program_colo
     used.update(TAG_FILL_VARIANTS)
     for item in overlays:
         if item.get("kind") != "program":
+            continue
+        if item.get("fill_color"):
             continue
         program_codes = sorted(set(item.get("program_codes", [])))
         if not program_codes:
@@ -487,10 +506,10 @@ def _write_group_timetable_sheet(
                 item = items[row_offset]
                 if item.get("kind") == "program":
                     program_key = "|".join(sorted(item.get("program_codes", [])))
-                    if program_key in program_color_map:
+                    if not item.get("fill_color") and program_key in program_color_map:
                         item["fill_color"] = program_color_map[program_key]
                 text = _format_item(item)
-                fill_color = _get_fill_color(item)
+                fill_color = _normalize_excel_color(_get_fill_color(item))
                 row_entries.append({"text": text, "fill_color": fill_color})
 
             for col_idx, entry in enumerate(row_entries, start=2):

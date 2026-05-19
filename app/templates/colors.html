@@ -1,0 +1,17 @@
+{% extends "entity_base.html" %}
+
+{% block title %}Manage Colors{% endblock %}
+{% block subtitle %}Customize course tag and study program colors.{% endblock %}
+
+{% block content %}
+<main>
+  <section class="card dashboard-card full-width" id="colorsSection">
+    <div class="subheader-row">
+      <h2>Color settings</h2>
+      <button class="ghost-btn" type="button" id="saveColorSettingsBtn">Save colors</button>
+    </div>
+    <div class="entity-list" id="courseTagColors"></div>
+    <div class="entity-list" id="programColors"></div>
+  </section>
+</main>
+{% endblock %}

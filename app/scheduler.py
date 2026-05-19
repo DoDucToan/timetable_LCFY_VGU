@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple, cast
 from uuid import uuid4
+import re
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.engine import ScalarResult
@@ -49,6 +50,45 @@ def estimate_program_size(group: Group, selected_program_count: int) -> int:
     selected_program_count = max(selected_program_count, 1)
     size_num = int(cast(int, group.size_num) or 0)
     return max(1, round(size_num * selected_program_count / total_programs))
+
+
+def _normalize_hex_color(color: str) -> Optional[str]:
+    color_text = str(color).strip()
+    if color_text.startswith('#'):
+        color_text = color_text[1:]
+    if len(color_text) == 3:
+        color_text = ''.join(ch * 2 for ch in color_text)
+    color_text = color_text.upper()
+    if re.fullmatch(r'[0-9A-F]{6}', color_text):
+        return f'#{color_text}'
+    return None
+
+
+def _stable_hash(value: str) -> int:
+    hash_value = 2166136261
+    for ch in value:
+        hash_value ^= ord(ch)
+        hash_value *= 16777619
+        hash_value &= 0xFFFFFFFF
+    return hash_value
+
+
+def _blend_hex_colors(colors: List[str]) -> str:
+    normalized: List[str] = []
+    for color in colors:
+        hex_color = _normalize_hex_color(color)
+        if hex_color:
+            normalized.append(hex_color[1:])
+    if not normalized:
+        return PROGRAM_FILL_VARIANTS[0]
+    rgb_totals = [0, 0, 0]
+    for hex_color in normalized:
+        rgb_totals[0] += int(hex_color[0:2], 16)
+        rgb_totals[1] += int(hex_color[2:4], 16)
+        rgb_totals[2] += int(hex_color[4:6], 16)
+    count = len(normalized)
+    blended = ''.join(f'{round(rgb_totals[i] / count):02X}' for i in range(3))
+    return f'#{blended}'
 
 
 def validate_new_class(
@@ -458,10 +498,41 @@ def build_timetable_payload(
             fill_color = FILL_MAP["elective"]
         else:
             color_key = COLOR_MAP.get(first.course.course_tag.name, "other")
-            fill_color = FILL_MAP.get(first.course.course_tag.name, "D9D2E9")
+            fill_color = FILL_MAP.get(color_key, "D9D2E9")
+            if first.course.course_tag and getattr(first.course.course_tag, 'fill_color', None):
+                fill_color = first.course.course_tag.fill_color
         if kind == "program":
             program_key = "|".join(programs) if programs else first.course.course_tag.name
-            fill_color = PROGRAM_FILL_VARIANTS[abs(hash(program_key)) % len(PROGRAM_FILL_VARIANTS)]
+            if programs:
+                program_colors: List[str] = []
+                has_custom_program_color = False
+                for program_code in programs:
+                    program_color = next(
+                        (
+                            cls.study_program.fill_color
+                            for cls in bundle
+                            if cls.study_program
+                            and _sanitize_text(cls.study_program.code) == program_code
+                            and getattr(cls.study_program, 'fill_color', None)
+                        ),
+                        None,
+                    )
+                    if program_color:
+                        has_custom_program_color = True
+                    else:
+                        program_color = PROGRAM_FILL_VARIANTS[_stable_hash(program_code) % len(PROGRAM_FILL_VARIANTS)]
+                    program_colors.append(program_color)
+                if has_custom_program_color:
+                    fill_color = _blend_hex_colors(program_colors) if len(program_colors) > 1 else program_colors[0]
+                elif first.course.course_tag and getattr(first.course.course_tag, 'fill_color', None):
+                    fill_color = first.course.course_tag.fill_color
+                else:
+                    fill_color = PROGRAM_FILL_VARIANTS[_stable_hash(program_key) % len(PROGRAM_FILL_VARIANTS)]
+            else:
+                if first.course.course_tag and getattr(first.course.course_tag, 'fill_color', None):
+                    fill_color = first.course.course_tag.fill_color
+                else:
+                    fill_color = PROGRAM_FILL_VARIANTS[_stable_hash(program_key) % len(PROGRAM_FILL_VARIANTS)]
         group_codes = [_sanitize_text(group_map[group_id].code)] if group_id in group_map else []
         all_group = False
         if kind == "program" and group_codes and programs:

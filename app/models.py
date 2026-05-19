@@ -1,5 +1,6 @@
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from typing import Optional
 
 from .database import Base
 
@@ -43,6 +44,7 @@ class StudyProgram(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
     code = Column(String, nullable=False, unique=True)
+    fill_color: Mapped[Optional[str]] = mapped_column(String(7), nullable=True)
 
     group_links = relationship("GroupStudyProgram", back_populates="study_program")
     course_links = relationship("StudyProgramCourse", back_populates="study_program")
@@ -53,6 +55,7 @@ class CourseTag(Base):
 
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False, unique=True)
+    fill_color: Mapped[Optional[str]] = mapped_column(String(7), nullable=True)
 
     courses = relationship("Course", back_populates="course_tag")
     teacher_links = relationship("TeacherCourseTag", back_populates="course_tag")

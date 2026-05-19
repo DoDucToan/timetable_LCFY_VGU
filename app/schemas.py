@@ -26,11 +26,13 @@ class GroupTagIn(BaseModel):
 
 class CourseTagIn(BaseModel):
     name: str
+    fill_color: Optional[str] = None
 
 
 class StudyProgramIn(BaseModel):
     code: str
     name: str
+    fill_color: Optional[str] = None
 
 
 class RoomIn(BaseModel):

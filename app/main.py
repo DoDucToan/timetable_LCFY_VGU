@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+import re
 import time
 from pathlib import Path
 from typing import Any, Iterable, cast, Dict, List, Optional
@@ -183,6 +184,7 @@ def render_entity_page(request: Request, section: str, open_new: bool = False, c
         "study-programs": "study-programs.html",
         "course-tags": "course-tags.html",
         "group-tags": "group-tags.html",
+        "colors": "colors.html",
         "upload": "upload.html",
         "data-sync": "data_sync.html",
     }.get(section, "entity.html")
@@ -242,6 +244,11 @@ def course_tags_page(request: Request, cycle_id: Optional[int] = Query(default=N
 @app.get("/course-tags/new", response_class=HTMLResponse)
 def course_tags_new_page(request: Request, cycle_id: Optional[int] = Query(default=None)):
     return render_entity_page(request, "course-tags", True, cycle_id)
+
+
+@app.get("/colors", response_class=HTMLResponse)
+def colors_page(request: Request, cycle_id: Optional[int] = Query(default=None)):
+    return render_entity_page(request, "colors", False, cycle_id)
 
 
 @app.get("/group-tags", response_class=HTMLResponse)
@@ -497,6 +504,20 @@ def _find_course_tag_id(db: Session, name: str) -> int:
     if not tag:
         raise HTTPException(status_code=404, detail=f'Course tag not found: {code}')
     return int(getattr(tag, 'id'))
+
+
+def _normalize_fill_color(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    color = str(value).strip()
+    if color.startswith('#'):
+        color = color[1:]
+    if len(color) == 3:
+        color = ''.join(ch * 2 for ch in color)
+    color = color.upper()
+    if re.fullmatch(r'[0-9A-F]{6}', color):
+        return f'#{color}'
+    return None
 
 
 def _find_study_program_id(db: Session, code: str) -> int:
@@ -1163,6 +1184,72 @@ def _build_timetable_payload(db: Session, timetable_id: Optional[int], cycle_id:
         first = bundle[0]
         programs = sorted({cls.study_program.code for cls in bundle if cls.study_program})
         kind = "elective" if bool(first.course.elective) else ("required" if bool(first.course.require_all_student_in_group) else "program")
+        fill_color_map = {
+            "ielts": "#9FC5E8",
+            "german": "#F9CB9C",
+            "ae": "#EAD1DC",
+            "core": "#CFE2F3",
+            "shared": "#D9EAD3",
+            "elective": "#B6D7A8",
+            "other": "#D9D2E9",
+        }
+        program_color_variants = [
+            "#FFF2CC",
+            "#E8F0D9",
+            "#D9E8F8",
+            "#F9E2E6",
+            "#EDE7F5",
+            "#F7EED9",
+            "#E8F2E8",
+            "#F8E7F2",
+            "#DFF0EB",
+            "#FAE9D3",
+            "#E9E8F3",
+            "#F3F0E8",
+            "#DDE8F0",
+            "#F8ECEA",
+            "#E9F1EF",
+            "#F8F2DA",
+            "#EDE9EC",
+            "#DDE9E4",
+            "#FDF3D8",
+            "#E8E8F0",
+        ]
+        def _stable_hash(value: str) -> int:
+            hash_value = 2166136261
+            for ch in value:
+                hash_value ^= ord(ch)
+                hash_value *= 16777619
+                hash_value &= 0xFFFFFFFF
+            return hash_value
+
+        color_key_value = color_map.get(first.course.course_tag.name, "other")
+        fill_color: Optional[str] = None
+        if kind == "program" and programs:
+            program_colors: List[str] = []
+            for program_code in programs:
+                program_color = next(
+                    (
+                        cls.study_program.fill_color
+                        for cls in bundle
+                        if cls.study_program
+                        and _sanitize_text(cls.study_program.code) == _sanitize_text(program_code)
+                        and getattr(cls.study_program, 'fill_color', None)
+                    ),
+                    None,
+                )
+                normalized_program_color = _normalize_fill_color(program_color)
+                if normalized_program_color:
+                    program_colors.append(normalized_program_color)
+                else:
+                    program_colors.append(program_color_variants[_stable_hash(program_code.upper()) % len(program_color_variants)])
+            if program_colors:
+                fill_color = program_colors[0]
+        if not fill_color and first.course.course_tag and getattr(first.course.course_tag, 'fill_color', None):
+            fill_color = _normalize_fill_color(first.course.course_tag.fill_color)
+        if not fill_color:
+            fill_color = fill_color_map.get(color_key_value, "#D9D2E9")
+
         cell_map[str(first.timeslot_id)][str(group_id)].append(
             {
                 "id": min(cls.id for cls in bundle),
@@ -1176,7 +1263,8 @@ def _build_timetable_payload(db: Session, timetable_id: Optional[int], cycle_id:
                 "room_name": first.room.code if first.room else "",
                 "program_codes": programs or [],
                 "kind": kind,
-                "color_key": color_map.get(first.course.course_tag.name, "other"),
+                "color_key": color_key_value,
+                "fill_color": fill_color,
                 "shared": bool(first.shared_key),
                 "expected_size": first.expected_size,
             }
@@ -1294,13 +1382,22 @@ def _entity_payload(db: Session, timetable_id: Optional[int] = None, cycle_id: O
             }
             for gt in group_tags
         ],
-        "course_tags": [{"id": ct.id, "name": _sanitize_text(ct.name)} for ct in course_tags],
+        "course_tags": [
+            {
+                "id": ct.id,
+                "name": _sanitize_text(ct.name),
+                "fill_color": ct.fill_color,
+                "requirements": group_tag_requirement.get(cast(int, ct.id), []),
+            }
+            for ct in course_tags
+        ],
         "programs": [
             {
                 "id": p.id,
                 "code": _sanitize_text(p.code),
                 "name": _sanitize_text(p.name),
-                "requirements": program_requirements.get(cast(int, p.id), [])
+                "fill_color": p.fill_color,
+                "requirements": program_requirements.get(cast(int, p.id), []),
             }
             for p in programs
         ],
@@ -1640,7 +1737,7 @@ def delete_group_tag(group_tag_id: int, db: Session = Depends(get_db)):
 
 @app.post("/api/course-tags")
 def create_course_tag(payload: CourseTagIn, db: Session = Depends(get_db)):
-    db.add(CourseTag(name=payload.name.strip()))
+    db.add(CourseTag(name=payload.name.strip(), fill_color=_normalize_fill_color(payload.fill_color)))
     db.commit()
     return bootstrap_payload(db)
 
@@ -1651,6 +1748,7 @@ def update_course_tag(course_tag_id: int, payload: CourseTagIn, db: Session = De
     if not row:
         raise HTTPException(status_code=404, detail="Course tag not found.")
     row.name = payload.name.strip()  # type: ignore
+    row.fill_color = _normalize_fill_color(payload.fill_color)
     db.commit()
     return bootstrap_payload(db)
 
@@ -1669,7 +1767,7 @@ def delete_course_tag(course_tag_id: int, db: Session = Depends(get_db)):
 
 @app.post("/api/study-programs")
 def create_program(payload: StudyProgramIn, db: Session = Depends(get_db)):
-    db.add(StudyProgram(code=payload.code.strip().upper(), name=payload.name.strip()))
+    db.add(StudyProgram(code=payload.code.strip().upper(), name=payload.name.strip(), fill_color=_normalize_fill_color(payload.fill_color)))
     db.commit()
     return bootstrap_payload(db)
 
@@ -1681,6 +1779,7 @@ def update_program(program_id: int, payload: StudyProgramIn, db: Session = Depen
         raise HTTPException(status_code=404, detail="Study program not found.")
     row.code = payload.code.strip().upper()  # type: ignore
     row.name = payload.name.strip()  # type: ignore
+    row.fill_color = _normalize_fill_color(payload.fill_color)
     db.commit()
     return bootstrap_payload(db)
 

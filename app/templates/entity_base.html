@@ -35,6 +35,7 @@
       <a class="page-nav-link{% if active_section == 'course-tags' %} active{% endif %}" href="/course-tags{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Course tags</a>
       <a class="page-nav-link{% if active_section == 'group-tags' %} active{% endif %}" href="/group-tags{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Group tags</a>
       <a class="page-nav-link{% if active_section == 'upload' %} active{% endif %}" href="/upload{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Upload</a>
+      <a class="page-nav-link{% if active_section == 'colors' %} active{% endif %}" href="/colors{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Colors</a>
       <a class="page-nav-link{% if active_section == 'data-sync' %} active{% endif %}" href="/data-sync{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Data sync</a>
     </nav>
 
@@ -63,6 +64,10 @@
           <label id="entityCodeWrap">
             <span>Code</span>
             <input name="code" />
+          </label>
+          <label id="entityFillColorWrap" class="hidden">
+            <span>Color</span>
+            <input type="color" name="fill_color" id="entityFillColorInput" />
           </label>
           <label id="entityYearWrap" class="hidden">
             <span>Year starting</span>

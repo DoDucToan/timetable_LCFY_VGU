@@ -27,6 +27,7 @@
       <a class="page-nav-link{% if active_section == 'course-tags' %} active{% endif %}" href="/course-tags{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Course tags</a>
       <a class="page-nav-link{% if active_section == 'group-tags' %} active{% endif %}" href="/group-tags{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Group tags</a>
       <a class="page-nav-link{% if active_section == 'upload' %} active{% endif %}" href="/upload{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Upload</a>
+      <a class="page-nav-link{% if active_section == 'colors' %} active{% endif %}" href="/colors{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Colors</a>
       <a class="page-nav-link{% if active_section == 'data-sync' %} active{% endif %}" href="/data-sync{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Data sync</a>
     </nav>
 
@@ -87,6 +88,7 @@
           <span class="legend-item"><strong>Gs</strong> Multiple Groups Class</span>
           <span class="legend-item"><strong>Ps</strong> Multiple Programs Class</span>
         </div>
+        <div class="timetable-color-legend" id="timetableColorLegend"></div>
         <div class="board-wrap">
           <table id="timetableBoard"></table>
         </div>
