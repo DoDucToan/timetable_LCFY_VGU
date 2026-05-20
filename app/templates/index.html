@@ -17,9 +17,13 @@
           <img src="{{ url_for('static', path='VGU-Logo.png') }}" alt="Timetable Builder" />
         </a>
       </div>
+      <div class="header-actions">
+        <span class="topbar-label">LCFY Timetable Builder</span>
+      </div>
     </header>
     <nav class="page-nav" aria-label="Page navigation">
       <a class="page-nav-link{% if active_section | default('') == '' %} active{% endif %}" href="{{ '/cycle/' ~ selected_cycle_id if selected_cycle_id else '/' }}">Timetable</a>
+      <a class="page-nav-link{% if active_section == 'teacher-load' %} active{% endif %}" href="/teacher-load{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Teacher load</a>
       <a class="page-nav-link{% if active_section == 'teachers' %} active{% endif %}" href="/teachers{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Teachers</a>
       <a class="page-nav-link{% if active_section == 'rooms' %} active{% endif %}" href="/rooms{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Rooms</a>
       <a class="page-nav-link{% if active_section == 'courses' %} active{% endif %}" href="/courses{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Courses</a>
@@ -557,6 +561,16 @@
             <button type="button" class="ghost-btn" data-close="viewRequirementsModal">Close</button>
           </div>
         </div>
+      </div>
+    </div>
+
+    <div class="modal hidden" id="teacherScheduleModal">
+      <div class="modal-card wide">
+        <div class="modal-header">
+          <h2 id="teacherScheduleModalTitle">Teacher schedule</h2>
+          <button class="icon-btn" data-close="teacherScheduleModal">×</button>
+        </div>
+        <div class="full-span" id="teacherScheduleTableWrapper"></div>
       </div>
     </div>
 

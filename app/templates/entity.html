@@ -15,10 +15,9 @@
         <a class="brand-logo" href="/">
           <img src="{{ url_for('static', path='VGU-Logo.png') }}" alt="Timetable Builder" />
         </a>
-        <p class="muted">Manage {{ active_section | replace('-', ' ') }}.</p>
       </div>
       <div class="header-actions">
-        <a class="ghost-btn" href="{{ '/cycle/' ~ selected_cycle_id if selected_cycle_id else '/' }}">Back to timetable</a>
+        <span class="topbar-label">LCFY Timetable Builder</span>
         <div class="toolbar-menu">
           <button type="button" class="ghost-btn small" id="manageMenuBtn">Manage</button>
           <div class="menu-dropdown hidden" id="manageMenuDropdown">
@@ -36,6 +35,7 @@
 
     <nav class="page-nav" aria-label="Page navigation">
       <a class="page-nav-link{% if active_section | default('') == '' %} active{% endif %}" href="{{ '/cycle/' ~ selected_cycle_id if selected_cycle_id else '/' }}">Timetable</a>
+      <a class="page-nav-link{% if active_section == 'teacher-load' %} active{% endif %}" href="/teacher-load{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Teacher load</a>
       <a class="page-nav-link{% if active_section == 'teachers' %} active{% endif %}" href="/teachers{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Teachers</a>
       <a class="page-nav-link{% if active_section == 'rooms' %} active{% endif %}" href="/rooms{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Rooms</a>
       <a class="page-nav-link{% if active_section == 'courses' %} active{% endif %}" href="/courses{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Courses</a>

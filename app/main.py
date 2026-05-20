@@ -187,6 +187,7 @@ def render_entity_page(request: Request, section: str, open_new: bool = False, c
         "colors": "colors.html",
         "upload": "upload.html",
         "data-sync": "data_sync.html",
+        "teacher-load": "teacher-load.html",
     }.get(section, "entity.html")
     return templates.TemplateResponse(
         request=request,
@@ -204,6 +205,11 @@ def teachers_page(request: Request, cycle_id: Optional[int] = Query(default=None
 @app.get("/teachers/new", response_class=HTMLResponse)
 def teachers_new_page(request: Request, cycle_id: Optional[int] = Query(default=None)):
     return render_entity_page(request, "teachers", True, cycle_id)
+
+
+@app.get("/teacher-load", response_class=HTMLResponse)
+def teacher_load_page(request: Request, cycle_id: Optional[int] = Query(default=None)):
+    return render_entity_page(request, "teacher-load", False, cycle_id)
 
 
 @app.get("/rooms", response_class=HTMLResponse)
