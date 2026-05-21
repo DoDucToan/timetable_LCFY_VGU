@@ -814,6 +814,11 @@ body[data-active-section] .dashboard-card {
   background: #eef3ff;
 }
 
+#timetableBoard td.day-cell,
+#timetableBoard td.time-cell {
+  top: 120px;
+}
+
 #timetableBoard thead th {
   position: sticky;
   top: 0;
@@ -1772,9 +1777,11 @@ body[data-active-section] .dashboard-card {
   align-items: center;
   gap: 12px;
   margin: 0;
-  padding: 14px 18px 14px 0;
-  background: white;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  padding: 14px 18px;
+  background: #ffffff;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  width: 100%;
 }
 
 .modal-header h2 {
