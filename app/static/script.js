@@ -545,6 +545,9 @@ function cacheEls() {
     'teacherScheduleModal',
     'teacherScheduleModalTitle',
     'teacherScheduleTableWrapper',
+    'roomScheduleModal',
+    'roomScheduleModalTitle',
+    'roomScheduleTableWrapper',
     'groupScheduleModal',
     'groupScheduleModalTitle',
     'groupScheduleTableWrapper',
@@ -861,7 +864,19 @@ function bindGlobalActions() {
   });
 
   document.body.addEventListener('click', event => {
-    const openEntityTarget = event.target.closest('[data-open-entity]');
+    const clicked = event.target instanceof Element ? event.target : event.target.parentElement;
+    const roomScheduleTarget = clicked?.closest('[data-view-room-schedule]');
+    if (roomScheduleTarget) {
+      event.preventDefault();
+      event.stopPropagation();
+      const roomId = Number(roomScheduleTarget.dataset.viewRoomSchedule);
+      const room = (state.data.rooms || []).find(r => Number(r.id) === roomId);
+      if (room) {
+        openRoomScheduleModal(room);
+      }
+      return;
+    }
+    const openEntityTarget = clicked?.closest('[data-open-entity]');
     if (openEntityTarget) {
       const type = openEntityTarget.dataset.openEntity;
       if (type) {
@@ -870,7 +885,7 @@ function bindGlobalActions() {
         return;
       }
     }
-    const viewReqTarget = event.target.closest('[data-view-requirements]');
+    const viewReqTarget = clicked?.closest('[data-view-requirements]');
     if (viewReqTarget) {
       event.preventDefault();
       openViewRequirementsModal(viewReqTarget.dataset.viewRequirements);
@@ -1548,8 +1563,9 @@ function renderEntityList(containerId, items, type, labelFn, metaFn = null) {
         ${metaFn ? `<small>${escapeHtml(metaFn(item))}</small>` : ''}
       </div>
       <div class="entity-actions">
-        <button class="ghost-btn small" data-edit-entity="${type}:${item.id}">Edit</button>
-        <button class="danger-btn small" data-delete-entity="${type}:${item.id}">Delete</button>
+        ${type === 'room' && document.body.dataset.activeSection === 'rooms' ? `<button type="button" class="ghost-btn small" data-view-room-schedule="${item.id}">View schedule</button>` : ''}
+        <button type="button" class="ghost-btn small" data-edit-entity="${type}:${item.id}">Edit</button>
+        <button type="button" class="danger-btn small" data-delete-entity="${type}:${item.id}">Delete</button>
       </div>`;
     root.appendChild(row);
   });
@@ -1561,6 +1577,16 @@ function renderEntityList(containerId, items, type, labelFn, metaFn = null) {
   root.querySelectorAll('[data-delete-entity]').forEach(btn => {
     const [type, id] = btn.dataset.deleteEntity.split(':');
     btn.addEventListener('click', () => deleteEntity(type, Number(id), `Delete this ${type.replace('_', ' ')}?`));
+  });
+  root.querySelectorAll('[data-view-room-schedule]').forEach(btn => {
+    btn.addEventListener('click', event => {
+      event.stopPropagation();
+      const roomId = Number(btn.dataset.viewRoomSchedule);
+      const room = (state.data.rooms || []).find(r => Number(r.id) === roomId);
+      if (room) {
+        openRoomScheduleModal(room);
+      }
+    });
   });
 }
 
@@ -1652,6 +1678,152 @@ function openGroupScheduleModal(item) {
   openModal('groupScheduleModal');
 }
 
+function renderRoomScheduleList(rooms) {
+  if (!els.roomScheduleList) return;
+  els.roomScheduleList.innerHTML = '';
+  rooms.forEach(room => {
+    const row = document.createElement('div');
+    row.className = 'entity-row';
+    row.innerHTML = `
+      <div class="entity-text">
+        <div>${escapeHtml(`${room.code} — ${room.name}`)}</div>
+        <small>Cap ${room.capacity}</small>
+      </div>
+      <div class="entity-actions">
+        <button class="ghost-btn small" data-view-room-schedule="${room.id}">View schedule</button>
+      </div>`;
+    els.roomScheduleList.appendChild(row);
+  });
+  els.roomScheduleList.querySelectorAll('[data-view-room-schedule]').forEach(btn => {
+    btn.addEventListener('click', event => {
+      event.stopPropagation();
+      const roomId = Number(btn.dataset.viewRoomSchedule);
+      const room = (state.data.rooms || []).find(r => Number(r.id) === roomId);
+      if (room) {
+        openRoomScheduleModal(room);
+      }
+    });
+  });
+}
+
+function openRoomScheduleModal(item) {
+  if (!els.roomScheduleModal || !els.roomScheduleModalTitle || !els.roomScheduleTableWrapper) return;
+  const roomName = item.code ? `${item.code} — ${item.name}` : item.name || 'Room';
+  const roomId = toNullableNumber(item.id);
+  els.roomScheduleModalTitle.textContent = `Room schedule: ${roomName}`;
+  renderRoomScheduleTable(roomId, roomName);
+  openModal('roomScheduleModal');
+}
+
+function renderRoomScheduleTable(roomId, roomName) {
+  if (!els.roomScheduleTableWrapper) return;
+  els.roomScheduleTableWrapper.innerHTML = '';
+  const rows = buildRoomScheduleRows(roomId, roomName);
+  if (!rows.length) {
+    const msg = document.createElement('div');
+    msg.className = 'muted';
+    msg.textContent = 'No scheduled classes found for this room.';
+    els.roomScheduleTableWrapper.appendChild(msg);
+    return;
+  }
+
+  const table = document.createElement('table');
+  table.className = 'requirements-modal-table';
+  const thead = document.createElement('thead');
+  thead.innerHTML = `
+    <tr>
+      <th>Day</th>
+      <th>Timeslot</th>
+      <th>Group</th>
+      <th>Program</th>
+      <th>Teacher</th>
+      <th>Course</th>
+    </tr>
+  `;
+  table.appendChild(thead);
+  const tbody = document.createElement('tbody');
+  rows.forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(row.weekday)}</td>
+      <td>${escapeHtml(row.timeslot)}</td>
+      <td>${escapeHtml(row.group_code)}</td>
+      <td>${escapeHtml(row.program_code)}</td>
+      <td>${escapeHtml(row.teacher_name)}</td>
+      <td>${escapeHtml(row.course_name)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  els.roomScheduleTableWrapper.appendChild(table);
+}
+
+function buildRoomScheduleRows(roomId, roomName) {
+  const timeslotMap = new Map((state.data.timeslots || []).map(ts => [String(ts.id), ts]));
+  const groupMap = new Map((state.data.groups || []).map(g => [String(g.id), g]));
+  const cells = state.data.cells || {};
+  const grouped = new Map();
+
+  Object.entries(cells).forEach(([timeslotId, groups]) => {
+    const timeslot = timeslotMap.get(timeslotId);
+    if (!timeslot || typeof groups !== 'object' || groups === null) return;
+    Object.entries(groups).forEach(([groupId, items]) => {
+      if (!Array.isArray(items)) return;
+      items.forEach(item => {
+        const normalizedRoomId = roomId != null ? Number(roomId) : null;
+        const normalizedItemRoomId = item.room_id != null ? Number(item.room_id) : null;
+        const normalizedRoomName = String(roomName || '').trim().toLowerCase();
+        const normalizedItemRoomName = String(item.room_name || '').trim().toLowerCase();
+        const matchesRoom = normalizedRoomId != null
+          ? normalizedItemRoomId === normalizedRoomId
+          : normalizedRoomName && normalizedItemRoomName === normalizedRoomName;
+        if (!matchesRoom) return;
+        const rowKey = [
+          String(timeslot.weekday || ''),
+          Number(timeslot.sort_order) || 0,
+          String(timeslot.label || ''),
+          String(item.teacher_name || ''),
+          String(item.course_name || ''),
+        ].join('||');
+
+        const existing = grouped.get(rowKey) || {
+          weekday: timeslot.weekday || '',
+          sort_order: Number(timeslot.sort_order) || 0,
+          timeslot: timeslot.label || '',
+          group_codes: new Set(),
+          teacher_name: item.teacher_name || '',
+          course_name: item.kind === 'elective' ? `(Elective) ${item.course_name || ''}` : item.course_name || '',
+          program_codes: new Set(),
+        };
+
+        const groupCode = groupMap.get(groupId)?.code || '';
+        if (groupCode) {
+          existing.group_codes.add(groupCode);
+        }
+
+        if (Array.isArray(item.program_codes)) {
+          item.program_codes.forEach(code => {
+            if (code) existing.program_codes.add(code);
+          });
+        }
+        grouped.set(rowKey, existing);
+      });
+    });
+  });
+
+  const rows = Array.from(grouped.values()).map(entry => ({
+    weekday: entry.weekday,
+    sort_order: entry.sort_order,
+    timeslot: entry.timeslot,
+    group_code: Array.from(entry.group_codes || []).sort().join(', '),
+    program_code: Array.from(entry.program_codes).sort().join(', '),
+    teacher_name: entry.teacher_name,
+    course_name: entry.course_name,
+  }));
+
+  rows.sort((a, b) => a.sort_order - b.sort_order || a.weekday.localeCompare(b.weekday) || a.timeslot.localeCompare(b.timeslot));
+  return rows;
+}
 function renderTeacherScheduleTable(teacherId, teacherName) {
   if (!els.teacherScheduleTableWrapper) return;
   els.teacherScheduleTableWrapper.innerHTML = '';

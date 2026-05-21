@@ -229,7 +229,11 @@ def _normalize_excel_color(value: Optional[str]) -> str:
 def _get_fill_color(item: Dict[str, Any]) -> str:
     if item.get("fill_color"):
         return _normalize_excel_color(item["fill_color"])
-
+    if item.get("kind") == "required":
+        #get color based on course tag if available, otherwise use default required color
+        if item.get("course_tag_fill_color"):
+            return _normalize_excel_color(item["course_tag_fill_color"])
+        
     if item.get("kind") == "program":
         program_codes = item.get("program_codes", [])
         return _program_fill_color([str(code) for code in program_codes])

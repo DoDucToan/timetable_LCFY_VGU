@@ -497,6 +497,8 @@ def build_timetable_payload(
         if kind == "elective":
             color_key = "elective"
             fill_color = FILL_MAP["elective"]
+            if first.course.course_tag and getattr(first.course.course_tag, 'fill_color', None):
+                fill_color = first.course.course_tag.fill_color
         else:
             color_key = COLOR_MAP.get(first.course.course_tag.name, "other")
             fill_color = FILL_MAP.get(color_key, "D9D2E9")
@@ -567,6 +569,7 @@ def build_timetable_payload(
             "kind": kind,
             "color_key": color_key,
             "fill_color": fill_color,
+            "course_tag_fill_color": first.course.course_tag.fill_color if first.course.course_tag and getattr(first.course.course_tag, 'fill_color', None) else None,
             "shared": bool(first.shared_key),
             "expected_size": first.expected_size,
         }
