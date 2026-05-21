@@ -630,7 +630,9 @@ body[data-active-section] .full-width {
   .upload-card .upload-grid {
     display: grid;
     gap: 10px;
-    margin-top: 12px;
+    margin: 12px auto 0;
+    max-width: 720px;
+    width: min(100%, 720px);
   }
 
   .upload-card .upload-row {
@@ -876,9 +878,13 @@ body[data-active-section] .dashboard-card {
 
 .group-header-top {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: center;
   gap: 8px;
+}
+
+.group-header-top > div {
+  width: 100%;
 }
 
 .group-header {
@@ -888,6 +894,7 @@ body[data-active-section] .dashboard-card {
 .group-title-wrap {
   min-width: 0;
   flex: 1;
+  text-align: center;
 }
 
 .group-code {
@@ -1647,8 +1654,38 @@ body[data-active-section] .dashboard-card {
 }
 
 .modal-card.wide {
-  width: min(1080px, calc(100vw - 32px));
+  width: min(960px, calc(100vw - 32px));
   min-width: 320px;
+}
+
+#groupModal .form-grid {
+  grid-template-columns: 1fr;
+}
+
+.group-modal-panels {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.group-modal-panels .group-panel {
+  min-height: 220px;
+}
+
+.group-modal-panels .group-panel-info {
+  max-height: calc(100vh - 260px);
+  overflow: auto;
+}
+
+.group-modal-panels .group-panel-programs {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+.group-modal-panels .checkbox-grid {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
   /* Requirements section below timetable */
@@ -1775,6 +1812,25 @@ body[data-active-section] .dashboard-card {
   background: #fbfcff;
 }
 
+#entityCourseFlagsWrap {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+#entityCourseFlagsWrap .inline-checkbox {
+  width: 100%;
+  justify-content: center;
+  padding: 12px 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+#entityCourseProgramsWrap .checkbox-grid {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
 .form-grid input,
 .form-grid select,
 .form-grid textarea {
@@ -1823,6 +1879,32 @@ body[data-active-section] .dashboard-card {
   align-items: center;
   gap: 8px;
   margin-bottom: 10px;
+}
+
+.entity-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.entity-filter-row input,
+.entity-filter-row select {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  min-height: 44px;
+}
+
+.entity-filter-row input {
+  flex: 1 1 260px;
+  min-width: 180px;
+}
+
+.entity-filter-row select {
+  width: 220px;
 }
 
 .teacher-header-row {
@@ -1929,12 +2011,35 @@ body[data-active-section] .dashboard-card {
   border-top: 2px solid rgba(99, 114, 206, 0.18);
 }
 
+.requirements-table-select-col {
+  width: 48px;
+  text-align: center;
+}
+
+.requirements-table-select-col input {
+  margin: 0;
+}
+
 .requirements-table-item-row td {
   background: #ffffff;
 }
 
 .requirements-table-action-cell {
   width: 100px;
+}
+
+.requirements-modal-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.requirements-modal-selection-summary {
+  color: #666;
+  font-size: 0.95rem;
 }
 
 .requirements-modal-table button.danger-btn.small {

@@ -321,16 +321,6 @@ def _normalize_str(value: Any) -> str:
     return _sanitize_text(value)
 
 
-def _split_codes(value: Any) -> List[str]:
-    if value is None:
-        return []
-    if isinstance(value, str):
-        return [part.strip() for part in value.split(',') if part.strip()]
-    if isinstance(value, Iterable):
-        return [str(item).strip() for item in cast(Iterable[Any], value) if item is not None and str(item).strip()]
-    return [str(value).strip()]
-
-
 def _parse_bool(value: Any) -> bool:
     if isinstance(value, bool):
         return value
@@ -504,6 +494,31 @@ def _read_excel_rows(upload_file: UploadFile) -> List[Dict[str, Any]]:
     return result
 
 
+def _split_codes(value: Any) -> List[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [part.strip() for part in re.split(r'[;,]', value) if part.strip()]
+    if isinstance(value, Iterable):
+        return [str(item).strip() for item in cast(Iterable[Any], value) if item is not None and str(item).strip()]
+    return [str(value).strip()]
+
+
+def _find_row_key(row: dict[str, Any], candidates: List[str]) -> Optional[str]:
+    normalized_keys = {key.lower().strip(): key for key in row.keys()}
+    for candidate in candidates:
+        normalized_candidate = candidate.lower().strip()
+        if normalized_candidate in normalized_keys:
+            return normalized_keys[normalized_candidate]
+    for candidate in candidates:
+        candidate_terms = [term for term in candidate.lower().split() if term]
+        for key in row.keys():
+            normalized_key = key.lower().strip()
+            if all(term in normalized_key for term in candidate_terms):
+                return key
+    return None
+
+
 def _find_course_tag_id(db: Session, name: str) -> int:
     code = _normalize_str(name)
     tag = db.scalar(select(CourseTag).where(CourseTag.name == code).limit(1))
@@ -528,7 +543,13 @@ def _normalize_fill_color(value: Optional[str]) -> Optional[str]:
 
 def _find_study_program_id(db: Session, code: str) -> int:
     lookup = _normalize_str(code)
-    prog = db.scalar(select(StudyProgram).where(StudyProgram.code == lookup).limit(1))
+    prog = db.scalar(
+        select(StudyProgram)
+        .where(func.upper(func.trim(StudyProgram.code)) == func.upper(func.trim(lookup)))
+        .limit(1)
+    )
+    if not prog:
+        prog = db.scalar(select(StudyProgram).where(func.upper(func.trim(StudyProgram.code)) == func.upper(lookup)).limit(1))
     if not prog:
         raise HTTPException(status_code=404, detail=f'Study program not found: {lookup}')
     return int(getattr(prog, 'id'))
@@ -648,13 +669,29 @@ def _import_courses(file: UploadFile, db: Session, timetable_id: Optional[int] =
             setattr(course, 'course_tag_id', course_tag_id)
             setattr(course, 'require_all_student_in_group', require_all)
             setattr(course, 'elective', elective)
-        program_codes = list(dict.fromkeys(_split_codes(row.get('Study Program Codes (comma-separated)'))))
-        db.query(StudyProgramCourse).filter(StudyProgramCourse.course_id == course.id, StudyProgramCourse.timetable_id == timetable_id).delete()
-        for program_code in program_codes:
-            if not program_code:
-                continue
-            program_id = _find_study_program_id(db, program_code)
-            db.add(StudyProgramCourse(study_program_id=program_id, course_id=course.id, timetable_id=timetable_id))
+
+        study_program_key = _find_row_key(row, ['Study Program Codes (comma-separated)', 'Study Program Codes', 'Program Codes', 'Study Program Code', 'Study Program', 'Program'])
+        program_codes = list(dict.fromkeys(_split_codes(row.get(study_program_key) if study_program_key else None)))
+        if program_codes:
+            existing_program_ids = {
+                int(getattr(link, 'study_program_id')): getattr(link, 'sessions_required', 1)
+                for link in db.scalars(
+                    select(StudyProgramCourse)
+                    .where(StudyProgramCourse.course_id == course.id, StudyProgramCourse.timetable_id == timetable_id)
+                ).all()
+            }
+            for program_code in program_codes:
+                if not program_code:
+                    continue
+                program_id = _find_study_program_id(db, program_code)
+                if program_id in existing_program_ids:
+                    continue
+                db.add(StudyProgramCourse(
+                    study_program_id=program_id,
+                    course_id=course.id,
+                    timetable_id=timetable_id,
+                    sessions_required=existing_program_ids.get(program_id, 1),
+                ))
     db.commit()
 
 

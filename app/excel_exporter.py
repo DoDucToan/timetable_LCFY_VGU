@@ -1014,10 +1014,7 @@ def _write_timetable_sheet(
         if not first_active_day:
             group_header_row = row
             for idx, group in enumerate(groups, start=3):
-                program_codes = ", ".join([p["code"] for p in group.get("programs", [])])
                 group_label = group["code"]
-                if program_codes:
-                    group_label += f" ({program_codes})"
                 cell = ws.cell(row=group_header_row, column=idx, value=group_label)
                 cell.fill = header_fill
                 cell.font = default_font(bold=True, size=15)

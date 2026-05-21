@@ -104,6 +104,10 @@ function renderRequirementsSection() {
 function openViewRequirementsModal(type) {
   if (!els.viewRequirementsModal) return;
   state.activeRequirementModalType = type;
+  state.selectedRequirementKeys = new Set();
+  if (els.bulkDeleteRequirementsBtn) {
+    els.bulkDeleteRequirementsBtn.disabled = true;
+  }
   const titleMap = {
     group_only: 'Group-only requirements',
     group_tag: 'Group tag requirements',
@@ -122,11 +126,17 @@ function renderRequirementsModal(type) {
   root.innerHTML = '';
 
   const formatCourseName = req => req.course_name || req.course_id || 'Unknown course';
+  const getCourseCode = courseId => {
+    const course = (state.data.courses || []).find(c => c.id === courseId);
+    return course ? (course.code || course.course_code || '') : '';
+  };
   const table = document.createElement('table');
   table.className = 'requirements-modal-table';
   table.innerHTML = `
     <thead>
       <tr>
+        <th class="requirements-table-select-col"><input type="checkbox" id="selectAllRequirementsCheckbox" /></th>
+        <th>Course Code</th>
         <th>Item</th>
         <th>Requirement</th>
         <th></th>
@@ -140,7 +150,7 @@ function renderRequirementsModal(type) {
     const headerRow = document.createElement('tr');
     headerRow.className = 'requirements-table-group';
     const headerCell = document.createElement('td');
-    headerCell.colSpan = 3;
+    headerCell.colSpan = 5;
     headerCell.textContent = label;
     headerRow.appendChild(headerCell);
     tbody.appendChild(headerRow);
@@ -148,8 +158,19 @@ function renderRequirementsModal(type) {
     items.forEach(item => {
       const row = document.createElement('tr');
       row.className = 'requirements-table-item-row';
+      const selectCell = document.createElement('td');
+      selectCell.className = 'requirements-table-select-col';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.dataset.requirementKey = item.key;
+      checkbox.addEventListener('change', () => {
+        toggleRequirementSelection(item.key, checkbox.checked);
+      });
+      selectCell.appendChild(checkbox);
+      const codeCell = document.createElement('td');
+      codeCell.textContent = item.course_code || '';
       const labelCell = document.createElement('td');
-      labelCell.textContent = '';
+      labelCell.textContent = item.label || '';
       const detailCell = document.createElement('td');
       detailCell.textContent = item.detail;
       const actionCell = document.createElement('td');
@@ -168,6 +189,8 @@ function renderRequirementsModal(type) {
       deleteBtn.textContent = 'Delete';
       deleteBtn.addEventListener('click', item.deleteHandler);
       actionCell.appendChild(deleteBtn);
+      row.appendChild(selectCell);
+      row.appendChild(codeCell);
       row.appendChild(labelCell);
       row.appendChild(detailCell);
       row.appendChild(actionCell);
@@ -179,7 +202,10 @@ function renderRequirementsModal(type) {
   if (type === 'group_only') {
     (state.data.groups || []).forEach(group => {
       const items = (group.group_requirements || []).map(req => ({
-        detail: `${formatCourseName(req)} · ${req.sessions_required || 1} session(s)`,
+        key: `group_only:${req.id}`,
+        course_code: getCourseCode(req.course_id),
+        label: formatCourseName(req),
+        detail: `${req.sessions_required || 1} session(s)`,
         deleteHandler: () => deleteGroupOnlyRequirement(req.id),
         editHandler: () => openEditGroupOnlyRequirementModal(req),
       }));
@@ -190,13 +216,17 @@ function renderRequirementsModal(type) {
     });
     if (!added) root.innerHTML = '<div class="muted">No group-only requirements.</div>';
     else root.appendChild(table);
+    attachRequirementsTableHandlers();
     return;
   }
 
   if (type === 'group_tag') {
     (state.data.group_tags || []).forEach(tag => {
       const items = (tag.requirements || []).map(req => ({
-        detail: `${formatCourseName(req)} · ${req.sessions_required || 1} session(s)`,
+        key: `group_tag:${tag.id}:${req.course_id}`,
+        course_code: getCourseCode(req.course_id),
+        label: formatCourseName(req),
+        detail: `${req.sessions_required || 1} session(s)`,
         deleteHandler: () => deleteRequirement('group_tag', tag.id, req.course_id),
         editHandler: () => openEditRequirementModal('group_tag', tag.id, req.course_id, req.sessions_required),
       }));
@@ -207,13 +237,17 @@ function renderRequirementsModal(type) {
     });
     if (!added) root.innerHTML = '<div class="muted">No group tag requirements.</div>';
     else root.appendChild(table);
+    attachRequirementsTableHandlers();
     return;
   }
 
   if (type === 'program') {
     (state.data.programs || []).forEach(prog => {
       const items = (prog.requirements || []).map(req => ({
-        detail: `${formatCourseName(req)} · ${req.sessions_required || 1} session(s)`,
+        key: `program:${prog.id}:${req.course_id}`,
+        course_code: getCourseCode(req.course_id),
+        label: formatCourseName(req),
+        detail: `${req.sessions_required || 1} session(s)`,
         deleteHandler: () => deleteRequirement('program', prog.id, req.course_id),
         editHandler: () => openEditRequirementModal('program', prog.id, req.course_id, req.sessions_required),
       }));
@@ -224,10 +258,95 @@ function renderRequirementsModal(type) {
     });
     if (!added) root.innerHTML = '<div class="muted">No study program requirements.</div>';
     else root.appendChild(table);
+    attachRequirementsTableHandlers();
     return;
   }
 
   root.innerHTML = '<div class="muted">No requirements available.</div>';
+}
+
+function toggleRequirementSelection(key, checked) {
+  if (checked) {
+    state.selectedRequirementKeys.add(key);
+  } else {
+    state.selectedRequirementKeys.delete(key);
+  }
+  updateRequirementSelectionControls();
+}
+
+function updateRequirementSelectionControls() {
+  if (!els.bulkDeleteRequirementsBtn) return;
+  els.bulkDeleteRequirementsBtn.disabled = state.selectedRequirementKeys.size === 0;
+  const selectAllCheckbox = document.getElementById('selectAllRequirementsCheckbox');
+  const itemCheckboxes = [...document.querySelectorAll('#viewRequirementsContent input[type="checkbox"][data-requirement-key]')];
+  const checkedCount = itemCheckboxes.filter(cb => cb.checked).length;
+  if (els.requirementSelectionSummary) {
+    if (itemCheckboxes.length === 0) {
+      els.requirementSelectionSummary.textContent = 'No requirements available.';
+    } else if (state.selectedRequirementKeys.size === 0) {
+      els.requirementSelectionSummary.textContent = 'Select requirements to enable bulk delete.';
+    } else {
+      els.requirementSelectionSummary.textContent = `${state.selectedRequirementKeys.size} requirement(s) selected.`;
+    }
+  }
+  if (!selectAllCheckbox) return;
+  selectAllCheckbox.checked = itemCheckboxes.length > 0 && checkedCount === itemCheckboxes.length;
+  selectAllCheckbox.indeterminate = checkedCount > 0 && checkedCount < itemCheckboxes.length;
+}
+
+function attachRequirementsTableHandlers() {
+  const selectAllCheckbox = document.getElementById('selectAllRequirementsCheckbox');
+  if (!selectAllCheckbox) return;
+  selectAllCheckbox.addEventListener('change', () => {
+    const checked = selectAllCheckbox.checked;
+    [...document.querySelectorAll('#viewRequirementsContent input[type="checkbox"][data-requirement-key]')].forEach(cb => {
+      cb.checked = checked;
+      const key = cb.dataset.requirementKey;
+      if (key) {
+        if (checked) state.selectedRequirementKeys.add(key);
+        else state.selectedRequirementKeys.delete(key);
+      }
+    });
+    updateRequirementSelectionControls();
+  });
+  updateRequirementSelectionControls();
+}
+
+async function deleteSelectedRequirements() {
+  if (!state.selectedRequirementKeys.size) return;
+  if (!confirm(`Delete ${state.selectedRequirementKeys.size} selected requirement(s)?`)) return;
+  const requests = [];
+  state.selectedRequirementKeys.forEach(key => {
+    const parts = key.split(':');
+    if (parts[0] === 'group_only') {
+      const requirementId = Number(parts[1]);
+      requests.push(fetch(`/api/group-only-requirements/${requirementId}`, { method: 'DELETE' }));
+    } else if (parts[0] === 'group_tag' || parts[0] === 'program') {
+      const type = parts[0];
+      const targetId = Number(parts[1]);
+      const courseId = Number(parts[2]);
+      let url = '';
+      if (type === 'group_tag') {
+        url = `/api/group-tags/${targetId}/requirements/${courseId}`;
+      } else {
+        url = `/api/study-programs/${targetId}/requirements/${courseId}`;
+      }
+      if (state.timetableId) {
+        url += `?timetable_id=${state.timetableId}`;
+      }
+      requests.push(fetch(url, { method: 'DELETE' }));
+    }
+  });
+  const results = await Promise.all(requests);
+  const failed = results.find(res => !res.ok);
+  if (failed) {
+    const data = await failed.json().catch(() => ({}));
+    alert(`Failed to delete selected requirements: ${data.detail || failed.statusText}`);
+    return;
+  }
+  state.selectedRequirementKeys.clear();
+  await refreshData(state.timetableId);
+  refreshRequirementsModalIfOpen();
 }
 
 function refreshRequirementsModalIfOpen() {
@@ -283,6 +402,10 @@ const state = {
   selectedProgramGroupId: null,
   editingEntity: { type: null, id: null },
   activeRequirementModalType: null,
+  selectedRequirementKeys: new Set(),
+  courseFilterQuery: '',
+  courseFilterType: '',
+  courseFilterTag: '',
 };
 
 let currentImportEntity = null;
@@ -432,6 +555,9 @@ function cacheEls() {
     'teacherFilterWrapper',
     'teacherCourseTagFilter',
     'teacherList',
+    'courseSearchInput',
+    'courseFilterSelect',
+    'courseTagFilterSelect',
     'courseList',
     'groupProgramPanel',
     'groupProgramPanelTitle',
@@ -451,9 +577,12 @@ function cacheEls() {
     'entityFillColorInput',
     'entityTeacherTags',
     'entityCoursePrograms',
+    'entityCourseAnyProgram',
     'entityRequirementRows',
     'viewRequirementsModal',
     'viewRequirementsContent',
+    'bulkDeleteRequirementsBtn',
+    'requirementSelectionSummary',
     'addEntityRequirementBtn',
     'addGroupTagRequirementPanelBtn',
     'addStudyProgramRequirementPanelBtn',
@@ -471,6 +600,7 @@ function cacheEls() {
   els.requirementTagOrProgramLabel = document.getElementById('requirementTagOrProgramLabel');
   els.requirementTagOrProgramText = document.getElementById('requirementTagOrProgramText');
   els.requirementTagOrProgramSelect = document.getElementById('requirementTagOrProgramSelect');
+  els.requirementCourseSearchInput = document.getElementById('requirementCourseSearchInput');
   els.requirementCourseSelect = document.getElementById('requirementCourseSelect');
   els.requirementSessionsInput = document.getElementById('requirementSessionsInput');
   els.requirementSessionsRow = document.getElementById('requirementSessionsRow');
@@ -507,12 +637,45 @@ function bindGlobalActions() {
   } else {
     console.warn('Missing element: addStudyProgramRequirementPanelBtn');
   }
+  if (els.requirementTagOrProgramSelect) {
+    els.requirementTagOrProgramSelect.addEventListener('change', () => {
+      const type = els.addRequirementModal?.dataset.type || 'group_tag';
+      updateRequirementCourseOptions(type);
+    });
+  }
+  if (els.requirementCourseSearchInput) {
+    els.requirementCourseSearchInput.addEventListener('input', () => {
+      const type = els.addRequirementModal?.dataset.type || 'group_tag';
+      updateRequirementCourseOptions(type);
+    });
+  }
   if (els.addGroupOnlyRequirementPanelBtn) {
     els.addGroupOnlyRequirementPanelBtn.addEventListener('click', () => {
       openGroupOnlyRequirementModal();
     });
   } else {
     console.warn('Missing element: addGroupOnlyRequirementPanelBtn');
+  }
+  if (els.bulkDeleteRequirementsBtn) {
+    els.bulkDeleteRequirementsBtn.addEventListener('click', deleteSelectedRequirements);
+  }
+  if (els.courseSearchInput) {
+    els.courseSearchInput.addEventListener('input', () => {
+      state.courseFilterQuery = els.courseSearchInput.value;
+      renderEntityLists();
+    });
+  }
+  if (els.courseFilterSelect) {
+    els.courseFilterSelect.addEventListener('change', () => {
+      state.courseFilterType = els.courseFilterSelect.value;
+      renderEntityLists();
+    });
+  }
+  if (els.courseTagFilterSelect) {
+    els.courseTagFilterSelect.addEventListener('change', () => {
+      state.courseFilterTag = els.courseTagFilterSelect.value;
+      renderEntityLists();
+    });
   }
   if (els.addGroupTagRequirementBtn) {
     els.addGroupTagRequirementBtn.addEventListener('click', () => openAddRequirementModal('group_tag'));
@@ -837,6 +1000,7 @@ function bindGlobalActions() {
   } else {
     console.warn('Missing element: entityForm');
   }
+  bindEntitiyCourseProgramToggle();
   if (els.entityDeleteBtn) {
     els.entityDeleteBtn.addEventListener('click', deleteCurrentEntity);
   } else {
@@ -1034,7 +1198,39 @@ function renderEntityLists() {
     const tags = (item.course_tag_ids || []).map(id => courseTagMap.get(id)).filter(Boolean);
     return tags.length ? `Course tags: ${tags.join(', ')}` : 'No course tags';
   });
-  const sortedCourses = (state.data.courses || []).slice().sort((a, b) => String(a.code || a.name || '').localeCompare(String(b.code || b.name || '')));
+  if (els.courseTagFilterSelect) {
+    els.courseTagFilterSelect.innerHTML = `
+      <option value="">All course tags</option>
+      ${ (state.data.course_tags || []).map(tag => `<option value="${tag.id}">${escapeHtml(tag.name)}</option>`).join('') }
+    `;
+    if (state.courseFilterTag) {
+      els.courseTagFilterSelect.value = state.courseFilterTag;
+    }
+  }
+  let sortedCourses = (state.data.courses || []).slice();
+  const query = String(state.courseFilterQuery || '').trim().toLowerCase();
+  const filterType = String(state.courseFilterType || '');
+  if (query) {
+    sortedCourses = sortedCourses.filter(course => {
+      const label = `${course.code || ''} ${course.name || ''}`.toLowerCase();
+      return label.includes(query);
+    });
+  }
+  if (filterType) {
+    sortedCourses = sortedCourses.filter(course => {
+      if (filterType === 'require_all') return Boolean(course.require_all);
+      if (filterType === 'program') return !course.require_all && !course.elective;
+      if (filterType === 'elective') return Boolean(course.elective);
+      return true;
+    });
+  }
+  if (state.courseFilterTag) {
+    const tagId = Number(state.courseFilterTag);
+    if (tagId) {
+      sortedCourses = sortedCourses.filter(course => course.course_tag_id === tagId);
+    }
+  }
+  sortedCourses.sort((a, b) => String(a.code || a.name || '').localeCompare(String(b.code || b.name || '')));
   renderEntityList('courseList', sortedCourses, 'course', item => `${item.code} — ${item.name}`, item => item.require_all ? 'Require all' : (item.elective ? 'Elective' : 'Program class'));
 }
 
@@ -1399,6 +1595,10 @@ function populateStaticInputs() {
   if (els.entityCoursePrograms) {
     renderProgramCheckboxes(els.entityCoursePrograms, state.data.programs || [], 'entityPrograms');
   }
+  if (els.entityCourseAnyProgram) {
+    els.entityCourseAnyProgram.checked = true;
+    updateEntityCourseProgramsState();
+  }
   if (els.entityTeacherTags) {
     renderProgramCheckboxes(els.entityTeacherTags, state.data.course_tags || [], 'entityTeacherTags', 'name');
   }
@@ -1713,7 +1913,6 @@ function renderBoard() {
           <button class="dots-btn" data-group-menu="${group.id}" title="Group options">...</button>
           <div class="group-menu ${isOpen ? '' : 'hidden'}">
             <button type="button" data-edit-group="${group.id}">Adjust group</button>
-            <button type="button" data-open-programs="${group.id}">Edit programs</button>
             <button type="button" data-delete-group="${group.id}" class="danger-text">Delete group</button>
           </div>
         </div>
@@ -1799,12 +1998,6 @@ function renderBoard() {
       openGroupModal(Number(btn.dataset.editGroup));
     });
   });
-  els.timetableBoard.querySelectorAll('[data-open-programs]').forEach(btn => {
-    btn.addEventListener('click', event => {
-      event.stopPropagation();
-      openGroupModal(Number(btn.dataset.openPrograms));
-    });
-  });
   els.timetableBoard.querySelectorAll('[data-delete-group]').forEach(btn => {
     btn.addEventListener('click', async event => {
       event.stopPropagation();
@@ -1872,7 +2065,7 @@ function renderBoard() {
 
         const isGermanSlot = slot.label.startsWith('German');
       const rowKeys = slotRowMap[String(slot.id)]?.keys || [];
-      const rows = Math.max(1, rowKeys.length);
+      const rows = isGermanSlot ? Math.max(1, rowKeys.length) : Math.max(1, rowKeys.length + 1);
 
       groups.forEach(group => {
         const td = document.createElement('td');
@@ -2230,7 +2423,15 @@ function openEntityModal(type, id = null) {
       els.entityCourseTagSelect.value = String(item.course_tag_id);
       els.entityForm.elements.require_all.checked = !!item.require_all;
       els.entityForm.elements.elective.checked = !!item.elective;
-      precheckPrograms(els.entityCoursePrograms, item.study_program_ids);
+      if (els.entityCoursePrograms) {
+        const selectedPrograms = item.study_program_ids || [];
+        precheckPrograms(els.entityCoursePrograms, selectedPrograms);
+      }
+      if (els.entityCourseAnyProgram) {
+        const selectedPrograms = item.study_program_ids || [];
+        els.entityCourseAnyProgram.checked = selectedPrograms.length === 0;
+        updateEntityCourseProgramsState();
+      }
     }
   } else {
     if (type === 'timetable') {
@@ -2251,6 +2452,23 @@ function openEntityModal(type, id = null) {
 
   openModal('entityModal');
 }
+
+function updateEntityCourseProgramsState() {
+  if (!els.entityCoursePrograms || !els.entityCourseAnyProgram) return;
+  const anyProgram = els.entityCourseAnyProgram.checked;
+  [...els.entityCoursePrograms.querySelectorAll('input[type="checkbox"]')].forEach(input => {
+    input.disabled = anyProgram;
+    if (anyProgram) input.checked = false;
+  });
+}
+
+function bindEntitiyCourseProgramToggle() {
+  if (!els.entityCourseAnyProgram) return;
+  els.entityCourseAnyProgram.addEventListener('change', () => {
+    updateEntityCourseProgramsState();
+  });
+}
+
 
 function getEntityById(type, id) {
   const map = {
@@ -2282,7 +2500,7 @@ function toggleEntityFields(type) {
   show('entityFillColorWrap', type === 'course_tag' || type === 'program');
   show('entityInActionWrap', false);
   show('entityTeacherTagsWrap', type === 'teacher');
-  show('entityCourseProgramsWrap', false);
+  show('entityCourseProgramsWrap', type === 'course');
   show('entityCourseFlagsWrap', type === 'course');
   show('entityRequirementsWrap', false);
 }
@@ -2363,12 +2581,16 @@ function buildEntityPayload(type) {
     return { code: f.code.value, name: f.name.value, fill_color: f.fill_color?.value || null };
   }
   if (type === 'course') {
+    const study_program_ids = els.entityCourseAnyProgram && els.entityCourseAnyProgram.checked
+      ? []
+      : (els.entityCoursePrograms ? collectCheckedValues(els.entityCoursePrograms) : []);
     return {
       code: f.code.value,
       name: f.name.value,
       course_tag_id: Number(els.entityCourseTagSelect.value),
       require_all: !!f.require_all.checked,
       elective: !!f.elective.checked,
+      study_program_ids,
     };
   }
   if (type === 'room') {
@@ -2740,7 +2962,9 @@ function syncClassFormVisibility(currentCourseId = null) {
       } else if (programCourseIds.size > 0) {
         courses = courses.filter(c => programCourseIds.has(c.id));
       } else {
-        courses = (state.data.courses || []).filter(c => c.study_program_ids && c.study_program_ids.some(pid => selectedProgramIds.includes(pid)));
+        courses = (state.data.courses || []).filter(c => {
+          return !c.study_program_ids || c.study_program_ids.length === 0 || c.study_program_ids.some(pid => selectedProgramIds.includes(pid));
+        });
       }
     }
   }
@@ -2936,6 +3160,16 @@ function updateRoomOptions(currentRoomId = null, timeslotId = null, courseId = n
   );
 }
 
+function getTeacherLoadCounts() {
+  const map = {};
+  (state.data.teacher_load || []).forEach(item => {
+    if (item.teacher_id != null) {
+      map[item.teacher_id] = Number(item.timeslot_count) || 0;
+    }
+  });
+  return map;
+}
+
 function updateTeacherOptions(currentTeacherId = null, timeslotId = null, explicitCourseId = null) {
   const courseId = explicitCourseId != null ? explicitCourseId : Number(els.courseSelect.value);
   const course = (state.data.courses || []).find(c => c.id === courseId);
@@ -2949,6 +3183,7 @@ function updateTeacherOptions(currentTeacherId = null, timeslotId = null, explic
   if (timeslotId == null && state.selected && state.selected.length) {
     timeslotId = state.selected[0].timeslotId;
   }
+  const teacherLoadCounts = getTeacherLoadCounts();
   let teacherOptions = [{ value: '', label: 'No teacher' }];
   const teacherScheduleSummaries = buildTeacherScheduleSummaries();
   if (timeslotId != null) {
@@ -2958,9 +3193,10 @@ function updateTeacherOptions(currentTeacherId = null, timeslotId = null, explic
       ...teachers.map(t => {
         const conflicts = teacherConflictsById[t.id] || [];
         const occupied = occupiedTeacherIds.has(t.id) && t.id !== currentTeacherId;
+        const loadCount = teacherLoadCounts[t.id] ?? 0;
         return {
           value: t.id,
-          label: `${t.name}${conflicts.length ? ` — occupied by ${conflicts.join(', ')}` : ''}`,
+          label: `${t.name} (${loadCount})${conflicts.length ? ` — occupied by ${conflicts.join(', ')}` : ''}`,
           title: teacherScheduleSummaries[t.id] || 'No scheduled classes for this teacher.',
           disabled: occupied,
         };
@@ -2969,7 +3205,7 @@ function updateTeacherOptions(currentTeacherId = null, timeslotId = null, explic
   } else {
     teacherOptions = [{ value: '', label: 'No teacher' }, ...teachers.map(t => ({
       value: t.id,
-      label: t.name,
+      label: `${t.name} (${teacherLoadCounts[t.id] ?? 0})`,
       title: teacherScheduleSummaries[t.id] || 'No scheduled classes for this teacher.',
     }))];
   }
@@ -3842,18 +4078,11 @@ function openAddRequirementModal(type) {
     opt.textContent = `${item.code} — ${item.name}`;
     els.requirementTagOrProgramSelect.appendChild(opt);
   });
+  if (els.requirementCourseSearchInput) {
+    els.requirementCourseSearchInput.value = '';
+  }
   els.requirementCourseSelect.innerHTML = '';
-  (state.data.courses || [])
-    .slice()
-    .sort((a, b) => String(a.code || a.name || '').localeCompare(String(b.code || b.name || '')))
-    .forEach(course => {
-      const opt = document.createElement('option');
-      opt.value = course.id;
-      opt.textContent = course.code ? `${course.code} — ${course.name}` : course.name;
-      els.requirementCourseSelect.appendChild(opt);
-  });
   setSelectValues(els.requirementTagOrProgramSelect, []);
-  els.requirementCourseSelect.value = '';
   els.requirementSessionsInput.value = 1;
   if (els.requirementSessionsRow) {
     els.requirementSessionsRow.classList.remove('hidden');
@@ -3864,14 +4093,55 @@ function openAddRequirementModal(type) {
   els.addRequirementModal.dataset.type = type;
   delete els.addRequirementModal.dataset.editingType;
   delete els.addRequirementModal.dataset.editingTargetId;
+  updateRequirementCourseOptions(type);
   openModal('addRequirementModal');
+}
+
+function updateRequirementCourseOptions(type) {
+  if (!els.requirementCourseSelect) return;
+  const selectedTargetIds = getSelectValues(els.requirementTagOrProgramSelect);
+  const searchTerm = els.requirementCourseSearchInput?.value.trim().toLowerCase() || '';
+  const courseOptions = (state.data.courses || []).slice().sort((a, b) =>
+    String(a.code || a.name || '').localeCompare(String(b.code || b.name || ''))
+  );
+  els.requirementCourseSelect.innerHTML = '';
+
+  const shouldIncludeCourse = course => {
+    if (!searchTerm) return true;
+    const code = String(course.code || '').toLowerCase();
+    const name = String(course.name || '').toLowerCase();
+    return code.includes(searchTerm) || name.includes(searchTerm);
+  };
+
+  courseOptions.filter(shouldIncludeCourse).forEach(course => {
+    const opt = document.createElement('option');
+    opt.value = course.id;
+    opt.textContent = course.code ? `${course.code} — ${course.name}` : course.name;
+    els.requirementCourseSelect.appendChild(opt);
+  });
+
+  if (els.requirementCourseSelect.options.length === 0) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = 'No matching courses available';
+    els.requirementCourseSelect.appendChild(opt);
+    els.requirementCourseSelect.disabled = true;
+  } else {
+    els.requirementCourseSelect.disabled = false;
+    if (els.requirementCourseSelect.value === '' && els.requirementCourseSelect.options.length > 0) {
+      els.requirementCourseSelect.selectedIndex = 0;
+    }
+  }
 }
 
 function openEditRequirementModal(type, targetId, courseId, sessionsRequired) {
   openAddRequirementModal(type);
   els.addRequirementModalTitle.textContent = type === 'group_tag' ? 'Edit Group Tag Requirement' : 'Edit Study Program Requirement';
   setSelectValues(els.requirementTagOrProgramSelect, [targetId]);
-  els.requirementCourseSelect.value = courseId;
+  updateRequirementCourseOptions(type);
+  if (els.requirementCourseSelect) {
+    els.requirementCourseSelect.value = courseId;
+  }
   els.requirementSessionsInput.value = sessionsRequired || 1;
 }
 
@@ -3879,7 +4149,7 @@ async function submitAddRequirementForm(e) {
   e.preventDefault();
   const type = els.addRequirementModal.dataset.type || 'group_tag';
   const targetIds = getSelectValues(els.requirementTagOrProgramSelect);
-  const courseId = Number(els.requirementCourseSelect.value);
+  const courseId = Number(els.requirementCourseSelect?.value);
   const sessions = Number(els.requirementSessionsInput.value) || 1;
   if (!targetIds.length) {
     alert(`Select at least one ${type === 'group_tag' ? 'group tag' : 'study program'}.`);

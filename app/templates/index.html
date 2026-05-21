@@ -229,11 +229,6 @@
             <div id="entityTeacherTags" class="checkbox-grid"></div>
           </fieldset>
 
-          <fieldset id="entityCourseProgramsWrap" class="full-span hidden">
-            <legend>Study programs for this course</legend>
-            <div id="entityCoursePrograms" class="checkbox-grid"></div>
-          </fieldset>
-
           <div id="entityCourseFlagsWrap" class="full-span hidden plain-box">
             <label class="inline-checkbox"><input type="checkbox" name="require_all" /> <span>Require all students in group</span></label>
             <label class="inline-checkbox"><input type="checkbox" name="elective" /> <span>Elective</span></label>
@@ -508,6 +503,7 @@
           </label>
           <label class="full-span">
             <span>Course</span>
+            <input type="search" id="requirementCourseSearchInput" placeholder="Search course code or name" autocomplete="off" />
             <select id="requirementCourseSelect" required></select>
           </label>
           <label class="full-span" id="requirementSessionsRow">
@@ -556,6 +552,10 @@
           <button class="icon-btn" data-close="viewRequirementsModal">×</button>
         </div>
         <div class="form-grid">
+          <div class="full-span requirements-modal-toolbar">
+            <button type="button" class="danger-btn" id="bulkDeleteRequirementsBtn" disabled>Delete selected</button>
+            <div class="requirements-modal-selection-summary" id="requirementSelectionSummary">Select requirements to enable bulk delete</div>
+          </div>
           <div class="full-span" id="viewRequirementsContent"></div>
           <div class="full-span form-actions between-actions">
             <button type="button" class="ghost-btn" data-close="viewRequirementsModal">Close</button>

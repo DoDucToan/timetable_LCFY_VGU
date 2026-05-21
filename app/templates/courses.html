@@ -10,6 +10,18 @@
       <h2>Courses</h2>
       <button class="ghost-btn" data-open-entity="course">Add</button>
     </div>
+    <div class="entity-filter-row">
+      <input id="courseSearchInput" type="search" placeholder="Search courses by code or name..." />
+      <select id="courseFilterSelect">
+        <option value="">All course types</option>
+        <option value="require_all">Require all</option>
+        <option value="program">Program class</option>
+        <option value="elective">Elective</option>
+      </select>
+      <select id="courseTagFilterSelect">
+        <option value="">All course tags</option>
+      </select>
+    </div>
     <div id="courseList" class="entity-list"></div>
   </section>
 </main>
