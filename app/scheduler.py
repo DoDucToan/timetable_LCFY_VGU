@@ -277,6 +277,10 @@ def create_classes(
     effective_mode = MODE_ELECTIVE if mode == MODE_REQUIRED and self_study else mode
     shared_key = str(uuid4()) if len(target_group_ids) > 1 or len(study_program_ids) > 1 else None
     created: List[ScheduledClass] = []
+    groups = db.execute(
+        select(Group).where(Group.id.in_(target_group_ids)).options(joinedload(Group.study_program_links))
+    ).unique().scalars().all()
+    group_map: Dict[int, Group] = {cast(int, g.id): g for g in groups}
 
     if effective_mode == MODE_REQUIRED:
         for group_id in target_group_ids:
@@ -296,8 +300,15 @@ def create_classes(
                 )
             )
     elif effective_mode == MODE_PROGRAM:
+        group_map: Dict[int, Group] = {cast(int, g.id): g for g in groups}
         for group_id in target_group_ids:
+            group = group_map.get(group_id)
+            if not group:
+                continue
+            group_program_ids = {cast(int, link.study_program_id) for link in group.study_program_links}
             for study_program_id in study_program_ids:
+                if study_program_id not in group_program_ids:
+                    continue
                 created.append(
                     ScheduledClass(
                         group_id=group_id,
