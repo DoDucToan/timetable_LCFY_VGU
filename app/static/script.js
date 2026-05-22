@@ -3119,7 +3119,7 @@ function getProgramsForGroupIds(groupIds = []) {
   return (state.data.programs || []).filter(program => programIds.has(program.id));
 }
 
-function getDisabledProgramIdsForGroupIds(groupIds = [], timeslotId = null) {
+function getDisabledProgramIdsForGroupIds(groupIds = [], timeslotId = null, excludeClassId = null) {
   if (!groupIds.length || timeslotId == null) return new Set();
   const cellGroups = state.data.cells?.[String(timeslotId)] || {};
   const programCodeToId = new Map((state.data.programs || []).map(program => [String(program.code || '').trim().toUpperCase(), program.id]));
@@ -3127,6 +3127,10 @@ function getDisabledProgramIdsForGroupIds(groupIds = [], timeslotId = null) {
   groupIds.forEach(groupId => {
     const items = cellGroups[String(groupId)] || [];
     items.forEach(item => {
+      const itemClassIds = Array.isArray(item.class_ids) ? item.class_ids : [item.id];
+      if (excludeClassId != null && itemClassIds.some(id => Number(id) === Number(excludeClassId))) {
+        return;
+      }
       if (Array.isArray(item.program_codes)) {
         item.program_codes.forEach(code => {
           const normalized = String(code || '').trim().toUpperCase();
@@ -3146,7 +3150,7 @@ function getDisabledGroupIdsForSelectedPrograms(selectedProgramIds, timeslotId =
   (state.data.groups || []).forEach(group => {
     const groupProgramIds = new Set((group.programs || []).map(p => p.id));
     const hasAnySelectedProgram = selectedProgramIds.some(pid => groupProgramIds.has(pid));
-    const programConflicts = getDisabledProgramIdsForGroupIds([group.id], timeslotId);
+    const programConflicts = getDisabledProgramIdsForGroupIds([group.id], timeslotId, state.editingClassId);
     if (!hasAnySelectedProgram || selectedProgramIds.some(pid => programConflicts.has(pid))) {
       disabled.add(group.id);
     }
@@ -3161,7 +3165,7 @@ function refreshClassProgramOptions() {
   const currentProgramIds = collectCheckedValues(els.classProgramOptions);
   const allowedProgramIds = new Set(availablePrograms.map(p => p.id));
   const selectedTimeslotId = state.currentClassModalTimeslotId || state.selected[0]?.timeslotId || null;
-  const disabledProgramIds = getDisabledProgramIdsForGroupIds(selectedGroupIds, selectedTimeslotId);
+  const disabledProgramIds = getDisabledProgramIdsForGroupIds(selectedGroupIds, selectedTimeslotId, state.editingClassId);
   const selectedProgramIds = currentProgramIds.filter(id => allowedProgramIds.has(id) && !disabledProgramIds.has(id));
   renderProgramCheckboxes(els.classProgramOptions, availablePrograms, 'classPrograms', disabledProgramIds);
   precheckPrograms(els.classProgramOptions, selectedProgramIds);

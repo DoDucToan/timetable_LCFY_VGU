@@ -197,6 +197,7 @@ def validate_new_class(
     if effective_mode == MODE_REQUIRED and len(target_group_ids) > 1:
         errors.append("Require-all-students classes must be added to one group at a time.")
 
+    valid_program_groups: List[int] = []
     # student/group clashes
     for group_id in target_group_ids:
         group = group_map[group_id]
@@ -225,8 +226,8 @@ def validate_new_class(
 
         if effective_mode == MODE_PROGRAM:
             if not any(pid in group_program_ids for pid in study_program_ids):
-                errors.append(f"Group {group.code} does not contain any selected study programs.")
                 continue
+            valid_program_groups.append(group_id)
 
             if any((cast(Optional[int], cls.study_program_id) is None and not cast(bool, cls.course.elective)) for cls in existing):
                 errors.append(f"Group {group.code} already has a require-all-students class in this timeslot.")
@@ -238,6 +239,9 @@ def validate_new_class(
                         program = db.get(StudyProgram, pid)
                         code = program.code if program else str(pid)
                         errors.append(f"Program {code} in group {group.code} already has a class in this timeslot.")
+
+    if effective_mode == MODE_PROGRAM and not valid_program_groups:
+        errors.append("Selected groups do not contain any selected study programs.")
 
     return errors
 
