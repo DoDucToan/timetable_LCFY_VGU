@@ -3078,22 +3078,22 @@ async function openClassModal(classId = null, mergedClassIds = null) {
   if (editingClass && editingClass.study_program_ids?.length) {
     els.classUpdateWarning?.classList.remove('hidden');
   }
-  renderProgramCheckboxes(
-    els.classProgramOptions,
-    intersectProgramsForSelectedGroups(selected),
-    'classPrograms'
-  );
+  const selectedTimeslotId = selected[0]?.timeslotId || null;
+  state.currentClassModalTimeslotId = selectedTimeslotId;
+  refreshClassProgramOptions();
   if (editingClass && editingClass.study_program_ids) {
     for (const id of editingClass.study_program_ids) {
       const cb = els.classProgramOptions.querySelector(`input[type="checkbox"][value="${id}"]`);
       if (cb) cb.checked = true;
     }
   }
-  els.classProgramOptions.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.addEventListener('change', syncClassFormVisibility));
   renderGroupCheckboxes(els.classGroupOptions, state.data.groups || [], 'classGroups');
   const preselectedGroupIds = editingClass ? [editingClass.group_id] : selected.map(item => item.groupId);
   precheckGroups(els.classGroupOptions, preselectedGroupIds);
-  const selectedTimeslotId = selected[0].timeslotId;
+  els.classGroupOptions.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.addEventListener('change', () => {
+    refreshClassProgramOptions();
+    syncClassFormVisibility();
+  }));
   syncClassFormVisibility(editingClass ? editingClass.course_id : null);
   updateRoomOptions(editingClass ? editingClass.room_id : null, selectedTimeslotId, editingClass ? editingClass.course_id : null);
 
@@ -3109,15 +3109,68 @@ async function openClassModal(classId = null, mergedClassIds = null) {
   openModal('classModal');
 }
 
-function intersectProgramsForSelectedGroups(selected = state.selected) {
-  if (!selected.length) return [];
-  const selectedGroups = (state.data.groups || []).filter(group => selected.some(sel => sel.groupId === group.id));
-  if (!selectedGroups.length) return [];
-  let set = new Set(selectedGroups[0].programs.map(p => p.id));
-  selectedGroups.slice(1).forEach(group => {
-    set = new Set(group.programs.map(p => p.id).filter(id => set.has(id)));
+function getProgramsForGroupIds(groupIds = []) {
+  if (!groupIds.length) return [];
+  const selectedGroups = (state.data.groups || []).filter(group => groupIds.includes(group.id));
+  const programIds = new Set();
+  selectedGroups.forEach(group => {
+    (group.programs || []).forEach(program => programIds.add(program.id));
   });
-  return (state.data.programs || []).filter(p => set.has(p.id));
+  return (state.data.programs || []).filter(program => programIds.has(program.id));
+}
+
+function getDisabledProgramIdsForGroupIds(groupIds = [], timeslotId = null) {
+  if (!groupIds.length || timeslotId == null) return new Set();
+  const cellGroups = state.data.cells?.[String(timeslotId)] || {};
+  const programCodeToId = new Map((state.data.programs || []).map(program => [String(program.code || '').trim().toUpperCase(), program.id]));
+  const disabled = new Set();
+  groupIds.forEach(groupId => {
+    const items = cellGroups[String(groupId)] || [];
+    items.forEach(item => {
+      if (Array.isArray(item.program_codes)) {
+        item.program_codes.forEach(code => {
+          const normalized = String(code || '').trim().toUpperCase();
+          if (programCodeToId.has(normalized)) {
+            disabled.add(programCodeToId.get(normalized));
+          }
+        });
+      }
+    });
+  });
+  return disabled;
+}
+
+function getDisabledGroupIdsForSelectedPrograms(selectedProgramIds, timeslotId = null) {
+  if (!selectedProgramIds.length) return new Set();
+  const disabled = new Set();
+  (state.data.groups || []).forEach(group => {
+    const groupProgramIds = new Set((group.programs || []).map(p => p.id));
+    const hasAnySelectedProgram = selectedProgramIds.some(pid => groupProgramIds.has(pid));
+    const programConflicts = getDisabledProgramIdsForGroupIds([group.id], timeslotId);
+    if (!hasAnySelectedProgram || selectedProgramIds.some(pid => programConflicts.has(pid))) {
+      disabled.add(group.id);
+    }
+  });
+  return disabled;
+}
+
+function refreshClassProgramOptions() {
+  if (!els.classProgramOptions) return;
+  const selectedGroupIds = getClassGroupIds().length ? getClassGroupIds() : state.selected.map(item => item.groupId);
+  const availablePrograms = getProgramsForGroupIds(selectedGroupIds);
+  const currentProgramIds = collectCheckedValues(els.classProgramOptions);
+  const allowedProgramIds = new Set(availablePrograms.map(p => p.id));
+  const selectedTimeslotId = state.currentClassModalTimeslotId || state.selected[0]?.timeslotId || null;
+  const disabledProgramIds = getDisabledProgramIdsForGroupIds(selectedGroupIds, selectedTimeslotId);
+  const selectedProgramIds = currentProgramIds.filter(id => allowedProgramIds.has(id) && !disabledProgramIds.has(id));
+  renderProgramCheckboxes(els.classProgramOptions, availablePrograms, 'classPrograms', disabledProgramIds);
+  precheckPrograms(els.classProgramOptions, selectedProgramIds);
+  els.classProgramOptions.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      updateClassGroupOptions();
+      syncClassFormVisibility();
+    });
+  });
 }
 
 function syncClassFormVisibility(currentCourseId = null) {
@@ -3513,13 +3566,20 @@ async function submitClassForm(event) {
   populateStaticInputs();
 }
 
-function renderProgramCheckboxes(container, items, groupName, labelKey = 'code') {
+function renderProgramCheckboxes(container, items, groupName, disabledIds = new Set(), labelKey = 'code') {
   if (!container) return;
+  if (!disabledIds || typeof disabledIds.has !== 'function') {
+    disabledIds = new Set(Array.isArray(disabledIds) ? disabledIds : []);
+  }
   container.innerHTML = '';
   items.forEach(item => {
+    const isDisabled = disabledIds.has(item.id);
     const label = document.createElement('label');
-    label.className = 'checkbox-card';
-    label.innerHTML = `<input type="checkbox" name="${groupName}" value="${item.id}" /><span>${escapeHtml(item[labelKey])}</span>`;
+    label.className = `checkbox-card${isDisabled ? ' disabled' : ''}`;
+    label.innerHTML = `
+      <input type="checkbox" name="${groupName}" value="${item.id}" ${isDisabled ? 'disabled="disabled"' : ''} />
+      <span>${escapeHtml(item[labelKey])}</span>
+    `;
     container.appendChild(label);
   });
 }
@@ -3754,17 +3814,24 @@ function updateClassGroupOptions() {
   const selectedProgramIds = collectCheckedValues(els.classProgramOptions);
 
   let visibleGroups = state.data.groups || [];
+  const selectedTimeslotId = state.currentClassModalTimeslotId || state.selected[0]?.timeslotId || null;
+  let disabledGroupIds = new Set();
   if (mode === 'program' && selectedProgramIds.length > 0) {
     visibleGroups = visibleGroups.filter(group => selectedProgramIds.some(pid => group.programs.some(p => p.id === pid)));
+    disabledGroupIds = getDisabledGroupIdsForSelectedPrograms(selectedProgramIds, selectedTimeslotId);
   }
 
   const currentlyChecked = getClassGroupIds();
-  renderGroupCheckboxes(els.classGroupOptions, visibleGroups, 'classGroups');
+  renderGroupCheckboxes(els.classGroupOptions, visibleGroups, 'classGroups', disabledGroupIds);
 
   const selectedGroupIds = currentlyChecked.length
-    ? currentlyChecked.filter(id => visibleGroups.some(group => group.id === id))
-    : state.selected.map(item => item.groupId).filter(id => visibleGroups.some(group => group.id === id));
+    ? currentlyChecked.filter(id => visibleGroups.some(group => group.id === id) && !disabledGroupIds.has(id))
+    : state.selected.map(item => item.groupId).filter(id => visibleGroups.some(group => group.id === id) && !disabledGroupIds.has(id));
   precheckGroups(els.classGroupOptions, selectedGroupIds);
+  els.classGroupOptions.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.addEventListener('change', () => {
+    refreshClassProgramOptions();
+    syncClassFormVisibility();
+  }));
 }
 
 function fillSelect(selectEl, options, includePlaceholder = false) {

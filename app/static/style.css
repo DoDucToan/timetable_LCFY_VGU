@@ -1495,6 +1495,13 @@ body[data-active-section] .dashboard-card {
       width: auto;
     }
 
+    .time-header,
+    .day-cell {
+      writing-mode: horizontal-tb;
+      transform: none;
+      white-space: normal;
+    }
+
     .time-header {
       width: 70px;
       min-width: 70px;
@@ -1995,6 +2002,21 @@ body[data-active-section] .dashboard-card {
   padding: 8px 10px;
   background: white;
   min-height: 48px;
+}
+
+.checkbox-card.disabled {
+  opacity: 0.45;
+  pointer-events: none;
+  background: #f7f8fc;
+  border-color: #d2d6e0;
+}
+
+.checkbox-card.disabled input[type="checkbox"] {
+  cursor: not-allowed;
+}
+
+.checkbox-card.disabled span {
+  cursor: not-allowed;
 }
 
 .subheader-row {
