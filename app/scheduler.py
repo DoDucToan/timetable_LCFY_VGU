@@ -225,20 +225,24 @@ def validate_new_class(
                 continue
 
         if effective_mode == MODE_PROGRAM:
-            if not any(pid in group_program_ids for pid in study_program_ids):
+            valid_program_ids = [pid for pid in study_program_ids if pid in group_program_ids]
+            if not valid_program_ids:
                 continue
-            valid_program_groups.append(group_id)
 
             if any((cast(Optional[int], cls.study_program_id) is None and not cast(bool, cls.course.elective)) for cls in existing):
-                errors.append(f"Group {group.code} already has a require-all-students class in this timeslot.")
                 continue
 
             if not allow_teacher_conflict:
-                for pid in study_program_ids:
-                    if any(cls.study_program_id == pid and not cls.course.elective for cls in existing):
-                        program = db.get(StudyProgram, pid)
-                        code = program.code if program else str(pid)
-                        errors.append(f"Program {code} in group {group.code} already has a class in this timeslot.")
+                invalid_program_ids = {
+                    pid for pid in valid_program_ids
+                    if any(cls.study_program_id == pid and not cls.course.elective for cls in existing)
+                }
+                valid_program_ids = [pid for pid in valid_program_ids if pid not in invalid_program_ids]
+
+            if not valid_program_ids:
+                continue
+
+            valid_program_groups.append(group_id)
 
     if effective_mode == MODE_PROGRAM and not valid_program_groups:
         errors.append("Selected groups do not contain any selected study programs.")
