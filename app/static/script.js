@@ -948,6 +948,23 @@ function bindGlobalActions() {
   if (manageMenuBtn && manageMenuDropdown) {
     manageMenuBtn.addEventListener('click', event => {
       event.stopPropagation();
+      const rect = manageMenuBtn.getBoundingClientRect();
+      manageMenuDropdown.style.position = 'fixed';
+      manageMenuDropdown.style.top = `${rect.bottom + 8}px`;
+      manageMenuDropdown.style.minWidth = `${rect.width}px`;
+
+      // Place dropdown left-aligned under button if there is room,
+      // otherwise align the dropdown right edge to the button.
+      const dropdownWidth = manageMenuDropdown.offsetWidth || 240;
+      const fitsOnRight = rect.left + dropdownWidth <= window.innerWidth - 16;
+      if (fitsOnRight) {
+        manageMenuDropdown.style.left = `${rect.left}px`;
+        manageMenuDropdown.style.right = 'auto';
+      } else {
+        manageMenuDropdown.style.left = 'auto';
+        manageMenuDropdown.style.right = `${Math.max(16, window.innerWidth - rect.right)}px`;
+      }
+
       manageMenuDropdown.classList.toggle('hidden');
     });
     manageMenuDropdown.addEventListener('click', event => event.stopPropagation());
