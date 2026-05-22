@@ -213,6 +213,11 @@ def home(request: Request, db: Session = Depends(get_db)):
     )
 
 
+@app.get("/healthz")
+def healthz():
+    return {"status": "ok"}
+
+
 @app.get("/cycle/{cycle_id}", response_class=HTMLResponse)
 def cycle_page(cycle_id: int, request: Request, db: Session = Depends(get_db)):
     if not db.get(Cycle, cycle_id):
