@@ -1,25 +1,26 @@
 from __future__ import annotations
 
 from collections import defaultdict
+import io
+import logging
+import os
 import re
 import time
 from pathlib import Path
-from typing import Any, Iterable, cast, Dict, List, Optional
+from typing import Any, Awaitable, Callable, Iterable, cast, Dict, List, Optional
 from fastapi import Body, Depends, FastAPI, HTTPException, Query, UploadFile, File
 from contextlib import asynccontextmanager
 from fastapi.requests import Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
-from contextlib import asynccontextmanager
 from .database import SessionLocal, get_db
 from .excel_exporter import export_timetable_xlsx
 from openpyxl import Workbook, load_workbook
 from openpyxl.worksheet.worksheet import Worksheet
-import io
 from .models import (
     Course,
     CourseForGroup,
@@ -143,14 +144,62 @@ async def lifespan(app: FastAPI):  # Added type annotation
     _ensure_default_timeslots()
     yield
 
-app = FastAPI(title="Timetable Builder", lifespan=lifespan)
+ADMIN_API_KEY = os.getenv('TIMETABLE_ADMIN_API_KEY')
+logger = logging.getLogger(__name__)
+
+app = FastAPI(
+    title="Timetable Builder",
+    lifespan=lifespan,
+    openapi_url=None,
+    docs_url=None,
+    redoc_url=None,
+)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+
+
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next: Callable[[Request], Awaitable[Response]]):
+    if ADMIN_API_KEY and request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+        authorization = request.headers.get("authorization", "")
+        token = None
+        if authorization.lower().startswith("bearer "):
+            token = authorization.split(" ", 1)[1]
+        elif request.headers.get("x-api-key"):
+            token = request.headers.get("x-api-key")
+        if token != ADMIN_API_KEY:
+            return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+
+    response = await call_next(request)
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=()"
+    response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
+    response.headers["X-XSS-Protection"] = "0"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "connect-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; "
+        "object-src 'none'; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self';"
+    )
+    return response
 
 
 @app.exception_handler(IntegrityError)
 def integrity_error_handler(request: Request, exc: IntegrityError):
-    detail = str(exc.orig) if getattr(exc, 'orig', None) else str(exc)
-    return JSONResponse(status_code=400, content={"detail": detail})
+    logger.exception("Database integrity error")
+    return JSONResponse(status_code=400, content={"detail": "Database integrity error."})
+
+
+@app.exception_handler(Exception)
+def generic_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled exception")
+    return PlainTextResponse("Internal server error.", status_code=500)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -468,7 +517,36 @@ def _current_data_response(workbook: Workbook, filename: str) -> StreamingRespon
     )
 
 
+MAX_UPLOAD_SIZE = 5 * 1024 * 1024
+ALLOWED_UPLOAD_EXTENSIONS = {'.xlsx'}
+ALLOWED_UPLOAD_CONTENT_TYPES = {
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-excel',
+    'application/octet-stream',
+}
+
+
+def _assert_upload_file_safe(upload_file: UploadFile) -> None:
+    filename = Path(upload_file.filename or '').name
+    if not filename:
+        raise HTTPException(status_code=400, detail='Uploaded file must include a filename.')
+
+    if Path(filename).suffix.lower() not in ALLOWED_UPLOAD_EXTENSIONS:
+        raise HTTPException(status_code=400, detail='Only .xlsx files may be uploaded.')
+
+    content_type = (upload_file.content_type or '').lower()
+    if content_type not in ALLOWED_UPLOAD_CONTENT_TYPES:
+        raise HTTPException(status_code=400, detail='Uploaded file must be an Excel spreadsheet.')
+
+    upload_file.file.seek(0, io.SEEK_END)
+    size = upload_file.file.tell()
+    if size > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=400, detail='Uploaded file is too large.')
+    upload_file.file.seek(0)
+
+
 def _read_excel_rows(upload_file: UploadFile) -> List[Dict[str, Any]]:
+    _assert_upload_file_safe(upload_file)
     try:
         upload_file.file.seek(0)
         workbook = load_workbook(upload_file.file, data_only=True)

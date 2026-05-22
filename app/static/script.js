@@ -1346,14 +1346,23 @@ function _stableHashCode(value) {
 
 function normalizeCssColor(value) {
   const color = String(value || '').trim();
-  if (!color) return '';
-  if (color.startsWith('#')) {
-    return color;
+  if (!color) {
+    return '';
   }
+
+  if (/^#[0-9A-Fa-f]{6}$/.test(color)) {
+    return color.toUpperCase();
+  }
+
   if (/^[0-9A-Fa-f]{6}$/.test(color)) {
-    return `#${color}`;
+    return `#${color.toUpperCase()}`;
   }
-  return color;
+
+  if (/^#[0-9A-Fa-f]{3}$/.test(color)) {
+    return `#${color[1]}${color[1]}${color[2]}${color[2]}${color[3]}${color[3]}`.toUpperCase();
+  }
+
+  return '';
 }
 
 function getProgramColor(code) {
@@ -1406,38 +1415,62 @@ function getItemFillColor(item) {
 function renderColorLegend() {
   const legendRoot = document.getElementById('timetableColorLegend');
   if (!legendRoot) return;
+  legendRoot.textContent = '';
 
   const courseTags = (state.data?.course_tags || []).filter(tag => tag.fill_color);
   const programs = state.data?.programs || [];
 
-  const entries = [];
   if (courseTags.length) {
-    entries.push('<div class="legend-color-group"><div class="legend-group-title">Course tag colors</div>');
+    const group = document.createElement('div');
+    group.className = 'legend-color-group';
+    const title = document.createElement('div');
+    title.className = 'legend-group-title';
+    title.textContent = 'Course tag colors';
+    group.appendChild(title);
+
     courseTags.forEach(tag => {
-      const swatch = normalizeCssColor(tag.fill_color);
-      entries.push(`
-        <div class="legend-color-entry">
-          <span class="legend-color-swatch" style="background:${escapeHtml(swatch)}"></span>
-          <span>${escapeHtml(tag.name)}</span>
-        </div>
-      `);
+      const entry = document.createElement('div');
+      entry.className = 'legend-color-entry';
+      const swatch = document.createElement('span');
+      swatch.className = 'legend-color-swatch';
+      const color = normalizeCssColor(tag.fill_color);
+      if (color) {
+        swatch.style.backgroundColor = color;
+      }
+      const label = document.createElement('span');
+      label.textContent = tag.name || '';
+      entry.appendChild(swatch);
+      entry.appendChild(label);
+      group.appendChild(entry);
     });
-    entries.push('</div>');
+    legendRoot.appendChild(group);
   }
+
   if (programs.length) {
-    entries.push('<div class="legend-color-group"><div class="legend-group-title">Study program colors</div>');
+    const group = document.createElement('div');
+    group.className = 'legend-color-group';
+    const title = document.createElement('div');
+    title.className = 'legend-group-title';
+    title.textContent = 'Study program colors';
+    group.appendChild(title);
+
     programs.forEach(prog => {
-      const displayColor = getProgramColor(prog.code);
-      entries.push(`
-        <div class="legend-color-entry">
-          <span class="legend-color-swatch" style="background:${escapeHtml(displayColor)}"></span>
-          <span>${escapeHtml(prog.code)}</span>
-        </div>
-      `);
+      const entry = document.createElement('div');
+      entry.className = 'legend-color-entry';
+      const swatch = document.createElement('span');
+      swatch.className = 'legend-color-swatch';
+      const color = getProgramColor(prog.code);
+      if (color) {
+        swatch.style.backgroundColor = color;
+      }
+      const label = document.createElement('span');
+      label.textContent = prog.code || '';
+      entry.appendChild(swatch);
+      entry.appendChild(label);
+      group.appendChild(entry);
     });
-    entries.push('</div>');
+    legendRoot.appendChild(group);
   }
-  legendRoot.innerHTML = entries.join('');
 }
 
 function setSaveColorStatus(message, type = 'info') {
