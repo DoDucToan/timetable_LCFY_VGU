@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login - Timetable Builder</title>
+  <link rel="icon" type="image/png" href="/static/favicon.png" />
+  <link rel="stylesheet" href="/static/style.css?v={{ version }}" />
+</head>
+<body>
+  <div class="page">
+    <header class="topbar">
+      <div>
+        <a class="brand-logo" href="/">
+          <img src="{{ url_for('static', path='VGU-Logo.png') }}" alt="Timetable Builder" />
+        </a>
+        <p class="muted">Admin login is required to access the timetable builder.</p>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="card login-card">
+        <div class="subheader-row">
+          <h2>Admin Sign In</h2>
+        </div>
+        {% if error == 'invalid' %}
+        <div class="error-box">Invalid username or password.</div>
+        {% endif %}
+        <form action="/login" method="post" class="form-grid login-form">
+          <label>
+            <span>Username</span>
+            <input type="text" name="username" autocomplete="username" required />
+          </label>
+          <label>
+            <span>Password</span>
+            <input type="password" name="password" autocomplete="current-password" required />
+          </label>
+          <div class="form-actions">
+            <button type="submit" class="primary-btn">Sign in</button>
+          </div>
+        </form>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

@@ -8,10 +8,10 @@ import re
 import time
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Iterable, cast, Dict, List, Optional
-from fastapi import Body, Depends, FastAPI, HTTPException, Query, UploadFile, File
+from fastapi import Body, Depends, FastAPI, Form, HTTPException, Query, UploadFile, File
 from contextlib import asynccontextmanager
 from fastapi.requests import Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
@@ -59,6 +59,11 @@ BASE_DIR = Path(__file__).resolve().parent
 ROOT_DIR = BASE_DIR.parent
 EXPORT_DIR: Path = ROOT_DIR / "exports"
 EXPORT_DIR.mkdir(exist_ok=True)
+
+ADMIN_USERNAME = "admin"
+ADMIN_PASSWORD = "lcfy2026"
+ADMIN_COOKIE_NAME = "timetable_admin"
+ADMIN_COOKIE_VALUE = "admin-session"
 
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
@@ -157,8 +162,22 @@ app = FastAPI(
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
 
+def _is_authenticated(request: Request) -> bool:
+    return request.cookies.get(ADMIN_COOKIE_NAME) == ADMIN_COOKIE_VALUE
+
+ALLOWED_PATHS = {"/login", "/logout", "/healthz"}
+
 @app.middleware("http")
 async def security_headers_middleware(request: Request, call_next: Callable[[Request], Awaitable[Response]]):
+    if request.url.path.startswith("/static") or request.url.path in ALLOWED_PATHS:
+        pass
+    elif not _is_authenticated(request):
+        if request.url.path.startswith("/api"):
+            return JSONResponse(status_code=401, content={"detail": "Authentication required."})
+        if request.method == "GET":
+            return RedirectResponse(url="/login")
+        return JSONResponse(status_code=401, content={"detail": "Authentication required."})
+
     if ADMIN_API_KEY and request.method in {"POST", "PUT", "PATCH", "DELETE"}:
         authorization = request.headers.get("authorization", "")
         token = None
@@ -216,6 +235,37 @@ def home(request: Request, db: Session = Depends(get_db)):
 @app.get("/healthz")
 def healthz():
     return {"status": "ok"}
+
+
+@app.get("/login", response_class=HTMLResponse)
+def login_page(request: Request, error: Optional[str] = Query(default=None)):
+    return templates.TemplateResponse(
+        request=request,
+        name="login.html",
+        context={"error": error, "version": int(time.time())},
+        media_type="text/html; charset=utf-8",
+    )
+
+
+@app.post("/login")
+def login(request: Request, username: str = Form(...), password: str = Form(...)):
+    if username != ADMIN_USERNAME or password != ADMIN_PASSWORD:
+        return RedirectResponse(url="/login?error=invalid", status_code=303)
+    response = RedirectResponse(url="/", status_code=303)
+    response.set_cookie(
+        ADMIN_COOKIE_NAME,
+        ADMIN_COOKIE_VALUE,
+        httponly=True,
+        samesite="lax",
+    )
+    return response
+
+
+@app.get("/logout")
+def logout(request: Request):
+    response = RedirectResponse(url="/login", status_code=303)
+    response.delete_cookie(ADMIN_COOKIE_NAME)
+    return response
 
 
 @app.get("/cycle/{cycle_id}", response_class=HTMLResponse)
