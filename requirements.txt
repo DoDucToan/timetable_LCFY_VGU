@@ -6,3 +6,4 @@ openpyxl==3.1.5
 Pillow==12.2.0
 pydantic==2.11.7
 python-multipart==0.0.7
+psycopg2-binary==2.9.10
