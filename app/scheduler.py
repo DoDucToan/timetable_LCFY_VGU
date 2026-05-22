@@ -9,7 +9,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.engine import ScalarResult
 from sqlalchemy.orm import Session, joinedload
 
-from .models import Cycle, Course, Group, GroupStudyProgram, ScheduledClass, StudyProgram, Timetable, Timeslot
+from .models import Cycle, Course, Group, GroupStudyProgram, ScheduledClass, Timetable, Timeslot
 
 
 MODE_REQUIRED = "required_all"

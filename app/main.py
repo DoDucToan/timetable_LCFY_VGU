@@ -2232,6 +2232,19 @@ def add_class(payload: ClassCreateIn, db: Session = Depends(get_db)) -> dict[str
     if mode == MODE_ELECTIVE and not bool(course.elective):
         raise HTTPException(status_code=400, detail="Selected course is not an elective.")
 
+    if payload.teacher_id is not None and not db.get(Teacher, payload.teacher_id):
+        raise HTTPException(status_code=404, detail="Teacher not found.")
+    if payload.room_id is not None and not db.get(Room, payload.room_id):
+        raise HTTPException(status_code=404, detail="Room not found.")
+    if mode == MODE_PROGRAM and payload.study_program_ids:
+        existing_program_ids = {
+            pid
+            for pid in db.scalars(select(StudyProgram.id).where(StudyProgram.id.in_(payload.study_program_ids))).all()
+        }
+        invalid_program_ids = [pid for pid in payload.study_program_ids if pid not in existing_program_ids]
+        if invalid_program_ids:
+            raise HTTPException(status_code=400, detail=f"Study programs not found: {invalid_program_ids}")
+
     created, errors = create_classes(
         db,
         target_group_ids=payload.target_group_ids,
