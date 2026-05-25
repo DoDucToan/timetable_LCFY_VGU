@@ -23,6 +23,7 @@
         <a class="ghost-btn small" href="/logout">Logout</a>
         {% endif %}
       </div>
+      <button type="button" class="icon-btn mobile-nav-toggle" id="mobileNavToggle" aria-label="Open navigation menu">☰</button>
     </header>
 
     <nav class="page-nav" aria-label="Page navigation">
@@ -38,6 +39,29 @@
       <a class="page-nav-link{% if active_section == 'colors' %} active{% endif %}" href="/colors{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Colors</a>
       <a class="page-nav-link{% if active_section == 'data-sync' %} active{% endif %}" href="/data-sync{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Data sync</a>
     </nav>
+
+    <div class="mobile-nav-drawer hidden" id="mobileNavDrawer" aria-hidden="true">
+      <div class="mobile-nav-backdrop" id="mobileNavBackdrop"></div>
+      <div class="mobile-nav-panel">
+        <div class="mobile-nav-header">
+          <span>Menu</span>
+          <button type="button" class="icon-btn" id="mobileNavClose" aria-label="Close navigation menu">×</button>
+        </div>
+        <div class="mobile-nav-links">
+          <a class="page-nav-link{% if active_section | default('') == '' %} active{% endif %}" href="{{ '/cycle/' ~ selected_cycle_id if selected_cycle_id else '/' }}">Timetable</a>
+          <a class="page-nav-link{% if active_section == 'teacher-load' %} active{% endif %}" href="/teacher-load{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Teacher load</a>
+          <a class="page-nav-link{% if active_section == 'teachers' %} active{% endif %}" href="/teachers{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Teachers</a>
+          <a class="page-nav-link{% if active_section == 'rooms' %} active{% endif %}" href="/rooms{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Rooms</a>
+          <a class="page-nav-link{% if active_section == 'courses' %} active{% endif %}" href="/courses{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Courses</a>
+          <a class="page-nav-link{% if active_section == 'study-programs' %} active{% endif %}" href="/study-programs{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Study programs</a>
+          <a class="page-nav-link{% if active_section == 'course-tags' %} active{% endif %}" href="/course-tags{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Course tags</a>
+          <a class="page-nav-link{% if active_section == 'group-tags' %} active{% endif %}" href="/group-tags{{ '?cycle_id=' ~ selected_cycle_id else '' }}">Group tags</a>
+          <a class="page-nav-link{% if active_section == 'upload' %} active{% endif %}" href="/upload{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Upload</a>
+          <a class="page-nav-link{% if active_section == 'colors' %} active{% endif %}" href="/colors{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Colors</a>
+          <a class="page-nav-link{% if active_section == 'data-sync' %} active{% endif %}" href="/data-sync{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Data sync</a>
+        </div>
+      </div>
+    </div>
 
     <main class="layout">
       {% block content %}{% endblock %}
