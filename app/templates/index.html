@@ -34,7 +34,7 @@
       <a class="page-nav-link{% if active_section == 'group-tags' %} active{% endif %}" href="/group-tags{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Group tags</a>
       <a class="page-nav-link{% if active_section == 'upload' %} active{% endif %}" href="/upload{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Upload</a>
       <a class="page-nav-link{% if active_section == 'colors' %} active{% endif %}" href="/colors{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Colors</a>
-      <a class="page-nav-link{% if active_section == 'data-sync' %} active{% endif %}" href="/data-sync{{ '?cycle_id=' ~ selected_cycle_id else '' }}">Data sync</a>
+      <a class="page-nav-link{% if active_section == 'data-sync' %} active{% endif %}" href="/data-sync{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Data sync</a>
       <div class="page-nav-actions">
         <div class="toolbar-menu">
           <button type="button" class="ghost-btn small" id="manageMenuBtn">Export</button>
