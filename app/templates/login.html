@@ -3,30 +3,33 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Login - Timetable Builder</title>
+  <title>LCFY Timetable Builder - Admin Login</title>
   <link rel="icon" type="image/png" href="/static/favicon.png" />
   <link rel="stylesheet" href="/static/style.css?v={{ version }}" />
 </head>
-<body>
-  <div class="page">
-    <header class="topbar">
-      <div>
-        <a class="brand-logo" href="/">
-          <img src="{{ url_for('static', path='VGU-Logo.png') }}" alt="Timetable Builder" />
-        </a>
-        <p class="muted">Admin login is required to access the timetable builder.</p>
-      </div>
+<body class="login-page-body">
+  <div class="page login-page">
+    <header class="topbar login-topbar">
+      <a class="brand-logo" href="/">
+        <img src="{{ url_for('static', path='VGU-Logo.png') }}" alt="LCFY Timetable Builder" />
+      </a>
+      <p class="muted">Admin login is required to access the timetable builder.</p>
     </header>
 
-    <main class="layout">
+    <main class="layout login-layout">
       <section class="card login-card">
-        <div class="subheader-row">
-          <h2>Admin Sign In</h2>
+        <div class="login-card-header">
+          <div>
+            <h1>LCFY Timetable Builder</h1>
+            <p class="muted">Secure admin access for timetable management.</p>
+          </div>
         </div>
+
         {% if error == 'invalid' %}
         <div class="error-box">Invalid username or password.</div>
         {% endif %}
-        <form action="/login" method="post" class="form-grid login-form">
+
+        <form action="/login" method="post" class="login-form">
           <label>
             <span>Username</span>
             <input type="text" name="username" autocomplete="username" required />
@@ -40,6 +43,7 @@
           </div>
         </form>
       </section>
+
     </main>
   </div>
 </body>
