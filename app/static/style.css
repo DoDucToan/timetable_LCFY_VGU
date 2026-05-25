@@ -939,6 +939,19 @@ body[data-active-section] .full-width {
   overflow: auto;
 }
 
+.page main .entity-list {
+  gap: 14px;
+  max-height: 400px;
+}
+
+.page main .entity-row {
+  padding: 14px 16px;
+}
+
+.page main .entity-row .entity-text strong {
+  font-size: 1.05rem;
+}
+
 body[data-active-section] .entity-list,
 body[data-active-section] .teacher-load-list {
   max-height: 720px !important;
