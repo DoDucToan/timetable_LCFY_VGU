@@ -268,21 +268,17 @@ body {
   padding: 8px 12px;
 }
 
-  .page-nav-actions .export-btn {
-    padding: 10px 14px;
-    min-height: 42px;
-    background: #d7f8d7;
-    border-color: #9dd39d;
-    color: #1f5a20;
-  }
+.page-nav-actions .export-btn {
+  padding: 10px 14px;
+  min-height: 42px;
+  background: #d7f8d7;
+  border-color: #9dd39d;
+  color: #1f5a20;
+}
 
-  .page-nav-actions .export-btn:hover,
-  .page-nav-actions .export-btn:focus {
-    background: #c3efc3;
-  }
-
-  z-index: 9999;
-  overflow: visible;
+.page-nav-actions .export-btn:hover,
+.page-nav-actions .export-btn:focus {
+  background: #c3efc3;
 }
 
 .menu-dropdown {

@@ -512,6 +512,7 @@ function cacheEls() {
     'classErrors',
     'cycleSelect',
     'timetableSelect',
+    'teacherLoadSearchInput',
     'editCycleBtn',
     'duplicateCycleBtn',
     'deleteCycleBtn',
@@ -678,6 +679,12 @@ function bindGlobalActions() {
     els.courseTagFilterSelect.addEventListener('change', () => {
       state.courseFilterTag = els.courseTagFilterSelect.value;
       renderEntityLists();
+    });
+  }
+  if (els.teacherLoadSearchInput) {
+    els.teacherLoadSearchInput.addEventListener('input', () => {
+      state.teacherLoadQuery = els.teacherLoadSearchInput.value;
+      renderTeacherLoad();
     });
   }
   if (els.addGroupTagRequirementBtn) {
@@ -1738,7 +1745,12 @@ function populateStaticInputs() {
 function renderTeacherLoad() {
   if (!els.teacherLoadList) return;
   els.teacherLoadList.innerHTML = '';
-  (state.data.teacher_load || []).forEach(item => {
+  const query = String(state.teacherLoadQuery || '').trim().toLowerCase();
+  const items = (state.data.teacher_load || []).filter(item => {
+    if (!query) return true;
+    return String(item.teacher || '').toLowerCase().includes(query);
+  });
+  items.forEach(item => {
     const div = document.createElement('div');
     div.className = 'teacher-load-row';
     const teacherName = escapeHtml(item.teacher);
