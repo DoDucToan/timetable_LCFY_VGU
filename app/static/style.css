@@ -268,10 +268,19 @@ body {
   padding: 8px 12px;
 }
 
-.toolbar-menu {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
+  .page-nav-actions .export-btn {
+    padding: 10px 14px;
+    min-height: 42px;
+    background: #d7f8d7;
+    border-color: #9dd39d;
+    color: #1f5a20;
+  }
+
+  .page-nav-actions .export-btn:hover,
+  .page-nav-actions .export-btn:focus {
+    background: #c3efc3;
+  }
+
   z-index: 9999;
   overflow: visible;
 }
@@ -1019,14 +1028,10 @@ body[data-active-section] .full-width {
   overflow: auto;
 }
 
-.page main .entity-list {
-  gap: 14px;
-  max-height: 400px;
-}
-
-.page main .entity-row {
-  padding: 14px 16px;
-}
+  body[data-active-section="teacher-load"] .teacher-load-list {
+    max-height: calc(100vh - 220px) !important;
+    min-height: 280px;
+  }
 
 .page main .entity-row .entity-text strong {
   font-size: 1.05rem;
@@ -1761,7 +1766,7 @@ body[data-active-section] .dashboard-card {
     }
   }
 
-  @media (max-width: 1120px) {
+  @media (max-width: 1280px) {
     .board-wrap {
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
@@ -1774,7 +1779,7 @@ body[data-active-section] .dashboard-card {
 
     #timetableBoard th:not(:first-child):not(:nth-child(2)),
     #timetableBoard td:not(:first-child):not(:nth-child(2)) {
-      min-width: 180px;
+      min-width: 160px;
     }
 
     .time-header,
@@ -1802,7 +1807,12 @@ body[data-active-section] .dashboard-card {
 
     .group-header,
     .group-header-top {
-      min-height: 90px;
+      min-height: 100px;
+    }
+
+    .group-header {
+      white-space: normal;
+      word-break: break-word;
     }
 
     .timetable-cell {
