@@ -231,7 +231,7 @@ def generic_exception_handler(request: Request, exc: Exception):
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request, db: Session = Depends(get_db)):
-    cycles = db.scalars(select(Cycle).order_by(Cycle.year_starting.desc(), Cycle.name)).all()
+    cycles = db.scalars(select(Cycle).order_by(Cycle.name, Cycle.year_starting.desc())).all()
     return templates.TemplateResponse(
         request=request,
         name="home.html",

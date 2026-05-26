@@ -787,13 +787,46 @@ body[data-active-section] .full-width {
   grid-template-columns: 1fr;
 }
 
+.home-page .page {
+  padding: 0;
+  max-width: none;
+}
+
+.home-page .layout {
+  grid-template-columns: 1fr;
+  min-height: calc(100vh - 120px);
+}
+
+.home-page .page {
+  padding: 0;
+  max-width: none;
+}
+
+.home-page .layout {
+  grid-template-columns: 1fr;
+  min-height: calc(100vh - 116px);
+}
+
 .home-page .card {
   width: 100%;
   max-width: none;
+  margin: 0;
+  min-height: calc(100vh - 116px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.home-page .subheader-row {
+  flex: 0 0 auto;
 }
 
 .home-page .entity-list {
   width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
 }
 
 .layout.login-layout {
