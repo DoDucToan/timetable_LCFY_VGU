@@ -159,6 +159,14 @@ app = FastAPI(
     docs_url=None,
     redoc_url=None,
 )
+
+@app.get("/static/app")
+async def app_script():
+    script_path = BASE_DIR / "static" / "script.js"
+    if not script_path.is_file():
+        raise HTTPException(status_code=404, detail="Script not found.")
+    return FileResponse(script_path, media_type="application/javascript")
+
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
 
@@ -266,6 +274,16 @@ def logout(request: Request):
     response = RedirectResponse(url="/login", status_code=303)
     response.delete_cookie(ADMIN_COOKIE_NAME)
     return response
+
+
+@app.get("/cycle/new", response_class=HTMLResponse)
+def new_cycle_page(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="index.html",
+        context={"version": int(time.time()), "open_new": True},
+        media_type="text/html; charset=utf-8",
+    )
 
 
 @app.get("/cycle/{cycle_id}", response_class=HTMLResponse)

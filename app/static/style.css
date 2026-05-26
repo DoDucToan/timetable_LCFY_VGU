@@ -269,16 +269,32 @@ body {
 }
 
 .page-nav-actions .export-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  white-space: nowrap;
+  line-height: 1.2;
+  gap: 8px;
   padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid #c8e8c7;
+  background: #f4fbf0;
+  color: #2e6f28;
+  text-decoration: none;
+  font-weight: 600;
   min-height: 42px;
-  background: #d7f8d7;
-  border-color: #9dd39d;
-  color: #1f5a20;
 }
 
 .page-nav-actions .export-btn:hover,
-.page-nav-actions .export-btn:focus {
-  background: #c3efc3;
+.page-nav-actions .export-btn:focus,
+.page-nav-actions .export-btn:focus-visible,
+.page-nav-actions .export-btn:active {
+  background: #f4fbf0 !important;
+  border-color: #c8e8c7 !important;
+  color: #2e6f28 !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 .menu-dropdown {
@@ -765,6 +781,19 @@ body[data-active-section] .full-width {
   grid-template-columns: minmax(0, 1.7fr) 360px;
   gap: 16px;
   align-items: stretch;
+}
+
+.home-page .layout {
+  grid-template-columns: 1fr;
+}
+
+.home-page .card {
+  width: 100%;
+  max-width: none;
+}
+
+.home-page .entity-list {
+  width: 100%;
 }
 
 .layout.login-layout {
@@ -2021,7 +2050,7 @@ body[data-active-section] .dashboard-card {
   justify-content: center;
   align-items: center;
   padding: 24px;
-  z-index: 1000;
+  z-index: 10001;
 }
 
 .modal.hidden {
@@ -2050,6 +2079,28 @@ body[data-active-section] .dashboard-card {
 .modal-card.wide {
   width: min(960px, calc(100vw - 32px));
   min-width: 320px;
+  max-height: calc(100vh - 48px);
+}
+
+@media (max-width: 800px) {
+  .modal {
+    align-items: stretch;
+    padding: 12px;
+  }
+
+  .modal-card,
+  .modal-card.wide {
+    width: 100%;
+    min-width: auto;
+    max-width: 100%;
+    height: calc(100vh - 24px);
+    max-height: calc(100vh - 24px);
+    border-radius: 16px;
+  }
+
+  .modal-card > :not(.modal-header) {
+    padding: 14px;
+  }
 }
 
 #groupModal .form-grid {

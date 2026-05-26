@@ -948,6 +948,8 @@ function bindGlobalActions() {
         openEntityModal(entityType);
       }
     }
+  } else if (initialPage.openNew) {
+    openEntityModal('cycle');
   }
 
   const manageMenuBtn = document.getElementById('manageMenuBtn');
@@ -973,6 +975,9 @@ function bindGlobalActions() {
       }
 
       manageMenuDropdown.classList.toggle('hidden');
+      if (typeof manageMenuBtn.blur === 'function') {
+        manageMenuBtn.blur();
+      }
     });
     manageMenuDropdown.addEventListener('click', event => event.stopPropagation());
     document.addEventListener('click', () => {
@@ -1172,6 +1177,12 @@ function showError(msg) {
   el.style.display = 'block';
 }
 
+function cycleOptions() {
+  return [...(state.data.cycles || [])]
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+    .map(item => ({ value: item.id, label: `${item.name} (${item.year_starting})` }));
+}
+
 function renderContextSelectors() {
   // Debug log
   console.log('renderContextSelectors: cycles', state.data.cycles);
@@ -1180,7 +1191,7 @@ function renderContextSelectors() {
   if (els.cycleSelect) {
     fillSelect(
       els.cycleSelect,
-      (state.data.cycles || []).map(item => ({ value: item.id, label: `${item.name} (${item.year_starting})` })),
+      cycleOptions(),
       true
     );
     if (selectedCycleId) {
@@ -1706,7 +1717,7 @@ function populateStaticInputs() {
   if (els.entityCycleSelect) {
     fillSelect(
       els.entityCycleSelect,
-      (state.data.cycles || []).map(item => ({ value: item.id, label: `${item.name} (${item.year_starting})` })),
+      cycleOptions(),
       true
     );
   }
@@ -2633,6 +2644,9 @@ function isSelected(groupId, timeslotId) {
 }
 
 function openEntityModal(type, id = null) {
+  if (document.activeElement && typeof document.activeElement.blur === 'function') {
+    document.activeElement.blur();
+  }
   state.editingEntity = { type, id };
   els.entityForm.reset();
   els.entityErrors.innerHTML = '';
@@ -2656,7 +2670,7 @@ function openEntityModal(type, id = null) {
   els.entityForm.elements.entity_id.value = id || '';
   fillSelect(
     els.entityCycleSelect,
-    (state.data.cycles || []).map(item => ({ value: item.id, label: `${item.name} (${item.year_starting})` })),
+    cycleOptions(),
     true
   );
   fillSelect(
@@ -2817,6 +2831,15 @@ async function submitEntityForm(event) {
   }
   state.data = data;
   state.timetableId = state.data.selected_timetable_id || state.timetableId;
+
+  if (!id && type === 'cycle' && state.data.selected_cycle_id) {
+    const targetPath = `/cycle/${state.data.selected_cycle_id}`;
+    if (window.location.pathname !== targetPath) {
+      window.location.href = targetPath;
+      return;
+    }
+  }
+
   closeModal('entityModal');
   const reloadEntityTypes = new Set(['room', 'course', 'teacher', 'course_tag', 'group_tag', 'group']);
   if (reloadEntityTypes.has(type)) {
@@ -4005,12 +4028,16 @@ function collectCheckedValues(container) {
 function openModal(id) {
   const modal = document.getElementById(id);
   if (!modal) return;
+  if (document.activeElement && typeof document.activeElement.blur === 'function') {
+    document.activeElement.blur();
+  }
+  document.body.classList.add('modal-open');
   document.querySelectorAll('.modal').forEach(m => {
     if (!m.classList.contains('hidden')) {
-      m.style.zIndex = '1000';
+      m.style.zIndex = '10000';
     }
   });
-  modal.style.zIndex = '1100';
+  modal.style.zIndex = '10001';
   modal.classList.remove('hidden');
 }
 
@@ -4019,6 +4046,7 @@ function closeModal(id) {
   if (!modal) return;
   modal.classList.add('hidden');
   modal.style.zIndex = '';
+  document.body.classList.remove('modal-open');
 }
 
 function toNullableNumber(value) {

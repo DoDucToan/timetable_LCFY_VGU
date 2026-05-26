@@ -7,7 +7,7 @@
   <link rel="icon" type="image/png" href="/static/favicon.png" />
   <link rel="stylesheet" href="/static/style.css?v={{ version }}" />
 </head>
-<body>
+<body class="home-page">
   <div class="page">
     <header class="topbar">
       <div>
@@ -25,6 +25,7 @@
       <section class="card">
         <div class="subheader-row">
           <h2>Available cycles</h2>
+          <button type="button" class="primary-btn" data-open-entity="cycle">+ Add Cycle</button>
         </div>
         <div class="entity-list">
           {% for cycle in cycles %}
@@ -45,6 +46,89 @@
         </div>
       </section>
     </main>
+
+    <div class="modal hidden" id="entityModal">
+      <div class="modal-card wide">
+        <div class="modal-header">
+          <h2 id="entityModalTitle">Manage item</h2>
+          <button class="icon-btn" data-close="entityModal">×</button>
+        </div>
+        <form id="entityForm" class="form-grid">
+          <fieldset id="entityGroupsWrap" class="full-span hidden">
+            <legend>Groups</legend>
+            <button type="button" id="selectAllEntityGroupsBtn" class="ghost-btn small">All groups</button>
+            <div id="entityGroups" class="checkbox-grid"></div>
+          </fieldset>
+          <input type="hidden" name="entity_type" />
+          <input type="hidden" name="entity_id" />
+
+          <label id="entityNameWrap" class="full-span">
+            <span>Name</span>
+            <input name="name" />
+          </label>
+          <label id="entityCodeWrap">
+            <span>Code</span>
+            <input name="code" />
+          </label>
+          <label id="entityYearWrap" class="hidden">
+            <span>Year starting</span>
+            <input type="number" name="year_starting" />
+          </label>
+          <label id="entityGermanTimeslotWrap" class="full-span hidden inline-checkbox">
+            <input type="checkbox" name="german_timeslots" />
+            <span>Generate German-style 20-timeslot schedule</span>
+          </label>
+          <label id="entityCapacityWrap" class="hidden">
+            <span>Capacity</span>
+            <input type="number" name="capacity" />
+          </label>
+          <label id="entityCycleWrap" class="hidden">
+            <span>Cycle</span>
+            <select name="cycle_id" id="entityCycleSelect"></select>
+          </label>
+          <label id="entityCourseTagWrap" class="hidden">
+            <span>Course tag</span>
+            <select name="course_tag_id" id="entityCourseTagSelect"></select>
+          </label>
+
+          <fieldset id="entityTeacherTagsWrap" class="full-span hidden">
+            <legend>Teacher can teach course tags</legend>
+            <div id="entityTeacherTags" class="checkbox-grid"></div>
+          </fieldset>
+
+          <div id="entityCourseFlagsWrap" class="full-span hidden plain-box">
+            <label class="inline-checkbox"><input type="checkbox" name="require_all" /> <span>Require all students in group</span></label>
+            <label class="inline-checkbox"><input type="checkbox" name="elective" /> <span>Elective</span></label>
+          </div>
+
+          <div id="entityRequirementsWrap" class="full-span hidden">
+            <div class="subheader-row">
+              <h3>Required courses for this group tag</h3>
+              <button type="button" class="ghost-btn" id="addEntityRequirementBtn">+ Add requirement</button>
+            </div>
+            <div id="entityRequirementRows" class="requirement-list"></div>
+          </div>
+
+          <div id="entityErrors" class="error-list full-span"></div>
+
+          <div class="full-span form-actions between-actions">
+            <button type="button" id="entityDeleteBtn" class="danger-btn hidden">Delete</button>
+            <div class="right-actions">
+              <button type="button" class="ghost-btn" data-close="entityModal">Cancel</button>
+              <button type="submit" class="primary-btn">Save</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <input type="file" id="entityUploadInput" accept=".xlsx" class="hidden" />
+    <script type="application/json" id="initial-page-data">
+      {{ {
+        "openNew": false,
+      } | tojson }}
+    </script>
+    <script src="/static/app?v={{ version }}"></script>
   </div>
 </body>
 </html>
