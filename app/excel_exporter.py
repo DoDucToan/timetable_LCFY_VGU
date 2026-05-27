@@ -367,6 +367,7 @@ def _same_overlay_connectable(a: Dict[str, Any], b: Dict[str, Any]) -> bool:
 class _RowEntry(TypedDict):
     text: str
     fill_color: str
+    col_span: int
 
 
 def _cell(ws: Worksheet, row: int, column: int, value: Any | None = None) -> Cell:
@@ -506,10 +507,12 @@ def _write_group_timetable_sheet(
                 merged_time_cell.border = border
             row_height = _OVERLAY_MIN_HEIGHT
             row_entries: List[Optional[_RowEntry]] = []
+            row_items: List[Optional[Dict[str, Any]]] = []
             for day_index, weekday in days:
                 items = day_cells.get(day_index, [])
                 if row_offset >= len(items):
                     row_entries.append(None)
+                    row_items.append(None)
                     continue
 
                 item = items[row_offset]
@@ -520,21 +523,82 @@ def _write_group_timetable_sheet(
                         item["fill_color"] = program_color_map[program_key]
                 text = _format_item(item)
                 fill_color = _normalize_excel_color(_get_fill_color(item))
-                row_entries.append({"text": text, "fill_color": fill_color})
+                row_entries.append({"text": text, "fill_color": fill_color, "col_span": 1})
+                row_items.append(item)
 
-            for col_idx, entry in enumerate(row_entries, start=2):
+            def _merge_overlay_segment(items: List[Dict[str, Any]]) -> _RowEntry:
+                merged = dict(items[0])
+                merged["program_codes"] = _normalize_program_codes(
+                    [code for item in items for code in item.get("program_codes", [])]
+                )
+                merged["group_codes"] = sorted(
+                    {code for item in items for code in item.get("group_codes", [])}
+                )
+                merged["all_group"] = any(item.get("all_group", False) for item in items)
+                merged["fill_color"] = None
+                merged_text = _format_item(merged)
+                merged_fill = _normalize_excel_color(_get_fill_color(merged))
+                return {"text": merged_text, "fill_color": merged_fill, "col_span": len(items)}
+
+            segment_start: Optional[int] = None
+            segment_items: List[Dict[str, Any]] = []
+            for idx, item in enumerate(row_items):
+                if not item or item.get("merge_id") is None:
+                    if segment_start is not None and len(segment_items) > 1:
+                        merged_entry = _merge_overlay_segment(segment_items)
+                        row_entries[segment_start] = merged_entry
+                        for skip_idx in range(segment_start + 1, idx):
+                            row_entries[skip_idx] = None
+                    segment_start = None
+                    segment_items = []
+                    continue
+                if segment_start is None:
+                    segment_start = idx
+                    segment_items = [item]
+                elif item.get("merge_id") == segment_items[0].get("merge_id"):
+                    segment_items.append(item)
+                else:
+                    if len(segment_items) > 1:
+                        merged_entry = _merge_overlay_segment(segment_items)
+                        row_entries[segment_start] = merged_entry
+                        for skip_idx in range(segment_start + 1, idx):
+                            row_entries[skip_idx] = None
+                    segment_start = idx
+                    segment_items = [item]
+            if segment_start is not None and len(segment_items) > 1:
+                merged_entry = _merge_overlay_segment(segment_items)
+                row_entries[segment_start] = merged_entry
+                for skip_idx in range(segment_start + 1, len(row_entries)):
+                    row_entries[skip_idx] = None
+
+            col_idx = 2
+            while col_idx < 2 + len(row_entries):
+                entry = row_entries[col_idx - 2]
                 cell = _cell(ws, current_row, col_idx)
                 cell.border = border
                 if entry is None:
                     cell.fill = blank_fill
+                    col_idx += 1
                     continue
+
+                assert entry is not None
+                span = entry["col_span"]
+                end_col = col_idx + span - 1
+                if span > 1:
+                    ws.merge_cells(start_row=current_row, start_column=col_idx, end_row=current_row, end_column=end_col)
+                cell = _cell(ws, current_row, col_idx)
                 cell.value = entry["text"]
                 cell.fill = PatternFill("solid", fgColor=str(entry["fill_color"]))
                 cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
                 cell.font = default_font(bold=True, size=12)
-                column_width = _column_range_width_chars(ws, col_idx, col_idx)
+                for c in range(col_idx, end_col + 1):
+                    ws.cell(row=current_row, column=c).border = border
+                    if c != col_idx:
+                        _cell(ws, current_row, c).value = None
+                column_width = _column_range_width_chars(ws, col_idx, end_col)
                 needed_height = _row_height_for_text(entry["text"], width_cols=column_width, min_height=_OVERLAY_MIN_HEIGHT, font_size=12)
                 row_height = max(row_height, needed_height)
+                col_idx = end_col + 1
 
             if label.startswith("German") and len(days) > 1:
                 segment_start = None
@@ -564,6 +628,7 @@ def _write_group_timetable_sheet(
                         segment_entry = entry
                         continue
 
+                    assert entry is not None
                     if segment_entry is not None and (entry["text"] != segment_entry["text"] or entry["fill_color"] != segment_entry["fill_color"]):
                         if idx_day - segment_start > 1:
                             segment_entry_value = segment_entry
