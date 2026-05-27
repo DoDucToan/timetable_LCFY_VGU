@@ -219,8 +219,12 @@ async def security_headers_middleware(request: Request, call_next: Callable[[Req
 
 @app.exception_handler(IntegrityError)
 def integrity_error_handler(request: Request, exc: IntegrityError):
-    logger.exception("Database integrity error")
-    return JSONResponse(status_code=400, content={"detail": "Database integrity error."})
+    original_error = getattr(exc, 'orig', None)
+    detail = str(original_error) if original_error else str(exc)
+    logger.exception("Database integrity error: %s", detail)
+    if not detail:
+        detail = "Database integrity error."
+    return JSONResponse(status_code=400, content={"detail": detail})
 
 
 @app.exception_handler(Exception)
