@@ -1421,6 +1421,7 @@ def _write_timetable_sheet(
                     cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
                     cell.font = default_font(bold=True, size=15)
 
+            merged_overlay_columns: Dict[int, Set[int]] = {}
             for overlay_idx, overlay_item in enumerate(unique_overlays):
                 overlay_row = required_row + 1 + overlay_idx
                 row_has_overlay = [any(_same_overlay_connectable(item, overlay_item) for item in group_items) for group_items in overlay_rows_content]
@@ -1451,9 +1452,11 @@ def _write_timetable_sheet(
                 row_dimension: RowDimension = ws.row_dimensions[overlay_row]
                 current_height = float(getattr(row_dimension, "height", 0) or 0)
                 setattr(row_dimension, "height", float(max(current_height, needed_height)))
+                merged_overlay_columns[overlay_row] = set()
                 if overlay_item.get("kind") == "program" and len(present_cols) > 1:
                     start_col = min(present_cols)
                     end_col = max(present_cols)
+                    merged_overlay_columns[overlay_row].update(range(start_col, end_col + 1))
                     _write_overlay_merge(ws, overlay_row, start_col, end_col, overlay_item, border)
                 else:
                     col_idx = 3
@@ -1468,12 +1471,15 @@ def _write_timetable_sheet(
                         while next_col <= total_cols and next_col - 3 < len(row_has_overlay) and row_has_overlay[next_col - 3]:
                             end_col = next_col
                             next_col += 1
+                        merged_overlay_columns[overlay_row].update(range(col_idx, end_col + 1))
                         _write_overlay_merge(ws, overlay_row, col_idx, end_col, overlay_item, border)
                         col_idx = end_col + 1
 
             for overlay_idx, overlay_item in enumerate(unique_overlays):
                 overlay_row = required_row + 1 + overlay_idx
                 for col_idx2, group in enumerate(groups, start=3):
+                    if col_idx2 in merged_overlay_columns.get(overlay_row, set()):
+                        continue
                     group_items = overlay_rows_content[col_idx2 - 3]
                     if not any(_same_overlay(item, overlay_item) for item in group_items):
                         cell = _cell(ws, overlay_row, col_idx2)
