@@ -1771,7 +1771,7 @@ function populateStaticInputs() {
     updateEntityCourseProgramsState();
   }
   if (els.entityTeacherTags) {
-    renderProgramCheckboxes(els.entityTeacherTags, state.data.course_tags || [], 'entityTeacherTags', 'name');
+    renderProgramCheckboxes(els.entityTeacherTags, state.data.course_tags || [], 'entityTeacherTags', new Set(), 'name');
   }
   if (els.roomSelect) {
     fillSelect(
@@ -2949,7 +2949,7 @@ function openEntityModal(type, id = null) {
     (state.data.course_tags || []).map(item => ({ value: item.id, label: item.name })),
     true
   );
-  renderProgramCheckboxes(els.entityTeacherTags, state.data.course_tags || [], 'entityTeacherTags', 'name');
+  renderProgramCheckboxes(els.entityTeacherTags, state.data.course_tags || [], 'entityTeacherTags', new Set(), 'name');
   renderProgramCheckboxes(els.entityCoursePrograms, state.data.programs || [], 'entityCoursePrograms');
   els.entityRequirementRows.innerHTML = '';
 
@@ -3925,6 +3925,10 @@ async function submitClassForm(event) {
 
 function renderProgramCheckboxes(container, items, groupName, disabledIds = new Set(), labelKey = 'code') {
   if (!container) return;
+  if (typeof disabledIds === 'string') {
+    labelKey = disabledIds;
+    disabledIds = new Set();
+  }
   if (!disabledIds || typeof disabledIds.has !== 'function') {
     disabledIds = new Set(Array.isArray(disabledIds) ? disabledIds : []);
   }
