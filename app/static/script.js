@@ -555,6 +555,9 @@ function cacheEls() {
     'programScheduleModal',
     'programScheduleModalTitle',
     'programScheduleTableWrapper',
+    'timeslotScheduleModal',
+    'timeslotScheduleModalTitle',
+    'timeslotScheduleTableWrapper',
     'groupTagList',
     'courseTagList',
     'programList',
@@ -1833,6 +1836,119 @@ function openProgramScheduleModal(item) {
   openModal('programScheduleModal');
 }
 
+function openTimeslotScheduleModal(slot) {
+  if (!els.timeslotScheduleModal || !els.timeslotScheduleModalTitle || !els.timeslotScheduleTableWrapper) return;
+  const title = slot.weekday ? `${slot.weekday} ${slot.label}` : slot.label || 'Timeslot';
+  els.timeslotScheduleModalTitle.textContent = `Timeslot schedule: ${title}`;
+  renderTimeslotScheduleTable(String(slot.id));
+  openModal('timeslotScheduleModal');
+}
+
+function renderTimeslotScheduleTable(timeslotId) {
+  if (!els.timeslotScheduleTableWrapper) return;
+  els.timeslotScheduleTableWrapper.innerHTML = '';
+  const rows = buildTimeslotScheduleRows(timeslotId);
+  if (!rows.length) {
+    const msg = document.createElement('div');
+    msg.className = 'muted';
+    msg.textContent = 'No scheduled classes found for this timeslot.';
+    els.timeslotScheduleTableWrapper.appendChild(msg);
+    return;
+  }
+
+  const table = document.createElement('table');
+  table.className = 'requirements-modal-table';
+  const thead = document.createElement('thead');
+  thead.innerHTML = `
+    <tr>
+      <th>Day</th>
+      <th>Timeslot</th>
+      <th>Group</th>
+      <th>Program</th>
+      <th>Teacher</th>
+      <th>Room</th>
+      <th>Course</th>
+    </tr>
+  `;
+  table.appendChild(thead);
+  const tbody = document.createElement('tbody');
+  rows.forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(row.weekday)}</td>
+      <td>${escapeHtml(row.timeslot)}</td>
+      <td>${escapeHtml(row.group_code)}</td>
+      <td>${escapeHtml(row.program_code)}</td>
+      <td>${escapeHtml(row.teacher_name)}</td>
+      <td>${escapeHtml(row.room_name)}</td>
+      <td>${escapeHtml(row.course_name)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  els.timeslotScheduleTableWrapper.appendChild(table);
+}
+
+function buildTimeslotScheduleRows(timeslotId) {
+  const timeslotMap = new Map((state.data.timeslots || []).map(ts => [String(ts.id), ts]));
+  const groupMap = new Map((state.data.groups || []).map(g => [String(g.id), g]));
+  const timeslot = timeslotMap.get(String(timeslotId));
+  const cells = state.data.cells || {};
+  const itemsByGroup = cells[String(timeslotId)] || {};
+  const grouped = new Map();
+
+  Object.entries(itemsByGroup).forEach(([groupId, items]) => {
+    const groupCode = groupMap.get(String(groupId))?.code || '';
+    if (!Array.isArray(items)) return;
+    items.forEach(item => {
+      const rowKey = [
+        item.course_name || '',
+        item.teacher_name || '',
+        item.room_name || '',
+        item.kind || '',
+      ].join('||');
+      const existing = grouped.get(rowKey) || {
+        weekday: timeslot?.weekday || '',
+        sort_order: Number(timeslot?.sort_order) || 0,
+        timeslot: timeslot?.label || '',
+        group_codes: new Set(),
+        program_codes: new Set(),
+        teacher_name: item.teacher_name || '',
+        room_name: item.room_name || '',
+        course_name: item.kind === 'elective' ? `(Elective) ${item.course_name || ''}` : item.course_name || '',
+      };
+      if (groupCode) {
+        existing.group_codes.add(groupCode);
+      }
+      if (Array.isArray(item.program_codes)) {
+        item.program_codes.forEach(code => {
+          if (code) existing.program_codes.add(code);
+        });
+      }
+      grouped.set(rowKey, existing);
+    });
+  });
+
+  const rows = Array.from(grouped.values()).map(entry => ({
+    weekday: entry.weekday,
+    sort_order: entry.sort_order,
+    timeslot: entry.timeslot,
+    group_code: Array.from(entry.group_codes || []).sort().join(', '),
+    program_code: Array.from(entry.program_codes).sort().join(', '),
+    teacher_name: entry.teacher_name,
+    room_name: entry.room_name,
+    course_name: entry.course_name,
+  }));
+
+  rows.sort((a, b) =>
+    a.group_code.localeCompare(b.group_code) ||
+    a.teacher_name.localeCompare(b.teacher_name) ||
+    a.room_name.localeCompare(b.room_name) ||
+    a.course_name.localeCompare(b.course_name)
+  );
+  return rows;
+}
+
 function renderProgramScheduleTable(programId, programCode) {
   if (!els.programScheduleTableWrapper) return;
   els.programScheduleTableWrapper.innerHTML = '';
@@ -2464,9 +2580,13 @@ function renderBoard() {
   });
 
   const tbody = document.createElement('tbody');
-  const days = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'];
+  const weekdayOrder = { MONDAY: 0, TUESDAY: 1, WEDNESDAY: 2, THURSDAY: 3, FRIDAY: 4 };
+  const days = [...new Set(timeslots
+    .map(slot => String(slot.weekday || '').trim().toUpperCase())
+    .filter(Boolean)
+  )].sort((a, b) => (weekdayOrder[a] ?? 99) - (weekdayOrder[b] ?? 99) || a.localeCompare(b));
   days.forEach(day => {
-    const daySlots = timeslots.filter(slot => slot.weekday === day);
+    const daySlots = timeslots.filter(slot => String(slot.weekday || '').trim().toUpperCase() === day);
     daySlots.forEach((slot, index) => {
       if (index === 0 && day !== 'MONDAY') {
         const divider = document.createElement('tr');
@@ -2487,13 +2607,26 @@ function renderBoard() {
       }
 
       const timeTd = document.createElement('td');
-      timeTd.className = 'slot-label time-cell';
-      timeTd.textContent = slot.label.startsWith('German')
+      timeTd.className = 'time-cell';
+      const displayedLabel = slot.label.startsWith('German')
         ? slot.label.replace(/^German/, 'GER')
         : slot.label;
+      timeTd.innerHTML = `
+        <div class="slot-label">
+          <div class="timeslot-label-text">${escapeHtml(displayedLabel)}</div>
+          <button type="button" class="ghost-btn small" data-view-timeslot-schedule="${slot.id}" title="View schedule">View</button>
+        </div>
+      `;
+      const viewButton = timeTd.querySelector('[data-view-timeslot-schedule]');
+      if (viewButton) {
+        viewButton.addEventListener('click', event => {
+          event.stopPropagation();
+          openTimeslotScheduleModal({ id: slot.id, label: displayedLabel, weekday: slot.weekday });
+        });
+      }
       tr.appendChild(timeTd);
 
-        const isGermanSlot = slot.label.startsWith('German');
+      const isGermanSlot = slot.label.startsWith('German');
       const rowKeys = slotRowMap[String(slot.id)]?.keys || [];
       const rows = isGermanSlot ? Math.max(1, rowKeys.length) : Math.max(1, rowKeys.length + 1);
 
