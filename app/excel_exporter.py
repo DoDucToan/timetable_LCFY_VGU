@@ -13,7 +13,7 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.dimensions import RowDimension
 from openpyxl.worksheet.worksheet import Worksheet
-from .scheduler import build_timetable_payload, teacher_load_rows
+from .scheduler import build_timetable_payload, teacher_load_rows, blend_hex_colors
 from .models import Group, GroupStudyProgram, StudyProgram, ScheduledClass
 
 def default_font(
@@ -535,7 +535,17 @@ def _write_group_timetable_sheet(
                     {code for item in items for code in item.get("group_codes", [])}
                 )
                 merged["all_group"] = any(item.get("all_group", False) for item in items)
-                merged["fill_color"] = None
+                fill_colors: List[str] = []
+                for item in items:
+                    fill_color = item.get("fill_color")
+                    if fill_color:
+                        normalized = _normalize_excel_color(fill_color)
+                        if normalized and len(normalized) == 8:
+                            fill_colors.append(f"#{normalized[2:]}")
+                if len(set(fill_colors)) > 1:
+                    merged["fill_color"] = blend_hex_colors(fill_colors)
+                else:
+                    merged["fill_color"] = None
                 merged_text = _format_item(merged)
                 merged_fill = _normalize_excel_color(_get_fill_color(merged))
                 return {"text": merged_text, "fill_color": merged_fill, "col_span": len(items)}
@@ -543,7 +553,7 @@ def _write_group_timetable_sheet(
             segment_start: Optional[int] = None
             segment_items: List[Dict[str, Any]] = []
             for idx, item in enumerate(row_items):
-                if not item or item.get("merge_id") is None:
+                if item is None or item.get("merge_id") is None:
                     if segment_start is not None and len(segment_items) > 1:
                         merged_entry = _merge_overlay_segment(segment_items)
                         row_entries[segment_start] = merged_entry
@@ -1413,7 +1423,7 @@ def _write_timetable_sheet(
 
             for overlay_idx, overlay_item in enumerate(unique_overlays):
                 overlay_row = required_row + 1 + overlay_idx
-                row_has_overlay = [any(_same_overlay(item, overlay_item) for item in group_items) for group_items in overlay_rows_content]
+                row_has_overlay = [any(_same_overlay_connectable(item, overlay_item) for item in group_items) for group_items in overlay_rows_content]
                 present_cols = [3 + idx for idx, has in enumerate(row_has_overlay) if has]
                 # Compute height based on each contiguous merged segment, not on total present columns.
                 needed_height = _OVERLAY_MIN_HEIGHT

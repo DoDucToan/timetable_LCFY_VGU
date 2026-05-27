@@ -91,6 +91,10 @@ def _blend_hex_colors(colors: List[str]) -> str:
     return f'#{blended}'
 
 
+def blend_hex_colors(colors: List[str]) -> str:
+    return _blend_hex_colors(colors)
+
+
 def validate_new_class(
     db: Session,
     *,
@@ -590,6 +594,7 @@ def build_timetable_payload(
             "fill_color": fill_color,
             "course_tag_fill_color": first.course.course_tag.fill_color if first.course.course_tag and getattr(first.course.course_tag, 'fill_color', None) else None,
             "shared": bool(first.shared_key),
+            "merge_id": first.shared_key,
             "expected_size": first.expected_size,
         }
         cell_map[str(cast(int, first.timeslot_id))][str(group_id)].append(item)
