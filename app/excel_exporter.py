@@ -203,10 +203,15 @@ def _row_height_for_text(text: str, width_cols: int = 1, min_height: int = 24, f
     return max(min_height, int(line_count * line_height + 10))
 
 
+def _normalize_program_codes(program_codes: List[str]) -> List[str]:
+    return sorted({str(code).strip() for code in program_codes if str(code).strip()})
+
+
 def _program_fill_color(program_codes: List[str]) -> str:
+    program_codes = _normalize_program_codes(program_codes)
     if not program_codes:
         return PROGRAM_FILL_VARIANTS[0]
-    key = "|".join(sorted(program_codes))
+    key = "|".join(program_codes)
     return PROGRAM_FILL_VARIANTS[abs(hash(key)) % len(PROGRAM_FILL_VARIANTS)]
 
 
@@ -235,8 +240,8 @@ def _get_fill_color(item: Dict[str, Any]) -> str:
             return _normalize_excel_color(item["course_tag_fill_color"])
         
     if item.get("kind") == "program":
-        program_codes = item.get("program_codes", [])
-        return _program_fill_color([str(code) for code in program_codes])
+        program_codes = _normalize_program_codes(item.get("program_codes", []))
+        return _program_fill_color(program_codes)
 
     if item.get("kind") == "elective":
         return FILL_MAP.get("elective", "C49A00")
@@ -254,10 +259,10 @@ def _assign_program_colors_for_slot(overlays: List[Dict[str, Any]], program_colo
             continue
         if item.get("fill_color"):
             continue
-        program_codes = sorted(set(item.get("program_codes", [])))
+        program_codes = _normalize_program_codes(item.get("program_codes", []))
         if not program_codes:
             continue
-        program_key = ",".join(program_codes)
+        program_key = "|".join(program_codes)
         if program_key not in program_color_map:
             index = abs(hash(program_key)) % len(PROGRAM_FILL_VARIANTS)
             for attempt in range(len(PROGRAM_FILL_VARIANTS)):
@@ -295,14 +300,14 @@ def _build_program_color_map(payload: Dict[str, Any]) -> Dict[str, str]:
             for item in overlays:
                 found = next((uo for uo in unique_overlays if _same_overlay_connectable(item, uo)), None)
                 if found:
-                    found["program_codes"] = sorted(set(found.get("program_codes", []) + item.get("program_codes", [])))
+                    found["program_codes"] = _normalize_program_codes(found.get("program_codes", []) + item.get("program_codes", []))
                     found["group_codes"] = sorted(set(found.get("group_codes", []) + item.get("group_codes", [])))
                     found["all_group"] = found.get("all_group", False) or item.get("all_group", False)
                 elif not any(_same_overlay(item, uo) for uo in unique_overlays):
                     unique_overlays.append(
                         {
                             **item,
-                            "program_codes": list(item.get("program_codes", [])),
+                            "program_codes": _normalize_program_codes(item.get("program_codes", [])),
                             "group_codes": list(item.get("group_codes", [])),
                             "all_group": item.get("all_group", False),
                         }
@@ -509,7 +514,8 @@ def _write_group_timetable_sheet(
 
                 item = items[row_offset]
                 if item.get("kind") == "program":
-                    program_key = "|".join(sorted(item.get("program_codes", [])))
+                    program_codes = _normalize_program_codes(item.get("program_codes", []))
+                    program_key = "|".join(program_codes)
                     if not item.get("fill_color") and program_key in program_color_map:
                         item["fill_color"] = program_color_map[program_key]
                 text = _format_item(item)
