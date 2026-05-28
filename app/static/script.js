@@ -2434,7 +2434,7 @@ function renderBoard() {
 
   const thead = document.createElement('thead');
   const hrow = document.createElement('tr');
-  hrow.innerHTML = `<th class="time-header">Day</th><th class="time-header">Time</th>`;
+  hrow.innerHTML = `<th class="day-time-header">Day / Time</th>`;
   groups.forEach((group, idx) => {
     const th = document.createElement('th');
     th.className = 'group-header';
@@ -2592,29 +2592,25 @@ function renderBoard() {
         const divider = document.createElement('tr');
         divider.className = 'day-divider-row';
         const dividerCell = document.createElement('td');
-        dividerCell.colSpan = groups.length + 2;
+        dividerCell.colSpan = groups.length + 1;
         divider.appendChild(dividerCell);
         tbody.appendChild(divider);
       }
 
       const tr = document.createElement('tr');
-      if (index === 0) {
-        const dayCell = document.createElement('td');
-        dayCell.className = 'day-cell';
-        dayCell.rowSpan = daySlots.length + 1;
-        dayCell.textContent = day.replace('DAY', '');
-        tr.appendChild(dayCell);
-      }
-
+      const dayName = day.replace('DAY', '');
       const timeTd = document.createElement('td');
-      timeTd.className = 'time-cell';
+      timeTd.className = 'day-time-cell';
       const displayedLabel = slot.label.startsWith('German')
         ? slot.label.replace(/^German/, 'GER')
         : slot.label;
       timeTd.innerHTML = `
-        <div class="slot-label">
-          <div class="timeslot-label-text">${escapeHtml(displayedLabel)}</div>
-          <button type="button" class="ghost-btn small" data-view-timeslot-schedule="${slot.id}" title="View schedule">View</button>
+        <div class="day-time-stack">
+          <div class="day-text">${escapeHtml(dayName)}</div>
+          <div class="slot-label">
+            <div class="timeslot-label-text">${escapeHtml(displayedLabel)}</div>
+            <button type="button" class="ghost-btn small" data-view-timeslot-schedule="${slot.id}" title="View schedule">View</button>
+          </div>
         </div>
       `;
       const viewButton = timeTd.querySelector('[data-view-timeslot-schedule]');
@@ -2719,7 +2715,7 @@ function renderBoard() {
       if (slot.end === '12.00') {
         const lunch = document.createElement('tr');
         lunch.className = 'lunch-row';
-        lunch.innerHTML = `<td class="slot-label lunch">Lunch break</td><td colspan="${groups.length + 1}"></td>`;
+        lunch.innerHTML = `<td class="slot-label lunch">Lunch break</td><td colspan="${groups.length}"></td>`;
         tbody.appendChild(lunch);
       }
     });

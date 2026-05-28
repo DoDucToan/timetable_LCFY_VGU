@@ -854,6 +854,7 @@ body[data-active-section] .full-width {
   flex: 1;
   overflow: auto;
   min-height: 0;
+  position: relative;
 }
 
 #requirementsSection.full-width,
@@ -1172,46 +1173,30 @@ body[data-active-section] .dashboard-card {
   min-width: 200px;
 }
 
-#timetableBoard th:nth-child(2),
-#timetableBoard td:nth-child(2) {
-  width: 70px;
-  min-width: 70px;
+.day-time-header,
+#timetableBoard td.day-time-cell {
+  width: 120px;
+  min-width: 120px;
 }
 
 #timetableBoard th:first-child,
-#timetableBoard td.day-cell {
-  width: 60px;
-  min-width: 60px;
+#timetableBoard td.day-time-cell {
+  width: 120px;
+  min-width: 120px;
   position: sticky;
   left: 0;
   z-index: 5;
   background: #eef3ff;
 }
 
-#timetableBoard th:nth-child(2),
-#timetableBoard td.time-cell {
-  width: 60px;
-  min-width: 60px;
-  position: sticky;
-  left: 60px;
-  z-index: 4;
-  background: #eef3ff;
-  padding: 0;
-}
-
-#timetableBoard td.time-cell {
-  top: 120px;
-}
-
-#timetableBoard td.day-cell,
-#timetableBoard td.time-cell {
+#timetableBoard td.day-time-cell {
   top: 120px;
 }
 
 #timetableBoard thead th {
   position: sticky;
   top: 0;
-  z-index: 2;
+  z-index: 12;
   background: #ffffff;
   padding: 18px 10px;
   line-height: 1.2;
@@ -1246,7 +1231,7 @@ body[data-active-section] .dashboard-card {
   background: rgba(36, 87, 197, 0.5);
 }
 
-.time-header,
+.day-time-header,
 .group-header,
 .add-group-col {
   padding: 10px;
@@ -1254,11 +1239,11 @@ body[data-active-section] .dashboard-card {
   background: #eef3ff;
 }
 
-.time-header {
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  white-space: nowrap;
-  padding: 16px 6px;
+.day-time-header {
+  writing-mode: horizontal-tb;
+  transform: none;
+  white-space: normal;
+  padding: 12px 8px;
 }
 
 .group-header small {
@@ -1338,15 +1323,14 @@ body[data-active-section] .dashboard-card {
   color: var(--danger);
 }
 
-.day-cell {
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
+.day-time-cell {
   text-align: center;
   font-weight: 700;
   background: #edf5e6;
-  min-width: 60px;
-  width: 60px;
-  letter-spacing: 1px;
+  min-width: 120px;
+  width: 120px;
+  letter-spacing: 0;
+  padding: 8px 6px;
 }
 
 .slot-label {
@@ -1365,7 +1349,22 @@ body[data-active-section] .dashboard-card {
   box-sizing: border-box;
 }
 
-#timetableBoard td.time-cell > .slot-label {
+.day-time-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 8px;
+  min-height: 100%;
+}
+
+.day-time-stack .day-text {
+  font-weight: 700;
+  text-align: center;
+  white-space: normal;
+}
+
+#timetableBoard td.day-time-cell .slot-label {
   width: 100%;
   min-height: 100%;
   height: 100%;
@@ -1797,30 +1796,30 @@ body[data-active-section] .dashboard-card {
       min-width: 140px;
     }
 
-    .time-header,
+    .day-time-header,
     .slot-label,
-    .day-cell,
+    .day-time-cell,
     .timetable-cell {
       min-width: auto;
       width: auto;
     }
 
-    .time-header,
-    .day-cell {
+    .day-time-header,
+    .day-time-cell {
       writing-mode: horizontal-tb;
       transform: none;
       white-space: normal;
     }
 
-    .time-header {
-      width: 70px;
-      min-width: 70px;
+    .day-time-header {
+      width: 120px;
+      min-width: 120px;
       padding: 12px 4px;
     }
 
-    .day-cell {
-      width: 48px;
-      min-width: 48px;
+    .day-time-cell {
+      width: 120px;
+      min-width: 120px;
     }
 
     .slot-label {
@@ -1875,22 +1874,22 @@ body[data-active-section] .dashboard-card {
       min-width: 160px;
     }
 
-    .time-header,
-    .day-cell {
+    .day-time-header,
+    .day-time-cell {
       writing-mode: horizontal-tb;
       transform: none;
       white-space: normal;
     }
 
-    .time-header {
-      width: 70px;
-      min-width: 70px;
+    .day-time-header {
+      width: 120px;
+      min-width: 120px;
       padding: 12px 4px;
     }
 
-    .day-cell {
-      width: 48px;
-      min-width: 48px;
+    .day-time-cell {
+      width: 120px;
+      min-width: 120px;
     }
 
     .slot-label {
