@@ -207,12 +207,22 @@ def _normalize_program_codes(program_codes: List[str]) -> List[str]:
     return sorted({str(code).strip() for code in program_codes if str(code).strip()})
 
 
+def _program_base_color(program_code: str) -> str:
+    program_code = str(program_code).strip()
+    if not program_code:
+        return PROGRAM_FILL_VARIANTS[0]
+    index = abs(hash(program_code)) % len(PROGRAM_FILL_VARIANTS)
+    return PROGRAM_FILL_VARIANTS[index]
+
+
 def _program_fill_color(program_codes: List[str]) -> str:
     program_codes = _normalize_program_codes(program_codes)
     if not program_codes:
         return PROGRAM_FILL_VARIANTS[0]
-    key = "|".join(program_codes)
-    return PROGRAM_FILL_VARIANTS[abs(hash(key)) % len(PROGRAM_FILL_VARIANTS)]
+    program_colors = [f"#{_program_base_color(code)}" for code in program_codes]
+    if len(program_colors) == 1:
+        return program_colors[0][1:]
+    return blend_hex_colors(program_colors)
 
 
 def _normalize_excel_color(value: Optional[str]) -> str:
@@ -264,16 +274,9 @@ def _assign_program_colors_for_slot(overlays: List[Dict[str, Any]], program_colo
             continue
         program_key = "|".join(program_codes)
         if program_key not in program_color_map:
-            index = abs(hash(program_key)) % len(PROGRAM_FILL_VARIANTS)
-            for attempt in range(len(PROGRAM_FILL_VARIANTS)):
-                candidate = PROGRAM_FILL_VARIANTS[(index + attempt) % len(PROGRAM_FILL_VARIANTS)]
-                if candidate not in used:
-                    program_color_map[program_key] = candidate
-                    used.add(candidate)
-                    break
-            else:
-                program_color_map[program_key] = PROGRAM_FILL_VARIANTS[index]
-                used.add(PROGRAM_FILL_VARIANTS[index])
+            blended_color = _program_fill_color(program_codes)
+            program_color_map[program_key] = blended_color
+            used.add(blended_color)
         item["fill_color"] = program_color_map[program_key]
 
 
