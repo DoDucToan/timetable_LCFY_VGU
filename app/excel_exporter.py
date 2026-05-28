@@ -222,7 +222,13 @@ def _program_fill_color(program_codes: List[str]) -> str:
     program_colors = [f"#{_program_base_color(code)}" for code in program_codes]
     if len(program_colors) == 1:
         return program_colors[0][1:]
-    return blend_hex_colors(program_colors)
+    blended = blend_hex_colors(program_colors)
+    return blended[1:] if blended.startswith("#") else blended
+
+
+def _is_program_variant_color(value: str) -> bool:
+    normalized = _normalize_excel_color(value)
+    return normalized[2:] in set(PROGRAM_FILL_VARIANTS) or normalized[2:] in set(FILL_MAP.values()) or normalized[2:] in set(TAG_FILL_VARIANTS)
 
 
 def _normalize_excel_color(value: Optional[str]) -> str:
@@ -242,17 +248,21 @@ def _normalize_excel_color(value: Optional[str]) -> str:
 
 
 def _get_fill_color(item: Dict[str, Any]) -> str:
+    if item.get("kind") == "program":
+        program_codes = _normalize_program_codes(item.get("program_codes", []))
+        if program_codes:
+            if item.get("fill_color") and not _is_program_variant_color(item["fill_color"]):
+                return _normalize_excel_color(item["fill_color"])
+            return _normalize_excel_color(_program_fill_color(program_codes))
+
     if item.get("fill_color"):
         return _normalize_excel_color(item["fill_color"])
+
     if item.get("kind") == "required":
-        #get color based on course tag if available, otherwise use default required color
+        # get color based on course tag if available, otherwise use default required color
         if item.get("course_tag_fill_color"):
             return _normalize_excel_color(item["course_tag_fill_color"])
         
-    if item.get("kind") == "program":
-        program_codes = _normalize_program_codes(item.get("program_codes", []))
-        return _program_fill_color(program_codes)
-
     if item.get("kind") == "elective":
         return FILL_MAP.get("elective", "C49A00")
 
@@ -267,10 +277,10 @@ def _assign_program_colors_for_slot(overlays: List[Dict[str, Any]], program_colo
     for item in overlays:
         if item.get("kind") != "program":
             continue
-        if item.get("fill_color"):
-            continue
         program_codes = _normalize_program_codes(item.get("program_codes", []))
         if not program_codes:
+            continue
+        if item.get("fill_color") and not _is_program_variant_color(item["fill_color"]):
             continue
         program_key = "|".join(program_codes)
         if program_key not in program_color_map:
