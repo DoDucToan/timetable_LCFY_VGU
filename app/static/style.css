@@ -142,6 +142,28 @@ body {
   min-height: 48px;
 }
 
+.login-form .guest-action {
+  margin-top: 12px;
+}
+
+.login-form .secondary-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.login-form .secondary-btn:hover {
+  background: #f5f7fb;
+}
+
 @media (max-width: 520px) {
   .login-card {
     padding: 28px 18px;

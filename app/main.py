@@ -173,11 +173,11 @@ app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 def _is_authenticated(request: Request) -> bool:
     return request.cookies.get(ADMIN_COOKIE_NAME) == ADMIN_COOKIE_VALUE
 
-ALLOWED_PATHS = {"/login", "/logout", "/healthz"}
+ALLOWED_PATHS = {"/login", "/logout", "/healthz", "/guest", "/export.xlsx"}
 
 @app.middleware("http")
 async def security_headers_middleware(request: Request, call_next: Callable[[Request], Awaitable[Response]]):
-    if request.url.path.startswith("/static") or request.url.path in ALLOWED_PATHS:
+    if request.url.path.startswith("/static") or request.url.path in ALLOWED_PATHS or request.url.path.startswith("/guest"):
         pass
     elif not _is_authenticated(request):
         if request.url.path.startswith("/api"):
@@ -271,6 +271,53 @@ def login(request: Request, username: str = Form(...), password: str = Form(...)
         samesite="lax",
     )
     return response
+
+
+@app.get("/guest", response_class=HTMLResponse)
+def guest_page(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="guest.html",
+        context={"version": int(time.time())},
+        media_type="text/html; charset=utf-8",
+    )
+
+
+@app.get("/guest/api/cycles")
+def guest_cycles(db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
+    cycles = db.scalars(select(Cycle).order_by(Cycle.name, Cycle.year_starting.desc())).all()
+    return [
+        {"id": c.id, "name": c.name, "year_starting": c.year_starting}
+        for c in cycles
+    ]
+
+
+@app.get("/guest/api/timetables")
+def guest_timetables(cycle_id: Optional[int] = Query(default=None), db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
+    query = select(Timetable)
+    if cycle_id is not None:
+        query = query.where(Timetable.cycle_id == cycle_id)
+    timetables = db.scalars(query.order_by(Timetable.id)).all()
+    return [
+        {"id": t.id, "name": getattr(t, "name", f"Timetable {t.id}")}
+        for t in timetables
+    ]
+
+
+@app.get("/guest/api/timetable-teachers")
+def guest_timetable_teachers(timetable_id: int = Query(...), db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
+    rows = db.execute(
+        select(Teacher.id, Teacher.name)
+        .join(ScheduledClass, ScheduledClass.teacher_id == Teacher.id)
+        .join(Group, Group.id == ScheduledClass.group_id)
+        .where(
+            Group.timetable_id == timetable_id,
+            ScheduledClass.deploy.is_(True),
+        )
+        .distinct()
+        .order_by(Teacher.name)
+    ).all()
+    return [{"id": int(tid), "name": name} for tid, name in rows]
 
 
 @app.get("/logout")
