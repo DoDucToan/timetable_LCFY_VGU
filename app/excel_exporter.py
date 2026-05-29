@@ -501,6 +501,7 @@ def _write_group_timetable_sheet(
                         "time": label,
                         "item": item,
                     })
+                    expanded_items.append(item)
                     continue
                 expanded_items.append(item)
             day_cells[day_index] = expanded_items
@@ -723,12 +724,13 @@ def _write_group_timetable_sheet(
         row += 1
 
         for elective in elective_items:
-            ws.cell(row=row, column=1, value=elective["day"]) .border = border
-            ws.cell(row=row, column=2, value=elective["time"]) .border = border
+            ws.cell(row=row, column=1, value=elective["day"]).border = border
+            ws.cell(row=row, column=2, value=elective["time"]).border = border
             detail = _format_item(elective["item"])
             detail_cell = _cell(ws, row, 3, detail)
             detail_cell.alignment = Alignment(wrap_text=True, vertical="center")
             detail_cell.border = border
+            detail_cell.fill = PatternFill("solid", fgColor=_normalize_excel_color(_get_fill_color(elective["item"])))
             detail_cell.font = default_font(bold=True, size=12)
             detail_width = _column_range_width_chars(ws, 3, 3)
             ws.row_dimensions[row].height = _row_height_for_text(detail, width_cols=detail_width, min_height=_OVERLAY_MIN_HEIGHT, font_size=12)
@@ -1437,7 +1439,10 @@ def _write_timetable_sheet(
             merged_overlay_columns: Dict[int, Set[int]] = {}
             for overlay_idx, overlay_item in enumerate(unique_overlays):
                 overlay_row = required_row + 1 + overlay_idx
-                row_has_overlay = [any(_same_overlay_connectable(item, overlay_item) for item in group_items) for group_items in overlay_rows_content]
+                if overlay_item.get("kind") == "program":
+                    row_has_overlay = [any(_same_overlay_connectable(item, overlay_item) for item in group_items) for group_items in overlay_rows_content]
+                else:
+                    row_has_overlay = [any(_same_overlay(item, overlay_item) for item in group_items) for group_items in overlay_rows_content]
                 present_cols = [3 + idx for idx, has in enumerate(row_has_overlay) if has]
                 # Compute height based on each contiguous merged segment, not on total present columns.
                 needed_height = _OVERLAY_MIN_HEIGHT
