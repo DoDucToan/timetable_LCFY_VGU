@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Guest Timetable Export</title>
+  <link rel="icon" type="image/png" href="/static/favicon.png" />
+  <style>
+    :root {
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      color: #0f172a;
+      background: #f8fafc;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: #f8fafc; }
+    .page { max-width: 1040px; margin: 0 auto; padding: 24px; }
+    .topbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 24px; }
+    .brand-logo img { height: 64px; width: auto; display: block; }
+    .muted { color: #475569; margin-top: 8px; }
+    .ghost-btn { color: #0f172a; text-decoration: none; font-weight: 600; }
+    .card { background: white; border-radius: 18px; box-shadow: 0 24px 80px rgba(15, 23, 42, 0.08); padding: 28px; }
+    h1, h2 { margin: 0; }
+    h2 { margin-bottom: 8px; font-size: 1.5rem; }
+    .form-grid { display: grid; gap: 16px; margin-top: 24px; }
+    label { display: flex; flex-direction: column; gap: 8px; font-weight: 600; }
+    select, button { font: inherit; border: 1px solid #cbd5e1; border-radius: 12px; padding: 12px 14px; }
+    select { background: white; }
+    button { cursor: pointer; background: #0f172a; color: white; transition: background .2s ease; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button:hover:not(:disabled) { background: #1e293b; }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .link-row { margin-top: 8px; }
+    .link-row a { color: #2563eb; text-decoration: none; margin-right: 16px; }
+    .message { color: #334155; margin-top: 12px; }
+    .export-list { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+    .export-list a { display: inline-flex; align-items: center; justify-content: center; min-width: 160px; padding: 10px 14px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; color: #0f172a; text-decoration: none; font-weight: 600; }
+    .export-list a.disabled { pointer-events: none; opacity: 0.5; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="topbar">
+      <a class="brand-logo" href="/guest">
+        <img src="{{ url_for('static', path='VGU-Logo.png') }}" alt="VGU" />
+      </a>
+      <div class="link-row">
+        <a href="/logout">Logout</a>
+      </div>
+    </header>
+
+    <section class="card">
+      <h2>Guest export</h2>
+      <p class="muted">View cycles and timetables, then export either the full timetable or all teachers.</p>
+
+      <div class="form-grid">
+        <label>
+          Cycle
+          <select id="cycleSelect">
+            <option value="">Loading cycles...</option>
+          </select>
+        </label>
+
+        <label>
+          Timetable
+          <select id="timetableSelect" disabled>
+            <option value="">Select a cycle first</option>
+          </select>
+        </label>
+
+      </div>
+
+      <div class="export-list" id="exportOptions">
+        <a id="exportFull" class="disabled" href="#">Export full timetable</a>
+        <a id="exportAllTeachers" class="disabled" href="#">Export all teachers</a>
+      </div>
+
+      <p class="message" id="guestMessage">Select a cycle to load its timetables.</p>
+    </section>
+  </div>
+
+  <script>
+    const cycleSelect = document.getElementById('cycleSelect');
+    const timetableSelect = document.getElementById('timetableSelect');
+    const exportFull = document.getElementById('exportFull');
+    const exportAllTeachers = document.getElementById('exportAllTeachers');
+    const guestMessage = document.getElementById('guestMessage');
+    let timetableTeacherIds = [];
+
+    function fillSelect(select, items, placeholder) {
+      select.innerHTML = '';
+      const emptyOption = document.createElement('option');
+      emptyOption.value = '';
+      emptyOption.textContent = placeholder;
+      select.appendChild(emptyOption);
+      items.forEach(item => {
+        const option = document.createElement('option');
+        option.value = item.id;
+        option.textContent = item.name;
+        select.appendChild(option);
+      });
+    }
+
+    function setMessage(text) {
+      guestMessage.textContent = text;
+    }
+
+    function setExportsEnabled(enabled) {
+      const classes = enabled ? [] : ['disabled'];
+      exportFull.className = classes.join(' ');
+      exportAllTeachers.className = classes.join(' ');
+    }
+
+    function updateExportLinks() {
+      const timetableId = timetableSelect.value;
+      if (!timetableId) {
+        timetableTeacherIds = [];
+        setExportsEnabled(false);
+        exportFull.href = '#';
+        exportAllTeachers.href = '#';
+        return;
+      }
+      const base = `/export.xlsx?timetable_id=${encodeURIComponent(timetableId)}`;
+      exportFull.href = base;
+      if (timetableTeacherIds.length) {
+        const teacherParams = timetableTeacherIds.map(id => `teacher_ids=${encodeURIComponent(id)}`).join('&');
+        exportAllTeachers.href = `${base}&${teacherParams}`;
+      } else {
+        exportAllTeachers.href = base;
+      }
+      setExportsEnabled(true);
+    }
+
+    async function loadTeacherIds(timetableId) {
+      try {
+        const res = await fetch(`/guest/api/timetable-teachers?timetable_id=${encodeURIComponent(timetableId)}`);
+        const teachers = await res.json();
+        if (!Array.isArray(teachers) || teachers.length === 0) {
+          timetableTeacherIds = [];
+          setMessage('No teachers available for this timetable.');
+          updateExportLinks();
+          return;
+        }
+        timetableTeacherIds = teachers.map(t => t.id).filter(Boolean);
+        updateExportLinks();
+      } catch (err) {
+        timetableTeacherIds = [];
+        setMessage('Failed to load teachers for export.');
+        updateExportLinks();
+      }
+    }
+
+    async function loadCycles() {
+      try {
+        const res = await fetch('/guest/api/cycles');
+        const cycles = await res.json();
+        if (!Array.isArray(cycles) || cycles.length === 0) {
+          fillSelect(cycleSelect, [], 'No cycles available');
+          setMessage('No cycles are available to view.');
+          return;
+        }
+        fillSelect(cycleSelect, cycles.map(c => ({ id: c.id, name: `${c.name} (${c.year_starting})` })), 'Select a cycle');
+        setMessage('Select a cycle to load its timetables.');
+      } catch (err) {
+        fillSelect(cycleSelect, [], 'Unable to load cycles');
+        setMessage('Failed to load cycles. Please refresh.');
+      }
+    }
+
+    async function loadTimetables(cycleId) {
+      if (!cycleId) {
+        fillSelect(timetableSelect, [], 'Select a cycle first');
+        timetableSelect.disabled = true;
+        timetableTeacherIds = [];
+        updateExportLinks();
+        return;
+      }
+      try {
+        const res = await fetch(`/guest/api/timetables?cycle_id=${encodeURIComponent(cycleId)}`);
+        const timetables = await res.json();
+        if (!Array.isArray(timetables) || timetables.length === 0) {
+          fillSelect(timetableSelect, [], 'No timetables found');
+          timetableSelect.disabled = true;
+          timetableTeacherIds = [];
+          updateExportLinks();
+          setMessage('No timetables found for the selected cycle.');
+          return;
+        }
+        fillSelect(timetableSelect, timetables, 'Select a timetable');
+        timetableSelect.disabled = false;
+        timetableTeacherIds = [];
+        if (timetables.length === 1) {
+          timetableSelect.value = String(timetables[0].id);
+          await loadTeacherIds(timetables[0].id);
+          setMessage('Auto-selected the only available timetable. You can export now.');
+        } else {
+          updateExportLinks();
+          setMessage('Select a timetable to enable export.');
+        }
+      } catch (err) {
+        fillSelect(timetableSelect, [], 'Unable to load timetables');
+        timetableSelect.disabled = true;
+        timetableTeacherIds = [];
+        updateExportLinks();
+        setMessage('Failed to load timetables. Please refresh.');
+      }
+    }
+
+    cycleSelect.addEventListener('change', async () => {
+      await loadTimetables(cycleSelect.value);
+    });
+
+    timetableSelect.addEventListener('change', async () => {
+      updateExportLinks();
+      if (timetableSelect.value) {
+        await loadTeacherIds(timetableSelect.value);
+      }
+    });
+
+    window.addEventListener('DOMContentLoaded', loadCycles);
+  </script>
+</body>
+</html>
