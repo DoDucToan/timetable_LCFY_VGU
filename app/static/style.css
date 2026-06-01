@@ -2297,6 +2297,64 @@ body[data-active-section] .dashboard-card {
     border-bottom: none;
   }
 
+  @media (max-width: 980px) {
+    #requirementsSection .requirement-action-row {
+      grid-template-columns: 1fr;
+    }
+
+    #requirementsSection .requirement-action-group {
+      width: 100%;
+    }
+
+    #requirementsSection .requirement-summary button {
+      width: 100%;
+      text-align: center;
+    }
+
+    .requirements-modal-table {
+      display: block;
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .requirements-modal-table th,
+    .requirements-modal-table td {
+      white-space: normal;
+    }
+
+    .requirements-modal-toolbar {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .requirements-modal-toolbar button,
+    .requirements-modal-selection-summary {
+      width: 100%;
+    }
+
+    .entity-row,
+    .teacher-load-row {
+      flex-wrap: wrap;
+      align-items: stretch;
+    }
+
+    .entity-actions {
+      width: 100%;
+      justify-content: flex-end;
+    }
+
+    .board-wrap {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    #timetableBoard th,
+    #timetableBoard td {
+      white-space: normal;
+    }
+  }
+
 .modal-header {
   position: sticky;
   top: 0;

@@ -3285,7 +3285,7 @@ function openGroupModal(groupId = null) {
     els.groupModalTitle.textContent = 'Add group';
     els.saveGroupBtn.textContent = 'Save group';
     els.deleteGroupBtn.classList.add('hidden');
-    els.groupForm.elements.capacity.value = 40;
+    els.groupForm.elements.capacity.value = 1;
   }
 
   openModal('groupModal');
