@@ -357,6 +357,7 @@ def render_entity_page(request: Request, section: str, open_new: bool = False, c
         "study-programs": "study-programs.html",
         "course-tags": "course-tags.html",
         "group-tags": "group-tags.html",
+        "groups": "groups.html",
         "colors": "colors.html",
         "upload": "upload.html",
         "data-sync": "data_sync.html",
@@ -438,6 +439,11 @@ def group_tags_page(request: Request, cycle_id: Optional[int] = Query(default=No
 @app.get("/group-tags/new", response_class=HTMLResponse)
 def group_tags_new_page(request: Request, cycle_id: Optional[int] = Query(default=None)):
     return render_entity_page(request, "group-tags", True, cycle_id)
+
+
+@app.get("/groups", response_class=HTMLResponse)
+def groups_page(request: Request, cycle_id: Optional[int] = Query(default=None)):
+    return render_entity_page(request, "groups", False, cycle_id)
 
 
 @app.get("/upload", response_class=HTMLResponse)

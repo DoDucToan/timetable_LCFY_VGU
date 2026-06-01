@@ -566,6 +566,8 @@ function cacheEls() {
     'teacherCourseTagFilter',
     'teacherList',
     'courseSearchInput',
+    'addGroupBtn',
+    'groupListTable',
     'courseFilterSelect',
     'courseTagFilterSelect',
     'courseList',
@@ -771,6 +773,10 @@ function bindGlobalActions() {
     els.exportCourseForm.addEventListener('submit', submitExportCourseForm);
   }
 
+  if (els.addGroupBtn) {
+    els.addGroupBtn.addEventListener('click', () => openGroupModal());
+  }
+
   const importButtons = {
     teachers: {
       download: document.getElementById('downloadTeacherTemplateBtn'),
@@ -933,6 +939,7 @@ function bindGlobalActions() {
       'study-programs': '#programsSection',
       'course-tags': '#courseTagsSection',
       'group-tags': '#groupTagsSection',
+      'groups': '#groupsSection',
       'colors': '#colorsSection',
       'upload': '#uploadSection',
     };
@@ -1304,6 +1311,7 @@ function renderEntityLists() {
   renderEntityList('courseTagList', state.data.course_tags || [], 'course_tag', item => item.name);
   renderEntityList('programList', state.data.programs || [], 'program', item => `${item.code} — ${item.name}`);
   renderEntityList('roomList', state.data.rooms || [], 'room', item => `${item.code} — ${item.name}`, item => `Cap ${item.capacity}`);
+  renderGroupList();
   renderTeacherFilterByCourseTags();
   const courseTagMap = new Map((state.data.course_tags || []).map(tag => [tag.id, tag.name]));
   renderEntityList('teacherList', getFilteredTeachers(), 'teacher', item => item.name, item => {
@@ -1319,6 +1327,41 @@ function renderEntityLists() {
       els.courseTagFilterSelect.value = state.courseFilterTag;
     }
   }
+
+function renderGroupList() {
+  if (!els.groupListTable) return;
+  const tbody = els.groupListTable.querySelector('tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  const groups = (state.data.groups || []).slice();
+  groups.sort((a, b) => String(a.code || '').localeCompare(String(b.code || '')));
+
+  groups.forEach(group => {
+    const row = document.createElement('tr');
+    const programNames = (group.programs || []).map(p => p.code || p.name || '').filter(Boolean).join(', ');
+    row.innerHTML = `
+      <td>${escapeHtml(group.code || '')}</td>
+      <td>${escapeHtml(group.name || '')}</td>
+      <td>${escapeHtml(programNames || '—')}</td>
+      <td>${escapeHtml(String(group.capacity || ''))}</td>
+      <td>
+        <button type="button" class="ghost-btn small" data-edit-group="${group.id}">Edit</button>
+        <button type="button" class="danger-btn small" data-delete-group="${group.id}">Delete</button>
+      </td>
+    `;
+    tbody.appendChild(row);
+  });
+
+  tbody.querySelectorAll('[data-edit-group]').forEach(btn => {
+    const groupId = Number(btn.dataset.editGroup);
+    btn.addEventListener('click', () => openGroupModal(groupId));
+  });
+  tbody.querySelectorAll('[data-delete-group]').forEach(btn => {
+    const groupId = Number(btn.dataset.deleteGroup);
+    btn.addEventListener('click', () => deleteGroupById(groupId));
+  });
+}
   let sortedCourses = (state.data.courses || []).slice();
   const query = String(state.courseFilterQuery || '').trim().toLowerCase();
   const filterType = String(state.courseFilterType || '');

@@ -27,6 +27,7 @@
 
     <nav class="page-nav" aria-label="Page navigation">
       <a class="page-nav-link{% if active_section | default('') == '' %} active{% endif %}" href="{{ '/cycle/' ~ selected_cycle_id if selected_cycle_id else '/' }}">Timetable</a>
+      <a class="page-nav-link{% if active_section == 'groups' %} active{% endif %}" href="/groups{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Groups</a>
       <a class="page-nav-link{% if active_section == 'teacher-load' %} active{% endif %}" href="/teacher-load{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Teacher load</a>
       <a class="page-nav-link{% if active_section == 'teachers' %} active{% endif %}" href="/teachers{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Teachers</a>
       <a class="page-nav-link{% if active_section == 'rooms' %} active{% endif %}" href="/rooms{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Rooms</a>
@@ -138,6 +139,51 @@
             <div class="right-actions">
               <button type="button" class="ghost-btn" data-close="entityModal">Cancel</button>
               <button type="submit" class="primary-btn">Save</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal hidden" id="groupModal">
+      <div class="modal-card wide">
+        <div class="modal-header">
+          <h2 id="groupModalTitle">Add group</h2>
+          <button class="icon-btn" data-close="groupModal">×</button>
+        </div>
+        <form id="groupForm" class="form-grid">
+          <div class="group-modal-panels">
+            <section class="group-panel group-panel-info">
+              <div class="group-info-scroll">
+                <label>
+                  <span>Group code</span>
+                  <input name="code" required />
+                </label>
+                <label>
+                  <span>Group name</span>
+                  <input name="name" />
+                </label>
+                <label>
+                  <span>Group tag</span>
+                  <select name="group_tag_id" id="groupTagSelect" required></select>
+                </label>
+                <label>
+                  <span>Capacity</span>
+                  <input type="number" name="capacity" min="1" value="1" required />
+                </label>
+                <input type="hidden" name="group_id" />
+              </div>
+            </section>
+            <section class="group-panel group-panel-programs full-span">
+              <h3>Study programs</h3>
+              <div id="groupProgramOptions" class="checkbox-grid"></div>
+            </section>
+          </div>
+          <div class="full-span form-actions between-actions">
+            <button type="button" id="deleteGroupBtn" class="danger-btn hidden">Delete group</button>
+            <div class="right-actions">
+              <button type="button" class="ghost-btn" data-close="groupModal">Cancel</button>
+              <button type="submit" class="primary-btn" id="saveGroupBtn">Save group</button>
             </div>
           </div>
         </form>

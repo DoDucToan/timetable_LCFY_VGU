@@ -24,6 +24,7 @@
     </header>
     <nav class="page-nav" aria-label="Page navigation">
       <a class="page-nav-link{% if active_section | default('') == '' %} active{% endif %}" href="{{ '/cycle/' ~ selected_cycle_id if selected_cycle_id else '/' }}">Timetable</a>
+      <a class="page-nav-link{% if active_section == 'groups' %} active{% endif %}" href="/groups{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Groups</a>
       <a class="page-nav-link{% if active_section == 'teacher-load' %} active{% endif %}" href="/teacher-load{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Teacher load</a>
       <a class="page-nav-link{% if active_section == 'teachers' %} active{% endif %}" href="/teachers{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Teachers</a>
       <a class="page-nav-link{% if active_section == 'rooms' %} active{% endif %}" href="/rooms{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Rooms</a>

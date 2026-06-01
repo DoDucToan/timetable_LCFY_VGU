@@ -34,6 +34,7 @@
 
     <nav class="page-nav" aria-label="Page navigation">
       <a class="page-nav-link{% if active_section | default('') == '' %} active{% endif %}" href="{{ '/cycle/' ~ selected_cycle_id if selected_cycle_id else '/' }}">Timetable</a>
+      <a class="page-nav-link{% if active_section == 'groups' %} active{% endif %}" href="/groups{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Groups</a>
       <a class="page-nav-link{% if active_section == 'teacher-load' %} active{% endif %}" href="/teacher-load{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Teacher load</a>
       <a class="page-nav-link{% if active_section == 'teachers' %} active{% endif %}" href="/teachers{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Teachers</a>
       <a class="page-nav-link{% if active_section == 'rooms' %} active{% endif %}" href="/rooms{{ '?cycle_id=' ~ selected_cycle_id if selected_cycle_id else '' }}">Rooms</a>
@@ -84,6 +85,27 @@
             <button class="ghost-btn" data-open-entity="group_tag">Add</button>
           </div>
           <div id="groupTagList" class="entity-list"></div>
+        </section>
+
+        <section class="card dashboard-card span-2" id="groupsSection">
+          <div class="subheader-row">
+            <h2>Groups</h2>
+            <button class="ghost-btn" type="button" id="addGroupBtn">Add</button>
+          </div>
+          <div class="table-wrapper">
+            <table class="entity-table" id="groupListTable">
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Name</th>
+                  <th>Programs</th>
+                  <th>Capacity</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
         </section>
 
         <section class="card dashboard-card" id="courseTagsSection">

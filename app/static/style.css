@@ -2509,13 +2509,32 @@ body[data-active-section] .dashboard-card {
   min-height: 44px;
 }
 
-.entity-filter-row input {
-  flex: 1 1 260px;
-  min-width: 180px;
-}
+  .table-wrapper {
+    overflow-x: auto;
+  }
 
-.entity-filter-row select {
-  width: 220px;
+  .entity-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+  }
+
+  .entity-table th,
+  .entity-table td {
+    border: 1px solid var(--border);
+    padding: 10px;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .entity-table th {
+    background: var(--surface);
+    white-space: nowrap;
+  }
+
+  .entity-table button {
+    margin-right: 6px;
+  }
 }
 
 .teacher-header-row {

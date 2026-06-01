@@ -1,0 +1,29 @@
+{% extends "entity_base.html" %}
+
+{% block title %}Manage Groups{% endblock %}
+{% block subtitle %}Manage groups and edit group details in your current timetable.{% endblock %}
+
+{% block content %}
+<main>
+  <section class="card dashboard-card full-width" id="groupsSection">
+    <div class="subheader-row">
+      <h2>Groups</h2>
+      <button class="ghost-btn" type="button" id="addGroupBtn">Add</button>
+    </div>
+    <div class="table-wrapper">
+      <table class="entity-table" id="groupListTable">
+        <thead>
+          <tr>
+            <th>Code</th>
+            <th>Name</th>
+            <th>Programs</th>
+            <th>Capacity</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+{% endblock %}
