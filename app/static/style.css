@@ -2507,9 +2507,7 @@ body[data-active-section] .dashboard-card {
   padding: 10px 12px;
   font: inherit;
   min-height: 44px;
-}
-
-  .table-wrapper {
+.table-wrapper {
     overflow-x: auto;
   }
 
