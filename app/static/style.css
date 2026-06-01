@@ -497,11 +497,46 @@ body {
   font-size: 12px;
 }
 
+#groupScheduleProgramButtons {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: white;
+  padding: 12px 18px 10px;
+  border-bottom: 1px solid var(--border);
+  overflow: visible;
+}
+
+.group-schedule-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+}
+
+#groupScheduleTableWrapper {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
 .program-picker {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.5rem;
-  margin: 0 0 1rem;
+  margin: 0;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+.program-picker::-webkit-scrollbar {
+  height: 8px;
+}
+
+.program-picker::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 999px;
 }
 
 .program-picker .ghost-btn.active {
@@ -510,8 +545,9 @@ body {
   color: white;
 }
 
-.requirements-modal-table tr.elective-row {
-  background: #fff9c4;
+.requirements-modal-table tr.elective-row,
+.requirements-modal-table tr.elective-row td {
+  background: #fff9c4 !important;
 }
 
 .strip .small {

@@ -2386,7 +2386,7 @@ function renderGroupScheduleTable(groupId, groupCode) {
   const tbody = document.createElement('tbody');
   rows.forEach(row => {
     const tr = document.createElement('tr');
-    if (row.kind === 'elective') {
+    if (String(row.kind || '').trim().toLowerCase() === 'elective') {
       tr.classList.add('elective-row');
     }
     tr.innerHTML = `
