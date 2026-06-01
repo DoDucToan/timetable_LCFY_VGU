@@ -497,6 +497,23 @@ body {
   font-size: 12px;
 }
 
+.program-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+}
+
+.program-picker .ghost-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
+.requirements-modal-table tr.elective-row {
+  background: #fff9c4;
+}
+
 .strip .small {
   padding: 4px 0px;
   font-size: 9px;

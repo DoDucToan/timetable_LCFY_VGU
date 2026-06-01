@@ -400,6 +400,8 @@ const state = {
   editingGroupId: null,
   openMenuGroupId: null,
   selectedProgramGroupId: null,
+  groupScheduleGroupId: null,
+  groupScheduleSelectedProgramIds: [],
   editingEntity: { type: null, id: null },
   activeRequirementModalType: null,
   selectedRequirementKeys: new Set(),
@@ -551,6 +553,7 @@ function cacheEls() {
     'roomScheduleTableWrapper',
     'groupScheduleModal',
     'groupScheduleModalTitle',
+    'groupScheduleProgramButtons',
     'groupScheduleTableWrapper',
     'programScheduleModal',
     'programScheduleModalTitle',
@@ -1872,12 +1875,71 @@ function openTeacherScheduleModal(item) {
 }
 
 function openGroupScheduleModal(item) {
-  if (!els.groupScheduleModal || !els.groupScheduleModalTitle || !els.groupScheduleTableWrapper) return;
+  if (!els.groupScheduleModal || !els.groupScheduleModalTitle || !els.groupScheduleProgramButtons || !els.groupScheduleTableWrapper) return;
   const groupCode = item.group_code || item.groupCode || 'Group';
   const groupId = item.group_id ?? null;
+  state.groupScheduleGroupId = groupId;
+  state.groupScheduleSelectedProgramIds = [];
   els.groupScheduleModalTitle.textContent = `Group schedule: ${groupCode}`;
+  renderGroupScheduleProgramPicker(groupId);
   renderGroupScheduleTable(groupId, groupCode);
   openModal('groupScheduleModal');
+}
+
+function renderGroupScheduleProgramPicker(groupId) {
+  if (!els.groupScheduleProgramButtons) return;
+  const group = (state.data?.groups || []).find(g => String(g.id) === String(groupId));
+  if (!group) {
+    els.groupScheduleProgramButtons.innerHTML = '';
+    return;
+  }
+
+  const selectedProgramIds = new Set(state.groupScheduleSelectedProgramIds || []);
+  const programs = Array.isArray(group.programs) ? group.programs : [];
+  const wrapper = document.createElement('div');
+  wrapper.className = 'program-picker';
+
+  const allBtn = document.createElement('button');
+  allBtn.type = 'button';
+  allBtn.className = `ghost-btn small${selectedProgramIds.size === 0 ? ' active' : ''}`;
+  allBtn.textContent = 'All programs';
+  allBtn.addEventListener('click', () => {
+    state.groupScheduleSelectedProgramIds = [];
+    renderGroupScheduleProgramPicker(groupId);
+    renderGroupScheduleTable(groupId, group.code);
+  });
+  wrapper.appendChild(allBtn);
+
+  programs.forEach(program => {
+    const programId = Number(program.id);
+    const isActive = selectedProgramIds.has(programId);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `ghost-btn small${isActive ? ' active' : ''}`;
+    btn.textContent = String(program.code || program.name || 'Program');
+    btn.addEventListener('click', () => {
+      const nextSelected = new Set(state.groupScheduleSelectedProgramIds || []);
+      if (nextSelected.has(programId)) {
+        nextSelected.delete(programId);
+      } else {
+        nextSelected.add(programId);
+      }
+      state.groupScheduleSelectedProgramIds = Array.from(nextSelected);
+      renderGroupScheduleProgramPicker(groupId);
+      renderGroupScheduleTable(groupId, group.code);
+    });
+    wrapper.appendChild(btn);
+  });
+
+  if (programs.length === 0) {
+    const msg = document.createElement('div');
+    msg.className = 'muted';
+    msg.textContent = 'No programs are assigned to this group.';
+    wrapper.appendChild(msg);
+  }
+
+  els.groupScheduleProgramButtons.innerHTML = '';
+  els.groupScheduleProgramButtons.appendChild(wrapper);
 }
 
 function openProgramScheduleModal(item) {
@@ -2057,9 +2119,11 @@ function buildProgramScheduleRows(programId, programCode) {
     Object.entries(groups).forEach(([groupId, items]) => {
       if (!Array.isArray(items)) return;
       items.forEach(item => {
-        if (!Array.isArray(item.program_codes) || !item.program_codes.length) return;
-        const matched = item.program_codes.some(code => String(code || '').trim().toUpperCase() === normalizedProgramCode);
-        if (!matched) return;
+        const isRequiredOrElective = item.kind === 'required' || item.kind === 'elective';
+        const matchedProgram = Array.isArray(item.program_codes)
+          ? item.program_codes.some(code => String(code || '').trim().toUpperCase() === normalizedProgramCode)
+          : false;
+        if (!isRequiredOrElective && !matchedProgram) return;
 
         const rowKey = [
           String(timeslot.weekday || ''),
@@ -2322,6 +2386,9 @@ function renderGroupScheduleTable(groupId, groupCode) {
   const tbody = document.createElement('tbody');
   rows.forEach(row => {
     const tr = document.createElement('tr');
+    if (row.kind === 'elective') {
+      tr.classList.add('elective-row');
+    }
     tr.innerHTML = `
       <td>${escapeHtml(row.weekday)}</td>
       <td>${escapeHtml(row.timeslot)}</td>
@@ -2341,12 +2408,30 @@ function buildGroupScheduleRows(groupId, groupCode) {
   const cells = state.data.cells || {};
   const grouped = new Map();
 
+  const selectedProgramIds = Array.isArray(state.groupScheduleSelectedProgramIds)
+    ? state.groupScheduleSelectedProgramIds.map(Number).filter(pid => !Number.isNaN(pid))
+    : [];
+  const selectedProgramCodes = new Set(
+    (state.data.programs || [])
+      .filter(program => selectedProgramIds.includes(Number(program.id)))
+      .map(program => String(program.code || '').trim().toUpperCase())
+      .filter(Boolean)
+  );
+
   Object.entries(cells).forEach(([timeslotId, groups]) => {
     const timeslot = timeslotMap.get(timeslotId);
     if (!timeslot || typeof groups !== 'object' || groups === null) return;
     Object.entries(groups).forEach(([cellGroupId, items]) => {
       if (!Array.isArray(items) || String(cellGroupId) !== String(groupId)) return;
       items.forEach(item => {
+        const isRequiredOrElective = item.kind === 'required' || item.kind === 'elective';
+        if (selectedProgramCodes.size > 0 && !isRequiredOrElective) {
+          const hasMatchingProgram = Array.isArray(item.program_codes)
+            ? item.program_codes.some(code => selectedProgramCodes.has(String(code || '').trim().toUpperCase()))
+            : false;
+          if (!hasMatchingProgram) return;
+        }
+
         const rowKey = [
           String(timeslot.weekday || ''),
           Number(timeslot.sort_order) || 0,
@@ -2365,6 +2450,7 @@ function buildGroupScheduleRows(groupId, groupCode) {
           teacher_name: item.teacher_name || '',
           room_name: item.room_name || '',
           course_name: item.kind === 'elective' ? `(Elective) ${courseLabel}` : courseLabel,
+          kind: item.kind || '',
           program_codes: new Set(),
         };
 
@@ -2386,6 +2472,7 @@ function buildGroupScheduleRows(groupId, groupCode) {
     program_code: Array.from(entry.program_codes).sort().join(', '),
     room_name: entry.room_name,
     course_name: entry.course_name,
+    kind: entry.kind,
   }));
 
   rows.sort((a, b) => a.sort_order - b.sort_order || a.weekday.localeCompare(b.weekday) || a.timeslot.localeCompare(b.timeslot));
