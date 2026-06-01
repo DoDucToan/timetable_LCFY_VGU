@@ -539,6 +539,10 @@ body {
   border-radius: 999px;
 }
 
+.program-picker .toggle-electives-btn {
+  margin-left: auto;
+}
+
 .program-picker .ghost-btn.active {
   background: var(--primary);
   border-color: var(--primary);

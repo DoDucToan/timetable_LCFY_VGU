@@ -402,6 +402,7 @@ const state = {
   selectedProgramGroupId: null,
   groupScheduleGroupId: null,
   groupScheduleSelectedProgramIds: [],
+  groupScheduleShowElectives: true,
   editingEntity: { type: null, id: null },
   activeRequirementModalType: null,
   selectedRequirementKeys: new Set(),
@@ -1880,6 +1881,7 @@ function openGroupScheduleModal(item) {
   const groupId = item.group_id ?? null;
   state.groupScheduleGroupId = groupId;
   state.groupScheduleSelectedProgramIds = [];
+  state.groupScheduleShowElectives = true;
   els.groupScheduleModalTitle.textContent = `Group schedule: ${groupCode}`;
   renderGroupScheduleProgramPicker(groupId);
   renderGroupScheduleTable(groupId, groupCode);
@@ -1931,12 +1933,16 @@ function renderGroupScheduleProgramPicker(groupId) {
     wrapper.appendChild(btn);
   });
 
-  if (programs.length === 0) {
-    const msg = document.createElement('div');
-    msg.className = 'muted';
-    msg.textContent = 'No programs are assigned to this group.';
-    wrapper.appendChild(msg);
-  }
+  const toggleElectivesBtn = document.createElement('button');
+  toggleElectivesBtn.type = 'button';
+  toggleElectivesBtn.className = `ghost-btn small toggle-electives-btn${state.groupScheduleShowElectives ? ' active' : ''}`;
+  toggleElectivesBtn.textContent = state.groupScheduleShowElectives ? 'Hide electives' : 'Show electives';
+  toggleElectivesBtn.addEventListener('click', () => {
+    state.groupScheduleShowElectives = !state.groupScheduleShowElectives;
+    renderGroupScheduleProgramPicker(groupId);
+    renderGroupScheduleTable(groupId, group.code);
+  });
+  wrapper.appendChild(toggleElectivesBtn);
 
   els.groupScheduleProgramButtons.innerHTML = '';
   els.groupScheduleProgramButtons.appendChild(wrapper);
@@ -2425,6 +2431,9 @@ function buildGroupScheduleRows(groupId, groupCode) {
       if (!Array.isArray(items) || String(cellGroupId) !== String(groupId)) return;
       items.forEach(item => {
         const isRequiredOrElective = item.kind === 'required' || item.kind === 'elective';
+        if (!state.groupScheduleShowElectives && item.kind === 'elective') {
+          return;
+        }
         if (selectedProgramCodes.size > 0 && !isRequiredOrElective) {
           const hasMatchingProgram = Array.isArray(item.program_codes)
             ? item.program_codes.some(code => selectedProgramCodes.has(String(code || '').trim().toUpperCase()))
