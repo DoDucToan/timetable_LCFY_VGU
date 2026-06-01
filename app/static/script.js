@@ -1053,7 +1053,10 @@ function bindGlobalActions() {
   if (els.classForm) {
     els.classForm.addEventListener('submit', submitClassForm);
     els.classForm.querySelectorAll('input[name="mode"]').forEach(radio => {
-      radio.addEventListener('change', syncClassFormVisibility);
+      radio.addEventListener('change', () => {
+        syncClassFormVisibility();
+        refreshClassProgramOptions();
+      });
     });
   } else {
     console.warn('Missing element: classForm');
@@ -1071,12 +1074,14 @@ function bindGlobalActions() {
   if (els.selectAllClassProgramsBtn) {
     els.selectAllClassProgramsBtn.addEventListener('click', () => {
       els.classProgramOptions?.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
+      refreshClassProgramOptions();
       syncClassFormVisibility();
     });
   }
   if (els.clearClassProgramsBtn) {
     els.clearClassProgramsBtn.addEventListener('click', () => {
       els.classProgramOptions?.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+      refreshClassProgramOptions();
       syncClassFormVisibility();
     });
   }
@@ -1085,11 +1090,15 @@ function bindGlobalActions() {
       els.classGroupOptions?.querySelectorAll('input[type="checkbox"]').forEach(cb => {
         if (!cb.disabled) cb.checked = true;
       });
+      refreshClassProgramOptions();
+      syncClassFormVisibility();
     });
   }
   if (els.clearClassGroupsBtn) {
     els.clearClassGroupsBtn.addEventListener('click', () => {
       els.classGroupOptions?.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+      refreshClassProgramOptions();
+      syncClassFormVisibility();
     });
   }
   if (els.entityForm) {
