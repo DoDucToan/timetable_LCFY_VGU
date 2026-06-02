@@ -130,6 +130,43 @@
       setExportsEnabled(true);
     }
 
+    async function downloadBlob(url) {
+      const res = await fetch(url, { method: 'GET' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const detail = data.detail || res.statusText || 'This timetable is not ready.';
+        setMessage(`Timetable is not ready. ${detail}`);
+        return;
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get('content-disposition') || res.headers.get('Content-Disposition');
+      let filename = 'timetable.xlsx';
+      if (disposition && disposition.includes('filename=')) {
+        filename = disposition.split('filename=')[1].replace(/['"]/g, '').trim();
+      }
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        window.URL.revokeObjectURL(downloadUrl);
+        a.remove();
+      }, 100);
+    }
+
+    async function handleGuestExport(e, url) {
+      e.preventDefault();
+      if (exportFull.classList.contains('disabled') || exportAllTeachers.classList.contains('disabled')) return;
+      if (!url || url.endsWith('#')) return;
+      setMessage('Exporting...');
+      await downloadBlob(url);
+    }
+
+    exportFull.addEventListener('click', async (e) => handleGuestExport(e, exportFull.href));
+    exportAllTeachers.addEventListener('click', async (e) => handleGuestExport(e, exportAllTeachers.href));
+
     async function loadTeacherIds(timetableId) {
       try {
         const res = await fetch(`/guest/api/timetable-teachers?timetable_id=${encodeURIComponent(timetableId)}`);

@@ -362,6 +362,29 @@ function checkExportAllowed() {
   els.exportBtn.title = unmet.length ? `Cannot export: ${unmet.length} unmet requirement${unmet.length === 1 ? '' : 's'}.` : 'Export Excel';
 }
 
+function checkRequirements() {
+  const unmet = getUnmetRequirements();
+  if (!els.requirementCheckResult) {
+    alert(unmet.length ? `Unmet requirements:\n${unmet.join('\n')}` : 'All requirements are met.');
+    return;
+  }
+  if (!unmet.length) {
+    els.requirementCheckResult.innerHTML = '<strong>All requirements are met.</strong>';
+    return;
+  }
+  els.requirementCheckResult.innerHTML = `<strong>Unmet requirements:</strong><pre>${escapeHtml(unmet.join('\n'))}</pre>`;
+}
+
+function isTimetableExportUrl(url) {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url, window.location.href);
+    return parsed.pathname === '/export.xlsx';
+  } catch {
+    return false;
+  }
+}
+
 function getUnmetRequirements() {
   const groups = state.data.groups || [];
   const cells = state.data.cells || {};
@@ -369,7 +392,8 @@ function getUnmetRequirements() {
 
   groups.forEach(group => {
     const groupLabel = `${group.code} — ${group.name}`;
-    (group.requirements || []).forEach(req => {
+    const requirements = [...(group.requirements || []), ...(group.group_requirements || [])];
+    requirements.forEach(req => {
       const sessionsRequired = req.sessions_required || 1;
       let deployedCount = 0;
       Object.values(cells).forEach(cellGroups => {
@@ -384,6 +408,25 @@ function getUnmetRequirements() {
         const courseLabel = req.course_name || req.course_id;
         unmet.push(`Group ${groupLabel} needs ${sessionsRequired} ${courseLabel}, deployed ${deployedCount}`);
       }
+    });
+  });
+
+  const programs = state.data.programs || [];
+  programs.forEach(program => {
+    if (!program.requirements || !program.requirements.length) return;
+    const programGroups = groups.filter(group => (group.programs || []).some(p => p.id === program.id));
+    programGroups.forEach(group => {
+      const groupLabel = `${group.code} — ${group.name}`;
+      const deployedCounts = getDeployedCourseCountsForGroup(group.id);
+      program.requirements.forEach(req => {
+        const sessionsRequired = req.sessions_required || 1;
+        const deployedCount = deployedCounts[req.course_id] || 0;
+        if (deployedCount < sessionsRequired) {
+          const courseLabel = req.course_name || req.course_id;
+          const programLabel = program.code || program.name || `program ${program.id}`;
+          unmet.push(`Program ${programLabel} group ${groupLabel} needs ${sessionsRequired} ${courseLabel}, deployed ${deployedCount}`);
+        }
+      });
     });
   });
 
@@ -614,6 +657,8 @@ function cacheEls() {
     'addGroupOnlyRequirementPanelBtn',
     'addGroupTagRequirementBtn',
     'addStudyProgramRequirementBtn',
+    'checkRequirementsBtn',
+    'requirementCheckResult',
   ].forEach(id => {
     els[id] = document.getElementById(id);
   });
@@ -784,6 +829,9 @@ function bindGlobalActions() {
   }
   if (els.exportCourseForm) {
     els.exportCourseForm.addEventListener('submit', submitExportCourseForm);
+  }
+  if (els.checkRequirementsBtn) {
+    els.checkRequirementsBtn.addEventListener('click', checkRequirements);
   }
 
   if (els.addGroupBtn) {
@@ -4901,6 +4949,13 @@ async function submitExportTeacherForm(e) {
 
 async function downloadExcel(url, busyText = 'Exporting...') {
   if (!url) return;
+  if (isTimetableExportUrl(url)) {
+    const unmet = getUnmetRequirements();
+    if (unmet.length) {
+      alert('Cannot export: timetable is not ready.\n' + unmet.slice(0, 5).join('\n'));
+      return;
+    }
+  }
   const exportAnchor = els.exportBtn;
   const prevText = exportAnchor?.textContent;
   const wasDisabled = exportAnchor?.disabled;
