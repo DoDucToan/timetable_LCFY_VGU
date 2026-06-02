@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Timetable Builder - Manage {{ active_section | replace('-', ' ') | title }}</title>
-  <link rel="icon" type="image/png" href="/static/favicon.png" />
+  <link rel="icon" type="image/jpeg" href="{{ url_for('static', path='VGU.jpg') }}" />
   <link rel="stylesheet" href="/static/style.css?v={{ version }}" />
 </head>
 <body data-active-section="{{ active_section }}">
