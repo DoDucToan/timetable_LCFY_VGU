@@ -39,6 +39,17 @@ body {
   box-sizing: border-box;
 }
 
+.page-centered-content {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.centered-card {
+  max-width: 1000px;
+  width: 100%;
+}
+
 .login-page-body {
   min-height: 100vh;
   background: linear-gradient(180deg, #f4f7fb 0%, #eef3f9 100%);

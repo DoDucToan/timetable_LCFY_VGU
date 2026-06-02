@@ -5,13 +5,14 @@
 
 {% block content %}
 <main>
-  <section class="card dashboard-card full-width" id="groupsSection">
-    <div class="subheader-row">
-      <h2>Groups</h2>
-      <button class="ghost-btn" type="button" id="addGroupBtn">Add</button>
-    </div>
-    <div class="table-wrapper">
-      <table class="entity-table" id="groupListTable">
+  <div class="page-centered-content">
+    <section class="card dashboard-card full-width centered-card" id="groupsSection">
+      <div class="subheader-row">
+        <h2>Groups</h2>
+        <button class="ghost-btn" type="button" id="addGroupBtn">Add</button>
+      </div>
+      <div class="table-wrapper">
+        <table class="entity-table" id="groupListTable">
         <thead>
           <tr>
             <th>Code</th>
@@ -25,5 +26,6 @@
       </table>
     </div>
   </section>
+  </div>
 </main>
 {% endblock %}

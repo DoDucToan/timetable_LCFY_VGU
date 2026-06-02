@@ -403,6 +403,8 @@ const state = {
   groupScheduleGroupId: null,
   groupScheduleSelectedProgramIds: [],
   groupScheduleShowElectives: true,
+  timeslotScheduleSelectedProgramIds: [],
+  timeslotScheduleShowElectives: true,
   editingEntity: { type: null, id: null },
   activeRequirementModalType: null,
   selectedRequirementKeys: new Set(),
@@ -561,6 +563,7 @@ function cacheEls() {
     'programScheduleTableWrapper',
     'timeslotScheduleModal',
     'timeslotScheduleModalTitle',
+    'timeslotScheduleProgramButtons',
     'timeslotScheduleTableWrapper',
     'groupTagList',
     'courseTagList',
@@ -1350,6 +1353,7 @@ function renderGroupList() {
       <td>${escapeHtml(programNames || '—')}</td>
       <td>${escapeHtml(String(group.capacity || ''))}</td>
       <td>
+        <button type="button" class="ghost-btn small" data-view-group-schedule="${group.id}">View schedule</button>
         <button type="button" class="ghost-btn small" data-edit-group="${group.id}">Edit</button>
         <button type="button" class="danger-btn small" data-delete-group="${group.id}">Delete</button>
       </td>
@@ -1357,6 +1361,10 @@ function renderGroupList() {
     tbody.appendChild(row);
   });
 
+  tbody.querySelectorAll('[data-view-group-schedule]').forEach(btn => {
+    const groupId = Number(btn.dataset.viewGroupSchedule);
+    btn.addEventListener('click', () => openGroupScheduleModal({ group_id: groupId, group_code: (state.data.groups || []).find(g => Number(g.id) === groupId)?.code || '' }));
+  });
   tbody.querySelectorAll('[data-edit-group]').forEach(btn => {
     const groupId = Number(btn.dataset.editGroup);
     btn.addEventListener('click', () => openGroupModal(groupId));
@@ -1957,11 +1965,91 @@ function openProgramScheduleModal(item) {
 }
 
 function openTimeslotScheduleModal(slot) {
-  if (!els.timeslotScheduleModal || !els.timeslotScheduleModalTitle || !els.timeslotScheduleTableWrapper) return;
+  if (!els.timeslotScheduleModal || !els.timeslotScheduleModalTitle || !els.timeslotScheduleProgramButtons || !els.timeslotScheduleTableWrapper) return;
+  state.timeslotScheduleSelectedProgramIds = [];
+  state.timeslotScheduleShowElectives = true;
   const title = slot.weekday ? `${slot.weekday} ${slot.label}` : slot.label || 'Timeslot';
   els.timeslotScheduleModalTitle.textContent = `Timeslot schedule: ${title}`;
+  renderTimeslotScheduleProgramPicker(String(slot.id));
   renderTimeslotScheduleTable(String(slot.id));
   openModal('timeslotScheduleModal');
+}
+
+function renderTimeslotScheduleProgramPicker(timeslotId) {
+  if (!els.timeslotScheduleProgramButtons) return;
+  els.timeslotScheduleProgramButtons.innerHTML = '';
+
+  const normalizeCode = code => String(code || '').trim().toUpperCase();
+  const itemsByGroup = state.data?.cells?.[String(timeslotId)] || {};
+  const programCodes = new Set();
+  Object.values(itemsByGroup).forEach(items => {
+    if (!Array.isArray(items)) return;
+    items.forEach(item => {
+      if (Array.isArray(item.program_codes)) {
+        item.program_codes.forEach(code => {
+          const normalized = normalizeCode(code);
+          if (normalized) {
+            programCodes.add(normalized);
+          }
+        });
+      }
+    });
+  });
+
+  const programs = (state.data?.programs || []).filter(program => {
+    const normalized = normalizeCode(program.code);
+    return normalized && programCodes.has(normalized);
+  });
+  if (!programs.length) return;
+
+  const selectedProgramIds = new Set(state.timeslotScheduleSelectedProgramIds || []);
+  const wrapper = document.createElement('div');
+  wrapper.className = 'program-picker';
+
+  const allBtn = document.createElement('button');
+  allBtn.type = 'button';
+  allBtn.className = `ghost-btn small${selectedProgramIds.size === 0 ? ' active' : ''}`;
+  allBtn.textContent = 'All programs';
+  allBtn.addEventListener('click', () => {
+    state.timeslotScheduleSelectedProgramIds = [];
+    renderTimeslotScheduleProgramPicker(timeslotId);
+    renderTimeslotScheduleTable(timeslotId);
+  });
+  wrapper.appendChild(allBtn);
+
+  programs.forEach(program => {
+    const programId = Number(program.id);
+    const isActive = selectedProgramIds.has(programId);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `ghost-btn small${isActive ? ' active' : ''}`;
+    btn.textContent = String(program.code || program.name || 'Program');
+    btn.addEventListener('click', () => {
+      const nextSelected = new Set(state.timeslotScheduleSelectedProgramIds || []);
+      if (nextSelected.has(programId)) {
+        nextSelected.delete(programId);
+      } else {
+        nextSelected.add(programId);
+      }
+      state.timeslotScheduleSelectedProgramIds = Array.from(nextSelected);
+      renderTimeslotScheduleProgramPicker(timeslotId);
+      renderTimeslotScheduleTable(timeslotId);
+    });
+    wrapper.appendChild(btn);
+  });
+
+  const toggleElectivesBtn = document.createElement('button');
+  toggleElectivesBtn.type = 'button';
+  toggleElectivesBtn.className = `ghost-btn small toggle-electives-btn${state.timeslotScheduleShowElectives ? ' active' : ''}`;
+  toggleElectivesBtn.textContent = state.timeslotScheduleShowElectives ? 'Hide electives' : 'Show electives';
+  toggleElectivesBtn.addEventListener('click', () => {
+    state.timeslotScheduleShowElectives = !state.timeslotScheduleShowElectives;
+    renderTimeslotScheduleProgramPicker(timeslotId);
+    renderTimeslotScheduleTable(timeslotId);
+  });
+  wrapper.appendChild(toggleElectivesBtn);
+
+  els.timeslotScheduleProgramButtons.appendChild(wrapper);
 }
 
 function renderTimeslotScheduleTable(timeslotId) {
@@ -1994,6 +2082,9 @@ function renderTimeslotScheduleTable(timeslotId) {
   const tbody = document.createElement('tbody');
   rows.forEach(row => {
     const tr = document.createElement('tr');
+    if (String(row.kind || '').trim().toLowerCase() === 'elective') {
+      tr.classList.add('elective-row');
+    }
     tr.innerHTML = `
       <td>${escapeHtml(row.weekday)}</td>
       <td>${escapeHtml(row.timeslot)}</td>
@@ -2017,10 +2108,30 @@ function buildTimeslotScheduleRows(timeslotId) {
   const itemsByGroup = cells[String(timeslotId)] || {};
   const grouped = new Map();
 
+  const selectedProgramIds = Array.isArray(state.timeslotScheduleSelectedProgramIds)
+    ? state.timeslotScheduleSelectedProgramIds.map(Number).filter(pid => !Number.isNaN(pid))
+    : [];
+  const selectedProgramCodes = new Set(
+    (state.data.programs || [])
+      .filter(program => selectedProgramIds.includes(Number(program.id)))
+      .map(program => String(program.code || '').trim().toUpperCase())
+      .filter(Boolean)
+  );
+
   Object.entries(itemsByGroup).forEach(([groupId, items]) => {
     const groupCode = groupMap.get(String(groupId))?.code || '';
     if (!Array.isArray(items)) return;
     items.forEach(item => {
+      if (!state.timeslotScheduleShowElectives && item.kind === 'elective') {
+        return;
+      }
+      const isRequiredOrElective = item.kind === 'required' || item.kind === 'elective';
+      if (selectedProgramCodes.size > 0 && !isRequiredOrElective) {
+        const hasMatchingProgram = Array.isArray(item.program_codes)
+          ? item.program_codes.some(code => selectedProgramCodes.has(String(code || '').trim().toUpperCase()))
+          : false;
+        if (!hasMatchingProgram) return;
+      }
       const rowKey = [
         item.course_name || '',
         item.teacher_name || '',
@@ -2036,6 +2147,7 @@ function buildTimeslotScheduleRows(timeslotId) {
         teacher_name: item.teacher_name || '',
         room_name: item.room_name || '',
         course_name: item.kind === 'elective' ? `(Elective) ${item.course_name || ''}` : item.course_name || '',
+        kind: item.kind || '',
       };
       if (groupCode) {
         existing.group_codes.add(groupCode);
@@ -2058,6 +2170,7 @@ function buildTimeslotScheduleRows(timeslotId) {
     teacher_name: entry.teacher_name,
     room_name: entry.room_name,
     course_name: entry.course_name,
+    kind: entry.kind,
   }));
 
   rows.sort((a, b) =>
