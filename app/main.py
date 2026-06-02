@@ -2781,7 +2781,6 @@ def export_file(
     if db.scalar(missing_assignment_query):
         raise HTTPException(status_code=400, detail="Cannot export: some deployed classes are missing teacher or room assignment.")
 
-    if selected_teacher_ids is None:
         for group in groups:
             requirements = db.scalars(
                 select(CourseForGroupTag).where(
