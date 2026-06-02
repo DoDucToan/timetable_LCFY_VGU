@@ -2542,6 +2542,21 @@ body[data-active-section] .dashboard-card {
   gap: 8px;
 }
 
+.modal-card .checkbox-grid {
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.modal-card .checkbox-grid::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal-card .checkbox-grid::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.2);
+  border-radius: 999px;
+}
+
 .checkbox-card {
   display: flex;
   gap: 8px;

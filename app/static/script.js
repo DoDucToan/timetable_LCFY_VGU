@@ -1319,12 +1319,16 @@ function renderContextSelectors() {
   if (els.deleteSelectedGroupsBtn) {
     els.deleteSelectedGroupsBtn.disabled = state.selectedGroupIds.size === 0;
   }
+  const activePrograms = getProgramsWithClasses();
+  const activeCourses = getCoursesWithClasses();
+  const activeTeachers = getTeachersWithClasses();
+
   if (els.exportProgramOptions) {
     els.exportProgramOptions.innerHTML = '';
-    renderProgramCheckboxes(els.exportProgramOptions, state.data.programs || [], 'exportPrograms', 'code');
+    renderProgramCheckboxes(els.exportProgramOptions, activePrograms, 'exportPrograms', 'code');
   }
   if (els.exportProgramBtn) {
-    els.exportProgramBtn.disabled = !state.timetableId || !(state.data.programs || []).length;
+    els.exportProgramBtn.disabled = !state.timetableId || !activePrograms.length;
   }
   if (els.exportGroupBtn) {
     els.exportGroupBtn.disabled = !state.timetableId || !(state.data.groups || []).length;
@@ -1333,16 +1337,16 @@ function renderContextSelectors() {
     els.exportAllGroupBtn.disabled = !state.timetableId || !(state.data.groups || []).length;
   }
   if (els.exportCourseBtn) {
-    els.exportCourseBtn.disabled = !state.timetableId || !(state.data.courses || []).length;
+    els.exportCourseBtn.disabled = !state.timetableId || !activeCourses.length;
   }
   if (els.exportAllCourseBtn) {
-    els.exportAllCourseBtn.disabled = !state.timetableId || !(state.data.courses || []).length;
+    els.exportAllCourseBtn.disabled = !state.timetableId || !activeCourses.length;
   }
   if (els.exportTeacherBtn) {
-    els.exportTeacherBtn.disabled = !state.timetableId || !(state.data.teachers || []).length;
+    els.exportTeacherBtn.disabled = !state.timetableId || !activeTeachers.length;
   }
   if (els.exportAllTeacherBtn) {
-    els.exportAllTeacherBtn.disabled = !state.timetableId || !(state.data.teachers || []).length;
+    els.exportAllTeacherBtn.disabled = !state.timetableId || !activeTeachers.length;
   }
   if (els.editTimetableBtn) {
     els.editTimetableBtn.disabled = !state.timetableId;
@@ -4778,12 +4782,94 @@ function escapeHtml(value) {
     .replaceAll("'", '&#039;');
 }
 
+function getActiveClassItems() {
+  const cells = state.data.cells || {};
+  const items = [];
+  Object.values(cells).forEach(groupMap => {
+    if (!groupMap || typeof groupMap !== 'object') return;
+    Object.values(groupMap).forEach(groupItems => {
+      if (!Array.isArray(groupItems)) return;
+      groupItems.forEach(item => {
+        if (item && typeof item === 'object') {
+          items.push(item);
+        }
+      });
+    });
+  });
+  return items;
+}
+
+function getActiveClassTeacherIds() {
+  const ids = new Set();
+  getActiveClassItems().forEach(item => {
+    const id = item.teacher_id ?? item.teacherId ?? item.teacher_id;
+    if (id != null && id !== '') {
+      ids.add(Number(id));
+    }
+  });
+  return ids;
+}
+
+function getActiveClassCourseIds() {
+  const ids = new Set();
+  getActiveClassItems().forEach(item => {
+    const id = item.course_id ?? item.courseId ?? item.course_id;
+    if (id != null && id !== '') {
+      ids.add(Number(id));
+    }
+  });
+  return ids;
+}
+
+function getActiveClassProgramIds() {
+  const ids = new Set();
+  const programCodeToId = new Map((state.data.programs || []).map(program => [String(program.code || '').trim().toUpperCase(), program.id]));
+  const groupsById = new Map((state.data.groups || []).map(group => [String(group.id), group]));
+  getActiveClassItems().forEach(item => {
+    const groupId = item.group_id ?? item.groupId ?? item.group_id;
+    const programId = item.study_program_id ?? item.studyProgramId ?? item.study_program_id;
+    if (programId != null && programId !== '') {
+      ids.add(Number(programId));
+    }
+    if (Array.isArray(item.program_codes)) {
+      item.program_codes.forEach(code => {
+        const normalized = String(code || '').trim().toUpperCase();
+        if (programCodeToId.has(normalized)) {
+          ids.add(programCodeToId.get(normalized));
+        }
+      });
+    }
+    if (groupId != null && groupsById.has(String(groupId))) {
+      const group = groupsById.get(String(groupId));
+      (group.programs || []).forEach(program => ids.add(Number(program.id)));
+    }
+  });
+  return ids;
+}
+
+function getProgramsWithClasses() {
+  const activeIds = getActiveClassProgramIds();
+  return (state.data.programs || []).filter(program => activeIds.has(Number(program.id)));
+}
+
+function getTeachersWithClasses() {
+  const activeIds = getActiveClassTeacherIds();
+  return (state.data.teachers || []).filter(teacher => activeIds.has(Number(teacher.id)));
+}
+
+function getCoursesWithClasses() {
+  const activeIds = getActiveClassCourseIds();
+  return (state.data.courses || []).filter(course => activeIds.has(Number(course.id)));
+}
+
 function openExportProgramModal() {
   if (!els.exportProgramModal || !els.exportProgramOptions) return;
-  if (!els.exportProgramOptions.querySelector('input[type="checkbox"]')) {
-    alert('No study programs available to export.');
+  const activePrograms = getProgramsWithClasses();
+  if (!activePrograms.length) {
+    alert('No study programs with classes available to export.');
     return;
   }
+  renderProgramCheckboxes(els.exportProgramOptions, activePrograms, 'exportPrograms', 'code');
   openModal('exportProgramModal');
 }
 
@@ -4799,21 +4885,23 @@ function openExportGroupModal() {
 
 function openExportTeacherModal() {
   if (!els.exportTeacherModal || !els.exportTeacherOptions) return;
-  if (!(state.data.teachers || []).length) {
-    alert('No teachers available to export.');
+  const activeTeachers = getTeachersWithClasses();
+  if (!activeTeachers.length) {
+    alert('No teachers with classes available to export.');
     return;
   }
-  renderTeacherCheckboxesByCourseTag(els.exportTeacherOptions, state.data.teachers || [], 'exportTeachers');
+  renderTeacherCheckboxesByCourseTag(els.exportTeacherOptions, activeTeachers, 'exportTeachers');
   openModal('exportTeacherModal');
 }
 
 function openExportCourseModal() {
   if (!els.exportCourseModal || !els.exportCourseOptions) return;
-  if (!(state.data.courses || []).length) {
-    alert('No courses available to export.');
+  const activeCourses = getCoursesWithClasses();
+  if (!activeCourses.length) {
+    alert('No courses with classes available to export.');
     return;
   }
-  renderCourseCheckboxesByTag(els.exportCourseOptions, state.data.courses || [], 'exportCourses');
+  renderCourseCheckboxesByTag(els.exportCourseOptions, activeCourses, 'exportCourses');
   openModal('exportCourseModal');
 }
 
