@@ -2781,108 +2781,108 @@ def export_file(
     if db.scalar(missing_assignment_query):
         raise HTTPException(status_code=400, detail="Cannot export: some deployed classes are missing teacher or room assignment.")
 
-        for group in groups:
-            requirements = db.scalars(
-                select(CourseForGroupTag).where(
-                    CourseForGroupTag.group_tag_id == group.group_tag_id,
-                    CourseForGroupTag.timetable_id == timetable.id,
+    for group in groups:
+        requirements = db.scalars(
+            select(CourseForGroupTag).where(
+                CourseForGroupTag.group_tag_id == group.group_tag_id,
+                CourseForGroupTag.timetable_id == timetable.id,
+            )
+        ).all()
+        for req in requirements:
+            deployed_count = db.scalar(
+                select(func.count()).select_from(ScheduledClass)
+                .where(
+                    ScheduledClass.group_id == group.id,
+                    ScheduledClass.course_id == req.course_id,
+                    ScheduledClass.deploy.is_(True),
                 )
-            ).all()
-            for req in requirements:
-                deployed_count = db.scalar(
-                    select(func.count()).select_from(ScheduledClass)
-                    .where(
-                        ScheduledClass.group_id == group.id,
-                        ScheduledClass.course_id == req.course_id,
-                        ScheduledClass.deploy.is_(True),
-                    )
+            )
+            sessions_required = int(getattr(req, "sessions_required", 0))
+            if deployed_count is None or deployed_count < sessions_required:
+                course = db.get(Course, req.course_id)
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Group {group.code} is missing deployed class(es) for required course {course.name if course else req.course_id} (has {deployed_count}, needs {sessions_required})"
                 )
-                sessions_required = int(getattr(req, "sessions_required", 0))
-                if deployed_count is None or deployed_count < sessions_required:
-                    course = db.get(Course, req.course_id)
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Group {group.code} is missing deployed class(es) for required course {course.name if course else req.course_id} (has {deployed_count}, needs {sessions_required})"
-                    )
-            group_specific_requirements = db.scalars(
-                select(CourseForGroup).where(CourseForGroup.group_id == group.id)
-            ).all()
-            for req in group_specific_requirements:
-                deployed_count = db.scalar(
-                    select(func.count()).select_from(ScheduledClass)
-                    .where(
-                        ScheduledClass.group_id == group.id,
-                        ScheduledClass.course_id == req.course_id,
-                        ScheduledClass.deploy.is_(True),
-                    )
+        group_specific_requirements = db.scalars(
+            select(CourseForGroup).where(CourseForGroup.group_id == group.id)
+        ).all()
+        for req in group_specific_requirements:
+            deployed_count = db.scalar(
+                select(func.count()).select_from(ScheduledClass)
+                .where(
+                    ScheduledClass.group_id == group.id,
+                    ScheduledClass.course_id == req.course_id,
+                    ScheduledClass.deploy.is_(True),
                 )
-                sessions_required = int(getattr(req, "sessions_required", 0))
-                if deployed_count is None or deployed_count < sessions_required:
-                    course = db.get(Course, req.course_id)
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Group {group.code} is missing deployed class(es) for individual required course {course.name if course else req.course_id} (has {deployed_count}, needs {sessions_required})"
-                    )
+            )
+            sessions_required = int(getattr(req, "sessions_required", 0))
+            if deployed_count is None or deployed_count < sessions_required:
+                course = db.get(Course, req.course_id)
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Group {group.code} is missing deployed class(es) for individual required course {course.name if course else req.course_id} (has {deployed_count}, needs {sessions_required})"
+                )
 
-        programs = []
-        if program_ids is not None:
-            programs = selected_programs or []
-        elif selected_program is not None:
-            programs = [selected_program]
-        elif selected_group_ids is not None:
-            programs = list(db.scalars(
-                select(StudyProgram)
-                .join(GroupStudyProgram)
-                .where(GroupStudyProgram.group_id.in_(selected_group_ids))
-                .distinct()
-            ).all())
+    programs = []
+    if program_ids is not None:
+        programs = selected_programs or []
+    elif selected_program is not None:
+        programs = [selected_program]
+    elif selected_group_ids is not None:
+        programs = list(db.scalars(
+            select(StudyProgram)
+            .join(GroupStudyProgram)
+            .where(GroupStudyProgram.group_id.in_(selected_group_ids))
+            .distinct()
+        ).all())
+    else:
+        programs = db.scalars(select(StudyProgram)).all()
+    for program in programs:
+        reqs = db.query(StudyProgramCourse).filter(
+            StudyProgramCourse.study_program_id == program.id,
+            StudyProgramCourse.timetable_id == timetable.id
+        ).all()
+        if not reqs:
+            continue
+        if selected_group_ids is not None:
+            group_ids_for_program = [int(gid) for gid in db.scalars(
+                select(GroupStudyProgram.group_id)
+                .where(
+                    GroupStudyProgram.study_program_id == program.id,
+                    GroupStudyProgram.group_id.in_(selected_group_ids),
+                )
+            ).all()]
         else:
-            programs = db.scalars(select(StudyProgram)).all()
-        for program in programs:
-            reqs = db.query(StudyProgramCourse).filter(
-                StudyProgramCourse.study_program_id == program.id,
-                StudyProgramCourse.timetable_id == timetable.id
-            ).all()
-            if not reqs:
-                continue
-            if selected_group_ids is not None:
-                group_ids_for_program = [int(gid) for gid in db.scalars(
-                    select(GroupStudyProgram.group_id)
+            group_ids_for_program = [int(gid) for gid in db.scalars(
+                select(GroupStudyProgram.group_id)
+                .join(Group)
+                .where(
+                    GroupStudyProgram.study_program_id == program.id,
+                    Group.timetable_id == timetable.id
+                )
+            ).all()]
+        if not group_ids_for_program:
+            continue
+        for req in reqs:
+            for group_id in group_ids_for_program:
+                deployed_count = db.scalar(
+                    select(func.count()).select_from(ScheduledClass)
                     .where(
-                        GroupStudyProgram.study_program_id == program.id,
-                        GroupStudyProgram.group_id.in_(selected_group_ids),
+                        ScheduledClass.group_id == group_id,
+                        ScheduledClass.course_id == req.course_id,
+                        ScheduledClass.study_program_id == program.id,
+                        ScheduledClass.deploy.is_(True),
                     )
-                ).all()]
-            else:
-                group_ids_for_program = [int(gid) for gid in db.scalars(
-                    select(GroupStudyProgram.group_id)
-                    .join(Group)
-                    .where(
-                        GroupStudyProgram.study_program_id == program.id,
-                        Group.timetable_id == timetable.id
+                )
+                sessions_required = int(getattr(req, "sessions_required", 1))
+                if deployed_count is None or deployed_count < sessions_required:
+                    course = db.get(Course, req.course_id)
+                    group = db.get(Group, group_id)
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Study program {program.code} group {group.code if group else group_id} missing deployed class for required course {course.name if course else req.course_id}"
                     )
-                ).all()]
-            if not group_ids_for_program:
-                continue
-            for req in reqs:
-                for group_id in group_ids_for_program:
-                    deployed_count = db.scalar(
-                        select(func.count()).select_from(ScheduledClass)
-                        .where(
-                            ScheduledClass.group_id == group_id,
-                            ScheduledClass.course_id == req.course_id,
-                            ScheduledClass.study_program_id == program.id,
-                            ScheduledClass.deploy.is_(True),
-                        )
-                    )
-                    sessions_required = int(getattr(req, "sessions_required", 1))
-                    if deployed_count is None or deployed_count < sessions_required:
-                        course = db.get(Course, req.course_id)
-                        group = db.get(Group, group_id)
-                        raise HTTPException(
-                            status_code=400,
-                            detail=f"Study program {program.code} group {group.code if group else group_id} missing deployed class for required course {course.name if course else req.course_id}"
-                        )
 
     cycle = timetable.cycle if hasattr(timetable, 'cycle') else db.get(Cycle, timetable.cycle_id)
     import re
