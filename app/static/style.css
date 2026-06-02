@@ -535,10 +535,18 @@ body {
 .program-picker {
   display: flex;
   flex-wrap: nowrap;
+  align-items: center;
   gap: 0.5rem;
   margin: 0;
-  overflow-x: auto;
   padding-bottom: 0.25rem;
+  width: 100%;
+  overflow-x: auto;
+  min-width: 0;
+}
+
+.program-picker button {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .program-picker::-webkit-scrollbar {
@@ -551,6 +559,10 @@ body {
 }
 
 .program-picker .toggle-electives-btn {
+  margin-left: 0;
+}
+
+.program-picker .toggle-program-classes-btn {
   margin-left: auto;
 }
 
@@ -2217,7 +2229,7 @@ body[data-active-section] .dashboard-card {
 .modal-card {
   position: relative;
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto auto 1fr;
   width: min(980px, calc(100vw - 32px));
   min-width: 320px;
   max-width: 100%;
@@ -2230,6 +2242,10 @@ body[data-active-section] .dashboard-card {
 
 .modal-card > :not(.modal-header) {
   padding: 18px;
+  overflow: hidden;
+}
+
+.modal-card .full-span:last-child {
   overflow: auto;
 }
 

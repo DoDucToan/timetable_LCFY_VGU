@@ -405,6 +405,11 @@ const state = {
   groupScheduleShowElectives: true,
   timeslotScheduleSelectedProgramIds: [],
   timeslotScheduleShowElectives: true,
+  programScheduleProgramId: null,
+  programScheduleProgramCode: '',
+  programScheduleSelectedGroupIds: [],
+  programScheduleShowElectives: true,
+  programScheduleOnlyProgramClasses: false,
   editingEntity: { type: null, id: null },
   activeRequirementModalType: null,
   selectedRequirementKeys: new Set(),
@@ -560,6 +565,7 @@ function cacheEls() {
     'groupScheduleTableWrapper',
     'programScheduleModal',
     'programScheduleModalTitle',
+    'programScheduleGroupButtons',
     'programScheduleTableWrapper',
     'timeslotScheduleModal',
     'timeslotScheduleModalTitle',
@@ -1956,11 +1962,54 @@ function renderGroupScheduleProgramPicker(groupId) {
   els.groupScheduleProgramButtons.appendChild(wrapper);
 }
 
+function getProgramScheduleGroupIds(programId, programCode, options = {}) {
+  const normalizedProgramCode = String(programCode || '').trim().toUpperCase();
+  const onlyProgramClasses = Boolean(options.onlyProgramClasses);
+  const groups = new Map((state.data.groups || []).map(g => [String(g.id), g]));
+  const matchingGroupIds = new Set();
+
+  const cells = state.data.cells || {};
+  Object.entries(cells).forEach(([timeslotId, groupsById]) => {
+    if (!groupsById || typeof groupsById !== 'object') return;
+    Object.entries(groupsById).forEach(([groupId, items]) => {
+      if (!groups.has(groupId) || !Array.isArray(items)) return;
+      const group = groups.get(groupId);
+      const groupPrograms = Array.isArray(group.programs) ? group.programs : [];
+      const hasProgram = groupPrograms.some(program => Number(program.id) === Number(programId));
+      if (!hasProgram) return;
+
+      items.forEach(item => {
+        if (item.kind === 'required' || item.kind === 'elective') {
+          if (!onlyProgramClasses) {
+            matchingGroupIds.add(Number(groupId));
+          }
+          return;
+        }
+        if (Array.isArray(item.program_codes)) {
+          const matchesProgram = item.program_codes.some(code => String(code || '').trim().toUpperCase() === normalizedProgramCode);
+          if (matchesProgram) {
+            matchingGroupIds.add(Number(groupId));
+          }
+        }
+      });
+    });
+  });
+
+  return Array.from(matchingGroupIds).filter(id => !Number.isNaN(id));
+}
+
 function openProgramScheduleModal(item) {
-  if (!els.programScheduleModal || !els.programScheduleModalTitle || !els.programScheduleTableWrapper) return;
+  if (!els.programScheduleModal || !els.programScheduleModalTitle || !els.programScheduleGroupButtons || !els.programScheduleTableWrapper) return;
   const programName = `${item.code || ''}${item.name ? ` — ${item.name}` : ''}`.trim() || 'Study program';
+  state.programScheduleProgramId = Number(item.id);
+  state.programScheduleProgramCode = String(item.code || item.name || '').trim();
+  const relevantGroupIds = getProgramScheduleGroupIds(state.programScheduleProgramId, state.programScheduleProgramCode);
+  state.programScheduleSelectedGroupIds = relevantGroupIds;
+  state.programScheduleShowElectives = true;
+  state.programScheduleOnlyProgramClasses = false;
   els.programScheduleModalTitle.textContent = `Study program schedule: ${programName}`;
-  renderProgramScheduleTable(item.id, item.code || item.name);
+  renderProgramScheduleGroupPicker(state.programScheduleProgramId);
+  renderProgramScheduleTable(state.programScheduleProgramId, state.programScheduleProgramCode);
   openModal('programScheduleModal');
 }
 
@@ -2052,52 +2101,84 @@ function renderTimeslotScheduleProgramPicker(timeslotId) {
   els.timeslotScheduleProgramButtons.appendChild(wrapper);
 }
 
-function renderTimeslotScheduleTable(timeslotId) {
-  if (!els.timeslotScheduleTableWrapper) return;
-  els.timeslotScheduleTableWrapper.innerHTML = '';
-  const rows = buildTimeslotScheduleRows(timeslotId);
-  if (!rows.length) {
-    const msg = document.createElement('div');
-    msg.className = 'muted';
-    msg.textContent = 'No scheduled classes found for this timeslot.';
-    els.timeslotScheduleTableWrapper.appendChild(msg);
+function renderProgramScheduleGroupPicker(programId) {
+  if (!els.programScheduleGroupButtons) return;
+  els.programScheduleGroupButtons.innerHTML = '';
+
+  const relevantGroupIds = getProgramScheduleGroupIds(programId, state.programScheduleProgramCode, {
+    onlyProgramClasses: state.programScheduleOnlyProgramClasses,
+  });
+  const groupsWithProgram = (state.data.groups || [])
+    .filter(group => relevantGroupIds.includes(Number(group.id)));
+  if (!groupsWithProgram.length) {
     return;
   }
 
-  const table = document.createElement('table');
-  table.className = 'requirements-modal-table';
-  const thead = document.createElement('thead');
-  thead.innerHTML = `
-    <tr>
-      <th>Day</th>
-      <th>Timeslot</th>
-      <th>Group</th>
-      <th>Program</th>
-      <th>Teacher</th>
-      <th>Room</th>
-      <th>Course</th>
-    </tr>
-  `;
-  table.appendChild(thead);
-  const tbody = document.createElement('tbody');
-  rows.forEach(row => {
-    const tr = document.createElement('tr');
-    if (String(row.kind || '').trim().toLowerCase() === 'elective') {
-      tr.classList.add('elective-row');
-    }
-    tr.innerHTML = `
-      <td>${escapeHtml(row.weekday)}</td>
-      <td>${escapeHtml(row.timeslot)}</td>
-      <td>${escapeHtml(row.group_code)}</td>
-      <td>${escapeHtml(row.program_code)}</td>
-      <td>${escapeHtml(row.teacher_name)}</td>
-      <td>${escapeHtml(row.room_name)}</td>
-      <td>${escapeHtml(row.course_name)}</td>
-    `;
-    tbody.appendChild(tr);
+  const selectedGroupIds = new Set(state.programScheduleSelectedGroupIds || []);
+  const allSelected = selectedGroupIds.size === groupsWithProgram.length;
+  const picker = document.createElement('div');
+  picker.className = 'program-picker';
+
+  const allBtn = document.createElement('button');
+  allBtn.type = 'button';
+  allBtn.className = `ghost-btn small${allSelected ? ' active' : ''}`;
+  allBtn.textContent = 'All groups';
+  allBtn.addEventListener('click', () => {
+    state.programScheduleSelectedGroupIds = groupsWithProgram.map(group => Number(group.id));
+    renderProgramScheduleGroupPicker(programId);
+    renderProgramScheduleTable(programId, state.programScheduleProgramCode);
   });
-  table.appendChild(tbody);
-  els.timeslotScheduleTableWrapper.appendChild(table);
+  picker.appendChild(allBtn);
+
+  groupsWithProgram.forEach(group => {
+    const groupId = Number(group.id);
+    const isActive = !allSelected && selectedGroupIds.has(groupId);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `ghost-btn small${isActive ? ' active' : ''}`;
+    btn.textContent = String(group.code || group.name || 'Group');
+    btn.addEventListener('click', () => {
+      let nextSelected = new Set(state.programScheduleSelectedGroupIds || []);
+      if (allSelected) {
+        nextSelected = new Set([groupId]);
+      } else if (nextSelected.has(groupId)) {
+        nextSelected.delete(groupId);
+      } else {
+        nextSelected.add(groupId);
+      }
+      if (!nextSelected.size) {
+        nextSelected = new Set(groupsWithProgram.map(group => Number(group.id)));
+      }
+      state.programScheduleSelectedGroupIds = Array.from(nextSelected);
+      renderProgramScheduleGroupPicker(programId);
+      renderProgramScheduleTable(programId, state.programScheduleProgramCode);
+    });
+    picker.appendChild(btn);
+  });
+
+  const programOnlyBtn = document.createElement('button');
+  programOnlyBtn.type = 'button';
+  programOnlyBtn.className = `ghost-btn small toggle-program-classes-btn${state.programScheduleOnlyProgramClasses ? ' active' : ''}`;
+  programOnlyBtn.textContent = 'Only program classes';
+  programOnlyBtn.addEventListener('click', () => {
+    state.programScheduleOnlyProgramClasses = !state.programScheduleOnlyProgramClasses;
+    renderProgramScheduleGroupPicker(programId);
+    renderProgramScheduleTable(programId, state.programScheduleProgramCode);
+  });
+  picker.appendChild(programOnlyBtn);
+
+  const toggleElectivesBtn = document.createElement('button');
+  toggleElectivesBtn.type = 'button';
+  toggleElectivesBtn.className = `ghost-btn small toggle-electives-btn${state.programScheduleShowElectives ? ' active' : ''}`;
+  toggleElectivesBtn.textContent = state.programScheduleShowElectives ? 'Hide electives' : 'Show electives';
+  toggleElectivesBtn.addEventListener('click', () => {
+    state.programScheduleShowElectives = !state.programScheduleShowElectives;
+    renderProgramScheduleGroupPicker(programId);
+    renderProgramScheduleTable(programId, state.programScheduleProgramCode);
+  });
+  picker.appendChild(toggleElectivesBtn);
+
+  els.programScheduleGroupButtons.appendChild(picker);
 }
 
 function buildTimeslotScheduleRows(timeslotId) {
@@ -2211,6 +2292,9 @@ function renderProgramScheduleTable(programId, programCode) {
   const tbody = document.createElement('tbody');
   rows.forEach(row => {
     const tr = document.createElement('tr');
+    if (String(row.kind || '').trim().toLowerCase() === 'elective') {
+      tr.classList.add('elective-row');
+    }
     tr.innerHTML = `
       <td>${escapeHtml(row.weekday)}</td>
       <td>${escapeHtml(row.timeslot)}</td>
@@ -2231,6 +2315,12 @@ function buildProgramScheduleRows(programId, programCode) {
   const cells = state.data.cells || {};
   const grouped = new Map();
   const normalizedProgramCode = String(programCode || '').trim().toUpperCase();
+  const selectedGroupIds = Array.isArray(state.programScheduleSelectedGroupIds)
+    ? state.programScheduleSelectedGroupIds.map(Number).filter(pid => !Number.isNaN(pid))
+    : [];
+  const selectedGroupIdSet = new Set(selectedGroupIds);
+
+  const hasGroupSelection = selectedGroupIdSet.size > 0;
 
   Object.entries(cells).forEach(([timeslotId, groups]) => {
     const timeslot = timeslotMap.get(timeslotId);
@@ -2239,10 +2329,24 @@ function buildProgramScheduleRows(programId, programCode) {
       if (!Array.isArray(items)) return;
       items.forEach(item => {
         const isRequiredOrElective = item.kind === 'required' || item.kind === 'elective';
+        if (state.programScheduleOnlyProgramClasses && (item.kind === 'required' || item.kind === 'elective')) {
+          return;
+        }
+        if (item.kind === 'elective' && !state.programScheduleShowElectives) {
+          return;
+        }
+        const groupMatches = hasGroupSelection && selectedGroupIdSet.has(Number(groupId));
+        if (!groupMatches) return;
         const matchedProgram = Array.isArray(item.program_codes)
           ? item.program_codes.some(code => String(code || '').trim().toUpperCase() === normalizedProgramCode)
           : false;
-        if (!isRequiredOrElective && !matchedProgram) return;
+        if (item.kind === 'required') {
+          // include required classes for selected groups
+        } else if (item.kind === 'elective') {
+          // include elective classes for selected groups when enabled
+        } else if (!matchedProgram) {
+          return;
+        }
 
         const rowKey = [
           String(timeslot.weekday || ''),
@@ -2261,6 +2365,7 @@ function buildProgramScheduleRows(programId, programCode) {
           teacher_name: item.teacher_name || '',
           room_name: item.room_name || '',
           course_name: item.kind === 'elective' ? `(Elective) ${item.course_name || ''}` : item.course_name || '',
+          kind: item.kind || '',
         };
 
         const groupCode = groupMap.get(groupId)?.code || '';
@@ -2281,6 +2386,7 @@ function buildProgramScheduleRows(programId, programCode) {
     teacher_name: entry.teacher_name,
     room_name: entry.room_name,
     course_name: entry.course_name,
+    kind: entry.kind,
   }));
 
   rows.sort((a, b) => a.sort_order - b.sort_order || a.weekday.localeCompare(b.weekday) || a.timeslot.localeCompare(b.timeslot));
