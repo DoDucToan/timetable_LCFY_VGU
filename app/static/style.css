@@ -560,10 +560,12 @@ body {
 
 .program-picker .toggle-electives-btn {
   margin-left: 0;
+  text-align: left;
 }
 
 .program-picker .toggle-program-classes-btn {
   margin-left: auto;
+  text-align: left;
 }
 
 .program-picker .ghost-btn.active {

@@ -2591,6 +2591,55 @@ function buildRoomScheduleRows(roomId, roomName) {
   rows.sort((a, b) => a.sort_order - b.sort_order || a.weekday.localeCompare(b.weekday) || a.timeslot.localeCompare(b.timeslot));
   return rows;
 }
+
+function renderTimeslotScheduleTable(timeslotId) {
+  if (!els.timeslotScheduleTableWrapper) return;
+  els.timeslotScheduleTableWrapper.innerHTML = '';
+  const rows = buildTimeslotScheduleRows(timeslotId);
+  if (!rows.length) {
+    const msg = document.createElement('div');
+    msg.className = 'muted';
+    msg.textContent = 'No scheduled classes found for this timeslot.';
+    els.timeslotScheduleTableWrapper.appendChild(msg);
+    return;
+  }
+
+  const table = document.createElement('table');
+  table.className = 'requirements-modal-table';
+  const thead = document.createElement('thead');
+  thead.innerHTML = `
+    <tr>
+      <th>Day</th>
+      <th>Timeslot</th>
+      <th>Group</th>
+      <th>Program</th>
+      <th>Teacher</th>
+      <th>Room</th>
+      <th>Course</th>
+    </tr>
+  `;
+  table.appendChild(thead);
+  const tbody = document.createElement('tbody');
+  rows.forEach(row => {
+    const tr = document.createElement('tr');
+    if (String(row.kind || '').trim().toLowerCase() === 'elective') {
+      tr.classList.add('elective-row');
+    }
+    tr.innerHTML = `
+      <td>${escapeHtml(row.weekday)}</td>
+      <td>${escapeHtml(row.timeslot)}</td>
+      <td>${escapeHtml(row.group_code)}</td>
+      <td>${escapeHtml(row.program_code)}</td>
+      <td>${escapeHtml(row.teacher_name)}</td>
+      <td>${escapeHtml(row.room_name)}</td>
+      <td>${escapeHtml(row.course_name)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  els.timeslotScheduleTableWrapper.appendChild(table);
+}
+
 function renderTeacherScheduleTable(teacherId, teacherName) {
   if (!els.teacherScheduleTableWrapper) return;
   els.teacherScheduleTableWrapper.innerHTML = '';
