@@ -2,7 +2,7 @@ name: Keep Render App Alive
 
 on:
   schedule:
-    - cron: "7/5 * * * *"
+    - cron: "2,7,12,17,22,27,32,37,42,47,52,57 * * * *"
   workflow_dispatch:
 
 jobs:
@@ -12,12 +12,5 @@ jobs:
       - name: Ping Render app
         run: |
           echo "Pinging Render app..."
-          STATUS=$(curl -L -s -o /dev/null -w "%{http_code}" --max-time 180 https://timetable-builder-lcfy.onrender.com)
-          echo "HTTP status: $STATUS"
-
-          if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 400 ]; then
-            echo "Ping failed with status $STATUS"
-            exit 1
-          fi
-
+          curl -L -v --fail --max-time 180 https://timetable-builder-lcfy.onrender.com
           echo "Ping successful"
