@@ -2247,6 +2247,16 @@ body[data-active-section] .dashboard-card {
   overflow: hidden;
 }
 
+#classModal .modal-card {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+#classModal .form-grid {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px;
+}
+
 .modal-card .full-span:last-child {
   overflow: auto;
 }
