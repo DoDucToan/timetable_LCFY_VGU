@@ -1085,22 +1085,26 @@ def _write_timetable_sheet(
         day_to_slots.setdefault(ts["weekday"], []).append(ts)
 
     active_days: List[Tuple[int, str]] = []
-    for day_idx in range(1, 6):
-        weekday = weekday_names[day_idx]
-        day_slots = day_to_slots.get(weekday, [])
-        if not day_slots:
-            continue
-        has_class = any(
-            any(
-                cell_map.get(str(slot["id"]), {}).get(str(group["id"]), [])
-                for group in groups
+    if has_german_schedule:
+        for day_idx in range(1, 6):
+            weekday = weekday_names[day_idx]
+            day_slots = day_to_slots.get(weekday, [])
+            if not day_slots:
+                continue
+            has_class = any(
+                any(
+                    cell_map.get(str(slot["id"]), {}).get(str(group["id"]), [])
+                    for group in groups
+                )
+                for slot in day_slots
             )
-            for slot in day_slots
-        )
-        if has_class:
-            active_days.append((day_idx, weekday))
+            if has_class:
+                active_days.append((day_idx, weekday))
 
-    if not active_days:
+        if not active_days:
+            active_days = [(day_idx, weekday_names[day_idx]) for day_idx in range(1, 6) if day_to_slots.get(weekday_names[day_idx])]
+    else:
+        # For non-German exports, keep all configured days even if all slots are empty.
         active_days = [(day_idx, weekday_names[day_idx]) for day_idx in range(1, 6) if day_to_slots.get(weekday_names[day_idx])]
 
     first_active_day = True
