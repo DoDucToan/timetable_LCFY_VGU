@@ -1673,7 +1673,7 @@ def export_timetable_xlsx(
         wb.save(output_path)
         return output_path
 
-    ws.title = "Phase4 Timetable"
+    ws.title = "Timetable"
     _write_timetable_sheet(
         db,
         ws,
