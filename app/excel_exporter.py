@@ -1361,7 +1361,56 @@ def _write_timetable_sheet(
                     item.get("room_name", ""),
                 )
             )
+
             _assign_program_colors_for_slot(unique_overlays, program_color_map)
+
+            # A program class that belongs to ONLY ONE group can reuse the
+            # "required/all-student" row when that group has no required class.
+            #
+            # Program classes shared by multiple groups intentionally remain
+            # overlay rows, preserving the current merged multi-group layout.
+            promoted_program_by_group: Dict[int, Dict[str, Any]] = {}
+            remaining_overlays: List[Dict[str, Any]] = []
+
+            for overlay_item in unique_overlays:
+                if overlay_item.get("kind") != "program":
+                    remaining_overlays.append(overlay_item)
+                    continue
+
+                matching_group_indexes = [
+                    group_index
+                    for group_index, group_items in enumerate(overlay_rows_content)
+                    if any(
+                        _same_overlay_connectable(item, overlay_item)
+                        for item in group_items
+                    )
+                ]
+
+                # Keep multi-group program classes exactly as before.
+                if len(matching_group_indexes) != 1:
+                    remaining_overlays.append(overlay_item)
+                    continue
+
+                group_index = matching_group_indexes[0]
+                group = groups[group_index]
+                group_items = slot_items.get(str(group["id"]), [])
+
+                # Only reuse the required row if this group does NOT already
+                # have an all-student/required class in this timeslot.
+                if _required_item(group_items) is not None:
+                    remaining_overlays.append(overlay_item)
+                    continue
+
+                # One Excel cell can contain only one class block. If a group
+                # has several different program classes in the same timeslot,
+                # promote only the first one and keep the others as overlays.
+                if group["id"] in promoted_program_by_group:
+                    remaining_overlays.append(overlay_item)
+                    continue
+
+                promoted_program_by_group[group["id"]] = overlay_item
+
+            unique_overlays = remaining_overlays
             overlay_depth = len(unique_overlays)
             slot_start_row = row
             required_row = row
@@ -1383,7 +1432,10 @@ def _write_timetable_sheet(
                     break
                 group = groups[group_index]
                 items = slot_items.get(str(group["id"]), [])
-                req = _required_item(items)
+                req = (
+                    _required_item(items)
+                    or promoted_program_by_group.get(group["id"])
+                )
                 if not req:
                     col_idx += 1
                     continue
@@ -1392,7 +1444,10 @@ def _write_timetable_sheet(
                 while next_col <= total_cols:
                     next_group = groups[next_col - 3]
                     next_items = slot_items.get(str(next_group["id"]), [])
-                    next_req = _required_item(next_items)
+                    next_req = (
+                        _required_item(next_items)
+                        or promoted_program_by_group.get(next_group["id"])
+                    )
                     if not next_req or not _same_overlay(req, next_req):
                         break
                     end_col = next_col
@@ -1411,7 +1466,12 @@ def _write_timetable_sheet(
                 else:
                     req_cell = _cell(ws, required_row, col_idx)
                     req_cell.value = _format_item(req)
-                    req_cell.fill = PatternFill("solid", fgColor=FILL_MAP.get(req["color_key"], "D9D2E9"))
+                    req_fill = (
+                        _get_fill_color(req)
+                        if req.get("kind") == "program"
+                        else FILL_MAP.get(req["color_key"], "D9D2E9")
+                    )
+                    req_cell.fill = PatternFill("solid", fgColor=req_fill)
                     req_cell.border = border
                     req_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
                     req_cell.font = default_font(bold=True, size=15)
