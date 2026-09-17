@@ -1411,7 +1411,73 @@ def _write_timetable_sheet(
                 promoted_program_by_group[group["id"]] = overlay_item
 
             unique_overlays = remaining_overlays
-            overlay_depth = len(unique_overlays)
+
+            # Pack PROGRAM overlay classes into as few overlay rows as possible.
+            #
+            # Rules:
+            # - Never use the required/all-student row for this packing.
+            # - Existing single-group promotion to the required row stays unchanged.
+            # - Program classes may share an overlay row only when their rendered
+            #   horizontal spans do not overlap.
+            # - Multi-group program classes therefore move upward only into free
+            #   gray cells of PROGRAM overlay rows.
+            # - Non-program overlays keep dedicated rows.
+            packed_overlay_row_indices: List[int] = [-1] * len(unique_overlays)
+            program_overlay_spans: List[Tuple[int, int, int]] = []
+            dedicated_overlay_indices: List[int] = []
+
+            for overlay_index, overlay_item in enumerate(unique_overlays):
+                matching_group_indexes = [
+                    group_index
+                    for group_index, group_items in enumerate(overlay_rows_content)
+                    if any(
+                        _same_overlay_connectable(item, overlay_item)
+                        for item in group_items
+                    )
+                ]
+
+                if (
+                    overlay_item.get("kind") == "program"
+                    and matching_group_indexes
+                ):
+                    program_overlay_spans.append(
+                        (
+                            overlay_index,
+                            min(matching_group_indexes),
+                            max(matching_group_indexes),
+                        )
+                    )
+                else:
+                    dedicated_overlay_indices.append(overlay_index)
+
+            # Compact program rows using non-overlapping horizontal intervals.
+            program_row_last_end: List[int] = []
+
+            for overlay_index, span_start, span_end in sorted(
+                program_overlay_spans,
+                key=lambda value: (value[1], value[2], value[0]),
+            ):
+                packed_row_index = None
+
+                for candidate_row_index, last_end in enumerate(program_row_last_end):
+                    if last_end < span_start:
+                        packed_row_index = candidate_row_index
+                        program_row_last_end[candidate_row_index] = span_end
+                        break
+
+                if packed_row_index is None:
+                    packed_row_index = len(program_row_last_end)
+                    program_row_last_end.append(span_end)
+
+                packed_overlay_row_indices[overlay_index] = packed_row_index
+
+            # Preserve dedicated rows for non-program overlays after packed program rows.
+            next_dedicated_row_index = len(program_row_last_end)
+            for overlay_index in dedicated_overlay_indices:
+                packed_overlay_row_indices[overlay_index] = next_dedicated_row_index
+                next_dedicated_row_index += 1
+
+            overlay_depth = next_dedicated_row_index
             slot_start_row = row
             required_row = row
             overlay_rows = [required_row + i + 1 for i in range(overlay_depth)]
@@ -1502,7 +1568,11 @@ def _write_timetable_sheet(
 
             merged_overlay_columns: Dict[int, Set[int]] = {}
             for overlay_idx, overlay_item in enumerate(unique_overlays):
-                overlay_row = required_row + 1 + overlay_idx
+                overlay_row = (
+                    required_row
+                    + 1
+                    + packed_overlay_row_indices[overlay_idx]
+                )
                 if overlay_item.get("kind") == "program":
                     row_has_overlay = [any(_same_overlay_connectable(item, overlay_item) for item in group_items) for group_items in overlay_rows_content]
                 else:
@@ -1558,7 +1628,11 @@ def _write_timetable_sheet(
                         col_idx = end_col + 1
 
             for overlay_idx, overlay_item in enumerate(unique_overlays):
-                overlay_row = required_row + 1 + overlay_idx
+                overlay_row = (
+                    required_row
+                    + 1
+                    + packed_overlay_row_indices[overlay_idx]
+                )
                 for col_idx2, group in enumerate(groups, start=3):
                     if col_idx2 in merged_overlay_columns.get(overlay_row, set()):
                         continue
