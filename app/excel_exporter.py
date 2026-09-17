@@ -194,13 +194,52 @@ def _column_range_width_chars(ws: Worksheet, start_col: int, end_col: int) -> in
 
 
 def _row_height_for_text(text: str, width_cols: int = 1, min_height: int = 24, font_size: int = 11) -> int:
-    effective_width = width_cols
-    if effective_width < 10:
-        effective_width = max(8, int(effective_width * 24))
-    estimated_chars = max(8, int(effective_width * 0.88))
-    line_count = _estimate_line_count(text, estimated_chars)
-    line_height = max(font_size * 1.35, float(_LINE_HEIGHT_PTS))
-    return max(min_height, int(line_count * line_height + 10))
+    effective_width = max(8, int(width_cols))
+    # Excel column widths are roughly character-based at the default font size.
+    # Scale the usable width down for larger timetable fonts so wrapped text is
+    # never clipped vertically.
+    font_scale = min(1.0, 11.0 / max(float(font_size), 1.0))
+    estimated_chars = max(8, int(effective_width * 0.94 * font_scale))
+    line_count = _estimate_line_count(text, max(11, estimated_chars))
+    line_height = max(font_size * 1.45, float(_LINE_HEIGHT_PTS))
+    return max(min_height, int(line_count * line_height + 12))
+
+
+def _fit_row_height_to_rendered_cells(
+    ws: Worksheet,
+    row_idx: int,
+    start_col: int,
+    end_col: int,
+    min_height: int,
+) -> None:
+    """Fit one timetable row to the tallest rendered cell/merged cell in it."""
+    merged_end_by_anchor: Dict[int, int] = {}
+    for merged_range in ws.merged_cells.ranges:
+        if merged_range.min_row == row_idx and merged_range.max_row == row_idx:
+            merged_end_by_anchor[merged_range.min_col] = merged_range.max_col
+
+    needed_height = float(min_height)
+    for col_idx in range(start_col, end_col + 1):
+        cell = ws.cell(row=row_idx, column=col_idx)
+        if cell.value in (None, ""):
+            continue
+
+        merged_end_col = merged_end_by_anchor.get(col_idx, col_idx)
+        width_chars = _column_range_width_chars(ws, col_idx, merged_end_col)
+        font_size = int(float(cell.font.sz or 11))
+        needed_height = max(
+            needed_height,
+            float(
+                _row_height_for_text(
+                    str(cell.value),
+                    width_cols=width_chars,
+                    min_height=min_height,
+                    font_size=font_size,
+                )
+            ),
+        )
+
+    ws.row_dimensions[row_idx].height = needed_height
 
 
 def _normalize_program_codes(program_codes: List[str]) -> List[str]:
@@ -410,6 +449,7 @@ def _write_overlay_merge(
     item: Dict[str, Any],
     border: Border,
 ) -> None:
+    fill = PatternFill("solid", fgColor=_get_fill_color(item))
     ws.merge_cells(
         start_row=row_idx,
         start_column=start_col,
@@ -417,11 +457,13 @@ def _write_overlay_merge(
         end_column=end_col,
     )
     cell = _cell(ws, row_idx, start_col, _format_item(item))
-    cell.fill = PatternFill("solid", fgColor=_get_fill_color(item))
+    cell.fill = fill
     cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
     cell.font = default_font(bold=True, size=15)
     for c in range(start_col, end_col + 1):
-        ws.cell(row=row_idx, column=c).border = border
+        merged_cell = ws.cell(row=row_idx, column=c)
+        merged_cell.fill = fill
+        merged_cell.border = border
 
 
 def _write_group_timetable_sheet(
@@ -1604,7 +1646,7 @@ def _write_timetable_sheet(
                 row_dimension: RowDimension = ws.row_dimensions[overlay_row]
                 current_height = float(getattr(row_dimension, "height", 0) or 0)
                 setattr(row_dimension, "height", float(max(current_height, needed_height)))
-                merged_overlay_columns[overlay_row] = set()
+                merged_overlay_columns.setdefault(overlay_row, set())
                 if overlay_item.get("kind") == "program" and len(present_cols) > 1:
                     start_col = min(present_cols)
                     end_col = max(present_cols)
@@ -1641,6 +1683,25 @@ def _write_timetable_sheet(
                         cell = _cell(ws, overlay_row, col_idx2)
                         cell.fill = blank_fill
                         cell.border = border
+
+            # Recalculate heights from the cells that actually ended up in each
+            # physical row after packing/merging. This keeps compact rows while
+            # still giving wrapped text enough vertical space.
+            _fit_row_height_to_rendered_cells(
+                ws,
+                required_row,
+                3,
+                total_cols,
+                REQUIRED_ROW_HEIGHT,
+            )
+            for overlay_row in overlay_rows:
+                _fit_row_height_to_rendered_cells(
+                    ws,
+                    overlay_row,
+                    3,
+                    total_cols,
+                    _OVERLAY_MIN_HEIGHT,
+                )
 
             for rr in range(slot_start_row, slot_end_row + 1):
                 ws.cell(row=rr, column=2).border = border
