@@ -3965,13 +3965,32 @@ async function openClassModal(classId = null, mergedClassIds = null) {
         }];
       }
       state.editingClassId = classId;
+      state.editingClassCourseId = Number(editingClass.course_id) || null;
+      state.editingClassProgramIds = (() => {
+        const ids = new Set();
+        const addProgramId = (value) => {
+          const id = Number(value);
+          if (Number.isFinite(id) && id > 0) ids.add(id);
+        };
+
+        addProgramId(editingClass.study_program_id);
+        addProgramId(editingClass.program_id);
+        (Array.isArray(editingClass.study_program_ids) ? editingClass.study_program_ids : [])
+          .forEach(addProgramId);
+        (Array.isArray(editingClass.study_programs) ? editingClass.study_programs : [])
+          .forEach(item => addProgramId(item?.id ?? item?.study_program_id ?? item));
+
+        return [...ids];
+      })();
       state.editingClassCourseId = editingClass.course_id || null;
     } else {
       state.editingClassId = null;
+      state.editingClassProgramIds = null;
       state.editingClassCourseId = null;
     }
   } else {
     state.editingClassId = null;
+    state.editingClassProgramIds = null;
       state.editingClassCourseId = null;
   }
   if (!selected.length) return;
@@ -4073,6 +4092,52 @@ function getDisabledGroupIdsForSelectedPrograms(selectedProgramIds, timeslotId =
   return disabled;
 }
 
+function restoreEditingProgramSelection() {
+  if (
+    !state.editingClassId ||
+    !Array.isArray(state.editingClassProgramIds) ||
+    !state.editingClassProgramIds.length
+  ) {
+    return;
+  }
+
+  const container =
+    els.programSelectionBox ||
+    document.getElementById('programSelectionBox');
+
+  if (!container) return;
+
+  const wanted = new Set(
+    state.editingClassProgramIds
+      .map(Number)
+      .filter(id => Number.isFinite(id) && id > 0)
+  );
+
+  container.querySelectorAll('input[type="checkbox"]').forEach(input => {
+    const rawCandidates = [
+      input.value,
+      input.dataset?.programId,
+      input.dataset?.studyProgramId,
+      input.getAttribute('data-program-id'),
+      input.getAttribute('data-study-program-id'),
+    ];
+
+    let programId = null;
+    for (const raw of rawCandidates) {
+      const id = Number(raw);
+      if (Number.isFinite(id) && id > 0) {
+        programId = id;
+        break;
+      }
+    }
+
+    if (programId != null) {
+      input.checked = wanted.has(programId);
+    }
+  });
+}
+
+
 function refreshClassProgramOptions() {
   if (!els.classProgramOptions) return;
   const selectedGroupIds = getClassGroupIds().length ? getClassGroupIds() : state.selected.map(item => item.groupId);
@@ -4090,10 +4155,15 @@ function refreshClassProgramOptions() {
       syncClassFormVisibility();
     });
   });
+  // Editing must show the Study program already stored on the class.
+  restoreEditingProgramSelection();
 }
 
 function syncClassFormVisibility(currentCourseId = null) {
   if (!els.classForm) return;
+  // Program checkboxes may have just been re-rendered; restore the edit selection
+  // before course filtering reads the checked Study programs.
+  restoreEditingProgramSelection();
   if (currentCourseId == null && state.editingClassId) {
     currentCourseId =
       state.editingClassCourseId ||
@@ -4490,6 +4560,7 @@ async function submitClassForm(event) {
   closeModal('classModal');
   clearSelection(false);
   state.editingClassId = null;
+  state.editingClassProgramIds = null;
   state.editingClassCourseId = null;
   renderContextSelectors();
   renderEntityLists();
