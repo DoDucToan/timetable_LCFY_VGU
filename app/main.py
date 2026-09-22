@@ -2395,20 +2395,22 @@ def update_class(class_id: int, payload: ClassCreateIn, db: Session = Depends(ge
         raise HTTPException(status_code=400, detail="Editing a program class must select exactly one study program.")
 
     candidate_rows = [row]
-    if getattr(row, 'study_program_id', None) is not None:
+    # Prefer an explicit shared bundle. Otherwise only touch rows for the
+    # same study program; the old query could include unrelated program
+    # classes that happened to use the same course and timeslot.
+    if getattr(row, 'shared_key', None) is not None:
+        candidate_rows = db.query(ScheduledClass).filter(
+            ScheduledClass.shared_key == row.shared_key,
+            ScheduledClass.deploy.is_(True),
+        ).all()
+    elif getattr(row, 'study_program_id', None) is not None:
         candidate_rows = db.query(ScheduledClass).join(Group).filter(
             ScheduledClass.timeslot_id == row.timeslot_id,
             ScheduledClass.course_id == row.course_id,
             Group.timetable_id == row.group.timetable_id,
             ScheduledClass.deploy.is_(True),
-            ScheduledClass.study_program_id.isnot(None),
+            ScheduledClass.study_program_id == row.study_program_id,
         ).all()
-    elif getattr(row, 'shared_key', None) is not None:
-        candidate_rows = db.query(ScheduledClass).filter(
-            ScheduledClass.shared_key == row.shared_key,
-            ScheduledClass.deploy.is_(True),
-        ).all()
-
     target_group_ids = [cast(int, row.group_id)]
     rows = [row]
     is_multi_class_edit = (
@@ -2418,27 +2420,22 @@ def update_class(class_id: int, payload: ClassCreateIn, db: Session = Depends(ge
     )
     old_teacher_id = row.teacher_id
     old_room_id = row.room_id
-    changing_teacher = payload.teacher_id is not None and payload.teacher_id != old_teacher_id
-    changing_room = payload.room_id is not None and payload.room_id != old_room_id
+    changing_teacher = payload.teacher_id != old_teacher_id
+    changing_room = payload.room_id != old_room_id
 
     if mode == MODE_REQUIRED and len(target_group_ids) > 1:
         raise HTTPException(status_code=400, detail="Require-all-students classes must be edited one group at a time.")
 
-    if is_multi_class_edit and changing_teacher and changing_room:
-        raise HTTPException(
-            status_code=400,
-            detail="For multi-group or multi-program classes, change only teacher or room in one edit command, not both."
-        )
 
     custom_bulk_update = False
     if is_multi_class_edit and len(candidate_rows) > 1 and (changing_teacher or changing_room):
-        if changing_teacher:
+        if changing_teacher and not changing_room:
             if any(r.room_id != old_room_id for r in candidate_rows):
                 raise HTTPException(
                     status_code=400,
                     detail="Cannot bulk update teacher because other same-course classes use a different room in this timeslot. Change only the teacher or update individually."
                 )
-        if changing_room:
+        if changing_room and not changing_teacher:
             if any(r.teacher_id != old_teacher_id for r in candidate_rows):
                 raise HTTPException(
                     status_code=400,
@@ -2456,7 +2453,7 @@ def update_class(class_id: int, payload: ClassCreateIn, db: Session = Depends(ge
     try:
         if custom_bulk_update:
             errors: List[str] = []
-            if changing_teacher:
+            if changing_teacher and payload.teacher_id is not None:
                 existing_conflict = db.scalar(
                     select(func.count())
                     .where(
@@ -2468,7 +2465,7 @@ def update_class(class_id: int, payload: ClassCreateIn, db: Session = Depends(ge
                 )
                 if existing_conflict:
                     errors.append('Teacher conflict prevents bulk teacher update for this timeslot.')
-            if changing_room:
+            if changing_room and payload.room_id is not None:
                 existing_conflict = db.scalar(
                     select(func.count())
                     .where(
@@ -2765,21 +2762,6 @@ def export_file(
     if not existing_class_count:
         raise HTTPException(status_code=400, detail="No deployed classes found for selected timetable.")
 
-    missing_assignment_query = select(func.count()).select_from(ScheduledClass).join(Group).where(
-        ScheduledClass.deploy.is_(True),
-        Group.timetable_id == timetable.id,
-        (ScheduledClass.teacher_id.is_(None) | ScheduledClass.room_id.is_(None)),
-    )
-    if selected_group_ids is not None:
-        missing_assignment_query = missing_assignment_query.where(ScheduledClass.group_id.in_(selected_group_ids))
-    if selected_teacher_ids is not None:
-        missing_assignment_query = missing_assignment_query.where(ScheduledClass.teacher_id.in_(selected_teacher_ids))
-    if selected_program_export_ids is not None:
-        missing_assignment_query = missing_assignment_query.where(ScheduledClass.study_program_id.in_(selected_program_export_ids))
-    if selected_course_ids is not None:
-        missing_assignment_query = missing_assignment_query.where(ScheduledClass.course_id.in_(selected_course_ids))
-    if db.scalar(missing_assignment_query):
-        raise HTTPException(status_code=400, detail="Cannot export: some deployed classes are missing teacher or room assignment.")
 
     for group in groups:
         requirements = db.scalars(

@@ -362,17 +362,112 @@ function checkExportAllowed() {
   els.exportBtn.title = unmet.length ? `Cannot export: ${unmet.length} unmet requirement${unmet.length === 1 ? '' : 's'}.` : 'Export Excel';
 }
 
+function getMissingClassAssignments() {
+  const cells = state.data?.cells || {};
+  const timeslots = state.data?.timeslots || [];
+  const groups = state.data?.groups || [];
+  const timeslotMap = new Map(timeslots.map(ts => [String(ts.id), ts]));
+  const groupMap = new Map(groups.map(group => [String(group.id), group]));
+  const warnings = [];
+
+  Object.entries(cells).forEach(([timeslotId, cellGroups]) => {
+    const timeslot = timeslotMap.get(String(timeslotId)) || {};
+
+    const rawDate =
+      timeslot.date ??
+      timeslot.session_date ??
+      timeslot.calendar_date ??
+      timeslot.specific_date ??
+      null;
+
+    const weekday = timeslot.weekday ?? timeslot.day ?? "";
+    const dateLabel = rawDate
+      ? `${rawDate}${weekday ? ` (${weekday})` : ""}`
+      : (weekday || `Timeslot ${timeslotId}`);
+
+    const timeLabel =
+      timeslot.label ??
+      timeslot.time_label ??
+      [timeslot.start, timeslot.end].filter(Boolean).join(" - ") ??
+      "";
+
+    Object.entries(cellGroups || {}).forEach(([groupId, items]) => {
+      const group = groupMap.get(String(groupId));
+      const groupLabel = group
+        ? `${group.code || group.id}${group.name && group.name !== group.code ? ` — ${group.name}` : ""}`
+        : `Group ${groupId}`;
+
+      (Array.isArray(items) ? items : []).forEach(item => {
+        const hasTeacher =
+          item.teacher_id != null ||
+          item.teacher != null ||
+          Boolean(item.teacher_name);
+
+        const hasRoom =
+          item.room_id != null ||
+          item.room != null ||
+          Boolean(item.room_name);
+
+        const missing = [];
+        if (!hasTeacher) missing.push("teacher");
+        if (!hasRoom) missing.push("room");
+        if (!missing.length) return;
+
+        const courseLabel = item.course_code
+          ? `${item.course_code}${item.course_name && item.course_name !== item.course_code ? ` — ${item.course_name}` : ""}`
+          : (item.course_name || `Class ${item.id || ""}`.trim());
+
+        warnings.push(
+          `${dateLabel}${timeLabel ? ` — ${timeLabel}` : ""} | ${groupLabel} | ${courseLabel}: missing ${missing.join(" and ")}`
+        );
+      });
+    });
+  });
+
+  return warnings;
+}
+
 function checkRequirements() {
   const unmet = getUnmetRequirements();
+  const missingAssignments = getMissingClassAssignments();
+
   if (!els.requirementCheckResult) {
-    alert(unmet.length ? `Unmet requirements:\n${unmet.join('\n')}` : 'All requirements are met.');
+    const messages = [];
+    if (unmet.length) {
+      messages.push(`Unmet requirements:\n${unmet.join("\n")}`);
+    }
+    if (missingAssignments.length) {
+      messages.push(
+        `Classes missing teacher/room (date/day and timeslot):\n${missingAssignments.join("\n")}`
+      );
+    }
+    alert(
+      messages.length
+        ? messages.join("\n\n")
+        : "All requirements are met and all classes have teacher/room assignments."
+    );
     return;
   }
-  if (!unmet.length) {
-    els.requirementCheckResult.innerHTML = '<strong>All requirements are met.</strong>';
+
+  if (!unmet.length && !missingAssignments.length) {
+    els.requirementCheckResult.innerHTML =
+      "<strong>All requirements are met and all classes have teacher/room assignments.</strong>";
     return;
   }
-  els.requirementCheckResult.innerHTML = `<strong>Unmet requirements:</strong><pre>${escapeHtml(unmet.join('\n'))}</pre>`;
+
+  const sections = [];
+  if (unmet.length) {
+    sections.push(
+      `<strong>Unmet requirements:</strong><pre>${escapeHtml(unmet.join("\n"))}</pre>`
+    );
+  }
+  if (missingAssignments.length) {
+    sections.push(
+      `<strong>Classes missing teacher/room (date/day and timeslot):</strong><pre>${escapeHtml(missingAssignments.join("\n"))}</pre>`
+    );
+  }
+
+  els.requirementCheckResult.innerHTML = sections.join("<br>");
 }
 
 function isTimetableExportUrl(url) {
@@ -3870,11 +3965,14 @@ async function openClassModal(classId = null, mergedClassIds = null) {
         }];
       }
       state.editingClassId = classId;
+      state.editingClassCourseId = editingClass.course_id || null;
     } else {
       state.editingClassId = null;
+      state.editingClassCourseId = null;
     }
   } else {
     state.editingClassId = null;
+      state.editingClassCourseId = null;
   }
   if (!selected.length) return;
   els.classTargetInfo.innerHTML = `<strong>${escapeHtml(selected[0].slotLabel)}</strong><br>${escapeHtml(selected.map(item => item.groupCode).join(', '))}`;
@@ -3996,6 +4094,12 @@ function refreshClassProgramOptions() {
 
 function syncClassFormVisibility(currentCourseId = null) {
   if (!els.classForm) return;
+  if (currentCourseId == null && state.editingClassId) {
+    currentCourseId =
+      state.editingClassCourseId ||
+      Number(els.courseSelect?.value) ||
+      null;
+  }
   const mode = els.classForm.querySelector('input[name="mode"]:checked')?.value;
   if (!mode) return;
   const effectiveMode = mode;
@@ -4125,6 +4229,12 @@ function syncClassFormVisibility(currentCourseId = null) {
     .sort((a, b) => String(a.code || a.name || '').localeCompare(String(b.code || b.name || '')))
     .map(c => ({ value: c.id, label: c.code ? `${c.code} — ${c.name}` : c.name }));
   fillSelect(els.courseSelect, courseOptions, true);
+  if (
+    currentCourseId != null &&
+    courseOptions.some(option => Number(option.value) === Number(currentCourseId))
+  ) {
+    els.courseSelect.value = String(currentCourseId);
+  }
 
   const showProgramSelection = effectiveMode !== 'required_all';
   els.programSelectionBox.classList.toggle('hidden', !showProgramSelection);
@@ -4380,6 +4490,7 @@ async function submitClassForm(event) {
   closeModal('classModal');
   clearSelection(false);
   state.editingClassId = null;
+  state.editingClassCourseId = null;
   renderContextSelectors();
   renderEntityLists();
   renderBoard();
