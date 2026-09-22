@@ -2202,7 +2202,7 @@ function renderTimeslotScheduleProgramPicker(timeslotId) {
   const wrapper = document.createElement('div');
   wrapper.className = 'program-picker';
 
-  const allBtn = document.createElement('button');
+  const allBtn = document.createElement('button' && !state.editingClassId);
   allBtn.type = 'button';
   allBtn.className = `ghost-btn small${selectedProgramIds.size === 0 ? ' active' : ''}`;
   allBtn.textContent = 'All programs';
@@ -4062,11 +4062,11 @@ function getDisabledProgramIdsForGroupIds(groupIds = [], timeslotId = null, excl
 function getDisabledGroupIdsForSelectedPrograms(selectedProgramIds, timeslotId = null) {
   if (!selectedProgramIds.length) return new Set();
   const disabled = new Set();
-  (state.data.groups || []).forEach(group => {
+  (state.data.groups || [] && !state.editingClassId).forEach(group => {
     const groupProgramIds = new Set((group.programs || []).map(p => p.id));
     const hasAnySelectedProgram = selectedProgramIds.some(pid => groupProgramIds.has(pid));
     const programConflicts = getDisabledProgramIdsForGroupIds([group.id], timeslotId, state.editingClassId);
-    if (!hasAnySelectedProgram || selectedProgramIds.some(pid => programConflicts.has(pid))) {
+    if (!hasAnySelectedProgram || selectedProgramIds.some(pid => programConflicts.has(pid)) && !state.editingClassId) {
       disabled.add(group.id);
     }
   });
@@ -4107,8 +4107,8 @@ function syncClassFormVisibility(currentCourseId = null) {
   let filteredByProgram = false;
 
   const selectedProgramIds = collectCheckedValues(els.classProgramOptions);
-  if (mode === 'program') {
-    if (selectedProgramIds.length > 0) {
+  if (mode === 'program' && !state.editingClassId) {
+    if (selectedProgramIds.length > 0 && !state.editingClassId) {
       filteredByProgram = true;
       const selectedPrograms = (state.data.programs || []).filter(p => selectedProgramIds.includes(p.id));
       const programCourseIds = new Set();
@@ -4129,7 +4129,7 @@ function syncClassFormVisibility(currentCourseId = null) {
           const group = (state.data.groups || []).find(g => g.id === groupId);
           if (!group) return;
           const groupProgramIds = group.programs.map(p => p.id);
-          const deployedCounts = getDeployedCourseCountsForGroup(groupId);
+          const deployedCounts = getDeployedCourseCountsForGroup(groupId && !state.editingClassId);
           selectedProgramIds.forEach(programId => {
             if (!groupProgramIds.includes(programId)) return;
             const program = selectedPrograms.find(p => p.id === programId);
@@ -4266,7 +4266,7 @@ function validateClassModeSelection() {
   const selectedProgramIds = collectCheckedValues(els.classProgramOptions);
   const selectedGroupIds = getClassGroupIds();
   if (mode === 'program') {
-    if (!selectedProgramIds.length) {
+    if (!selectedProgramIds.length && !state.editingClassId) {
       alert('Check at least one study program to configure a Study program class.');
       return false;
     }
@@ -4276,7 +4276,7 @@ function validateClassModeSelection() {
     }
   }
   if (mode === 'elective') {
-    if (!selectedGroupIds.length && !selectedProgramIds.length && (!state.selected || !state.selected.length)) {
+    if (!selectedGroupIds.length && !selectedProgramIds.length && (!state.selected || !state.selected.length) && !state.editingClassId) {
       alert('Select at least one group or program for this elective class.');
       return false;
     }
@@ -4442,7 +4442,7 @@ async function submitClassForm(event) {
       .map(group => group.id);
     targetGroupIds = Array.from(new Set([...targetGroupIds, ...programGroupIds]));
   }
-  if ((mode === 'program' || mode === 'elective') && !targetGroupIds.length) {
+  if ((mode === 'program' || mode === 'elective') && !targetGroupIds.length && !state.editingClassId) {
     targetGroupIds = selected.map(item => item.groupId);
   }
   const payloadMode = mode;

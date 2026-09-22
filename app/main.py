@@ -2391,7 +2391,18 @@ def update_class(class_id: int, payload: ClassCreateIn, db: Session = Depends(ge
         raise HTTPException(status_code=400, detail="Selected course is not a study-program course.")
     if mode == MODE_ELECTIVE and not bool(course.elective):
         raise HTTPException(status_code=400, detail="Selected course is not an elective.")
-    if mode == MODE_PROGRAM and len(payload.study_program_ids) != 1:
+    # Existing Study program classes are edited as linked/bulk assignments.
+    # If the edit form does not re-select the program, preserve the program
+    # already stored on the class row instead of rejecting the edit.
+    effective_study_program_ids = list(payload.study_program_ids or [])
+    if (
+        mode == MODE_PROGRAM
+        and not effective_study_program_ids
+        and getattr(row, "study_program_id", None) is not None
+    ):
+        effective_study_program_ids = [cast(int, row.study_program_id)]
+
+    if mode == MODE_PROGRAM and len(effective_study_program_ids) != 1:
         raise HTTPException(status_code=400, detail="Editing a program class must select exactly one study program.")
 
     candidate_rows = [row]
@@ -2486,7 +2497,7 @@ def update_class(class_id: int, payload: ClassCreateIn, db: Session = Depends(ge
                 teacher_id=payload.teacher_id,
                 room_id=payload.room_id,
                 mode=mode,
-                study_program_ids=payload.study_program_ids,
+                study_program_ids=effective_study_program_ids,
                 expected_size=payload.expected_size,
                 self_study=getattr(payload, 'self_study', False),
                 allow_teacher_conflict=getattr(payload, 'allow_teacher_conflict', False),
@@ -2510,7 +2521,7 @@ def update_class(class_id: int, payload: ClassCreateIn, db: Session = Depends(ge
             r.course_id = payload.course_id  # type: ignore
             r.teacher_id = payload.teacher_id  # type: ignore
             r.room_id = payload.room_id  # type: ignore
-            r.study_program_id = payload.study_program_ids[0] if payload.study_program_ids else None  # type: ignore
+            r.study_program_id = effective_study_program_ids[0] if effective_study_program_ids else None  # type: ignore
         r.expected_size = payload.expected_size  # type: ignore
         r.notes = payload.notes  # type: ignore
     db.commit()
