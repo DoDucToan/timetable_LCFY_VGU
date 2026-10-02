@@ -2391,6 +2391,97 @@ def update_class(class_id: int, payload: ClassCreateIn, db: Session = Depends(ge
         raise HTTPException(status_code=400, detail="Selected course is not a study-program course.")
     if mode == MODE_ELECTIVE and not bool(course.elective):
         raise HTTPException(status_code=400, detail="Selected course is not an elective.")
+
+    # PROGRAM_BUNDLE_EDIT_V2
+    if mode == MODE_PROGRAM and payload.class_ids:
+        bundle_ids = list(dict.fromkeys(int(cid) for cid in payload.class_ids if int(cid) > 0))
+        if class_id not in bundle_ids:
+            bundle_ids.insert(0, class_id)
+
+        bundle_rows = db.query(ScheduledClass).filter(
+            ScheduledClass.id.in_(bundle_ids),
+            ScheduledClass.deploy.is_(True),
+        ).all()
+
+        found_ids = {int(cast(int, item.id)) for item in bundle_rows}
+        missing_ids = [cid for cid in bundle_ids if cid not in found_ids]
+        if missing_ids:
+            raise HTTPException(status_code=404, detail=f"Class rows not found in merged bundle: {missing_ids}")
+
+        if not payload.target_group_ids:
+            raise HTTPException(status_code=400, detail="Select at least one group for a Study program class.")
+        if not payload.study_program_ids:
+            raise HTTPException(status_code=400, detail="Select at least one study program for a Study program class.")
+
+        timetable_id = int(cast(int, row.group.timetable_id))
+
+        target_groups = db.query(Group).filter(Group.id.in_(payload.target_group_ids)).all()
+        found_group_ids = {int(cast(int, g.id)) for g in target_groups}
+        missing_group_ids = [gid for gid in payload.target_group_ids if gid not in found_group_ids]
+        if missing_group_ids:
+            raise HTTPException(status_code=404, detail=f"Groups not found: {missing_group_ids}")
+
+        if any(int(cast(int, g.timetable_id)) != timetable_id for g in target_groups):
+            raise HTTPException(status_code=400, detail="All selected groups must belong to the same timetable.")
+
+        existing_program_ids = {
+            int(pid)
+            for pid in db.scalars(
+                select(StudyProgram.id).where(StudyProgram.id.in_(payload.study_program_ids))
+            ).all()
+        }
+        invalid_program_ids = [pid for pid in payload.study_program_ids if pid not in existing_program_ids]
+        if invalid_program_ids:
+            raise HTTPException(status_code=400, detail=f"Study programs not found: {invalid_program_ids}")
+
+        if payload.teacher_id is not None and not db.get(Teacher, payload.teacher_id):
+            raise HTTPException(status_code=404, detail="Teacher not found.")
+        if payload.room_id is not None and not db.get(Room, payload.room_id):
+            raise HTTPException(status_code=404, detail="Room not found.")
+
+        for item in bundle_rows:
+            item.deploy = False  # type: ignore
+        db.flush()
+
+        try:
+            created, errors = create_classes(
+                db,
+                target_group_ids=payload.target_group_ids,
+                timeslot_id=payload.timeslot_id,
+                course=course,
+                teacher_id=payload.teacher_id,
+                room_id=payload.room_id,
+                mode=mode,
+                study_program_ids=payload.study_program_ids,
+                expected_size=payload.expected_size,
+                self_study=getattr(payload, "self_study", False),
+                notes=payload.notes,
+                source="ui",
+                allow_teacher_conflict=getattr(payload, "allow_teacher_conflict", False),
+            )
+            if errors:
+                raise ValueError("; ".join(errors))
+            if not created:
+                raise ValueError(
+                    "No class rows were created. Check that the selected study programs belong to the selected groups."
+                )
+
+            for item in bundle_rows:
+                db.delete(item)
+
+            db.commit()
+        except Exception as exc:
+            db.rollback()
+            if isinstance(exc, HTTPException):
+                raise
+            raise HTTPException(status_code=400, detail=str(exc))
+
+        return {
+            "ok": True,
+            "created_count": len(created),
+            "bootstrap": bootstrap_payload(db, timetable_id),
+        }
+
     # Existing Study program classes are edited as linked/bulk assignments.
     # If the edit form does not re-select the program, preserve the program
     # already stored on the class row instead of rejecting the edit.

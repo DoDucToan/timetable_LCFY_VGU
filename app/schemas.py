@@ -76,6 +76,7 @@ class GroupOrderIn(BaseModel):
 
 
 class ClassCreateIn(BaseModel):
+    class_ids: List[int] = []
     timeslot_id: int
     target_group_ids: List[int]
     mode: str

@@ -1,4 +1,4 @@
-﻿function addEntityRequirementRow(courseId = null, sessionsRequired = 1) {
+function addEntityRequirementRow(courseId = null, sessionsRequired = 1) {
   if (!els.entityRequirementRows) return;
   const clone = els.requirementRowTemplate.content.firstElementChild.cloneNode(true);
   const courseInput = clone.querySelector('.requirement-course');
@@ -536,6 +536,10 @@ const state = {
   selectedGroupIds: new Set(),
   selectedTeacherCourseTagIds: new Set(),
   editingGroupId: null,
+  editingClassIds: [], // PROGRAM_BUNDLE_EDIT_V2
+  editingClassGroupIds: [],
+  editingClassProgramIds: [],
+  editingClassCourseId: null,
   openMenuGroupId: null,
   selectedProgramGroupId: null,
   groupScheduleGroupId: null,
@@ -3919,127 +3923,154 @@ async function deleteGroupById(groupId) {
 }
 
 async function openClassModal(classId = null, mergedClassIds = null) {
+  // PROGRAM_BUNDLE_EDIT_V2
   els.classForm.reset();
   els.classErrors.innerHTML = '';
-  let selected = state.selected;
+
+  let selected = state.selected || [];
   let editingClass = null;
+  let editingClasses = [];
+
   if (classId) {
-    // Fetch class details from API
-    const res = await fetch(`/api/classes/${classId}`);
-    if (res.ok) {
-      editingClass = await res.json();
-      // Set up selection for editing
-      const timeslot = (state.data.timeslots || []).find(ts => ts.id === editingClass.timeslot_id);
-      const slotLabel = timeslot
-        ? `${timeslot.weekday || ''} ${editingClass.timeslot_label || ''}`
-        : (editingClass.timeslot_label || '');
-      if (mergedClassIds?.length > 1) {
-        const selections = [];
-        for (const mergedId of mergedClassIds) {
-          const mergedRes = await fetch(`/api/classes/${mergedId}`);
-          if (!mergedRes.ok) continue;
-          const mergedClass = await mergedRes.json();
-          selections.push({
-            groupId: mergedClass.group_id,
-            groupCode: mergedClass.group_code || '',
-            timeslotId: mergedClass.timeslot_id,
-            slotLabel,
-          });
-        }
-        if (selections.length) {
-          selected = selections;
-        } else {
-          selected = [{
-            groupId: editingClass.group_id,
-            groupCode: editingClass.group_code || '',
-            timeslotId: editingClass.timeslot_id,
-            slotLabel,
-          }];
-        }
-      } else {
-        selected = [{
-          groupId: editingClass.group_id,
-          groupCode: editingClass.group_code || '',
-          timeslotId: editingClass.timeslot_id,
-          slotLabel,
-        }];
-      }
-      state.editingClassId = classId;
-      state.editingClassCourseId = Number(editingClass.course_id) || null;
-      state.editingClassProgramIds = (() => {
-        const ids = new Set();
-        const addProgramId = (value) => {
-          const id = Number(value);
-          if (Number.isFinite(id) && id > 0) ids.add(id);
-        };
+    const requestedIds = [...new Set(
+      (Array.isArray(mergedClassIds) && mergedClassIds.length ? mergedClassIds : [classId])
+        .map(Number)
+        .filter(id => Number.isFinite(id) && id > 0)
+    )];
 
-        addProgramId(editingClass.study_program_id);
-        addProgramId(editingClass.program_id);
-        (Array.isArray(editingClass.study_program_ids) ? editingClass.study_program_ids : [])
-          .forEach(addProgramId);
-        (Array.isArray(editingClass.study_programs) ? editingClass.study_programs : [])
-          .forEach(item => addProgramId(item?.id ?? item?.study_program_id ?? item));
+    const clickedId = Number(classId);
+    if (!requestedIds.includes(clickedId)) requestedIds.unshift(clickedId);
 
-        return [...ids];
-      })();
-      state.editingClassCourseId = editingClass.course_id || null;
-    } else {
-      state.editingClassId = null;
-      state.editingClassProgramIds = null;
-      state.editingClassCourseId = null;
+    for (const id of requestedIds) {
+      const res = await fetch(`/api/classes/${id}`);
+      if (!res.ok) continue;
+      editingClasses.push(await res.json());
     }
+
+    editingClass =
+      editingClasses.find(item => Number(item.id) === clickedId) ||
+      editingClasses[0] ||
+      null;
+
+    if (!editingClass) return;
+
+    const timeslot = (state.data.timeslots || [])
+      .find(ts => Number(ts.id) === Number(editingClass.timeslot_id));
+    const slotLabel = timeslot
+      ? `${timeslot.weekday || ''} ${editingClass.timeslot_label || ''}`.trim()
+      : (editingClass.timeslot_label || '');
+
+    state.editingClassId = clickedId;
+    state.editingClassIds = [...new Set(editingClasses.map(item => Number(item.id)))];
+    state.editingClassGroupIds = [...new Set(
+      editingClasses.map(item => Number(item.group_id)).filter(id => id > 0)
+    )];
+
+    const programIds = new Set();
+    const addProgramId = value => {
+      const id = Number(value);
+      if (Number.isFinite(id) && id > 0) programIds.add(id);
+    };
+
+    editingClasses.forEach(item => {
+      addProgramId(item.study_program_id);
+      addProgramId(item.program_id);
+      (Array.isArray(item.study_program_ids) ? item.study_program_ids : []).forEach(addProgramId);
+      (Array.isArray(item.study_programs) ? item.study_programs : [])
+        .forEach(program => addProgramId(program?.id ?? program?.study_program_id ?? program));
+    });
+
+    state.editingClassProgramIds = [...programIds];
+    state.editingClassCourseId = Number(editingClass.course_id) || null;
+
+    const seenGroups = new Set();
+    selected = [];
+    editingClasses.forEach(item => {
+      const groupId = Number(item.group_id);
+      if (!groupId || seenGroups.has(groupId)) return;
+      seenGroups.add(groupId);
+      selected.push({
+        groupId,
+        groupCode: item.group_code || '',
+        timeslotId: item.timeslot_id,
+        slotLabel,
+      });
+    });
   } else {
     state.editingClassId = null;
-    state.editingClassProgramIds = null;
-      state.editingClassCourseId = null;
+    state.editingClassIds = [];
+    state.editingClassGroupIds = [];
+    state.editingClassProgramIds = [];
+    state.editingClassCourseId = null;
   }
+
   if (!selected.length) return;
-  els.classTargetInfo.innerHTML = `<strong>${escapeHtml(selected[0].slotLabel)}</strong><br>${escapeHtml(selected.map(item => item.groupCode).join(', '))}`;
+
+  els.classTargetInfo.innerHTML =
+    `<strong>${escapeHtml(selected[0].slotLabel)}</strong><br>` +
+    `${escapeHtml(selected.map(item => item.groupCode).join(', '))}`;
+
   if (editingClass) {
     els.classModalTitle.textContent = 'Edit class';
     els.classSubmitBtn.textContent = 'Save changes';
-    els.classForm.querySelector(`input[name="mode"][value="${editingClass.mode}"]`).checked = true;
+    const modeRadio = els.classForm.querySelector(
+      `input[name="mode"][value="${editingClass.mode}"]`
+    );
+    if (modeRadio) modeRadio.checked = true;
   } else {
     els.classModalTitle.textContent = 'Add class';
     els.classSubmitBtn.textContent = 'Create class';
-    const defaultRadio = els.classForm.querySelector('input[name="mode"][value="required_all"]');
+    const defaultRadio = els.classForm.querySelector(
+      'input[name="mode"][value="required_all"]'
+    );
     if (defaultRadio) defaultRadio.checked = true;
-    if (els.classProgramOptions) {
-      els.classProgramOptions.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
-    }
   }
+
   els.classUpdateWarning?.classList.add('hidden');
-  if (editingClass && editingClass.study_program_ids?.length) {
+  if (editingClass && state.editingClassProgramIds.length) {
     els.classUpdateWarning?.classList.remove('hidden');
   }
+
   const selectedTimeslotId = selected[0]?.timeslotId || null;
   state.currentClassModalTimeslotId = selectedTimeslotId;
-  refreshClassProgramOptions();
-  if (editingClass && editingClass.study_program_ids) {
-    for (const id of editingClass.study_program_ids) {
-      const cb = els.classProgramOptions.querySelector(`input[type="checkbox"][value="${id}"]`);
-      if (cb) cb.checked = true;
-    }
-  }
-  renderGroupCheckboxes(els.classGroupOptions, state.data.groups || [], 'classGroups');
-  const preselectedGroupIds = editingClass ? [editingClass.group_id] : selected.map(item => item.groupId);
-  precheckGroups(els.classGroupOptions, preselectedGroupIds);
-  els.classGroupOptions.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.addEventListener('change', () => {
-    refreshClassProgramOptions();
-    syncClassFormVisibility();
-  }));
-  syncClassFormVisibility(editingClass ? editingClass.course_id : null);
-  updateRoomOptions(editingClass ? editingClass.room_id : null, selectedTimeslotId, editingClass ? editingClass.course_id : null);
 
-  // Pre-fill form if editing
+  renderGroupCheckboxes(els.classGroupOptions, state.data.groups || [], 'classGroups');
+
+  const preselectedGroupIds = editingClass
+    ? state.editingClassGroupIds
+    : selected.map(item => item.groupId);
+
+  precheckGroups(els.classGroupOptions, preselectedGroupIds);
+
+  els.classGroupOptions.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      refreshClassProgramOptions();
+      syncClassFormVisibility();
+    });
+  });
+
+  refreshClassProgramOptions();
+
   if (editingClass) {
+    precheckPrograms(els.classProgramOptions, state.editingClassProgramIds);
+  }
+
+  syncClassFormVisibility(editingClass ? editingClass.course_id : null);
+
+  if (editingClass) {
+    precheckGroups(els.classGroupOptions, state.editingClassGroupIds);
+    refreshClassProgramOptions();
+    precheckPrograms(els.classProgramOptions, state.editingClassProgramIds);
+
     els.courseSelect.value = editingClass.course_id || '';
     updateTeacherOptions(editingClass.teacher_id, selectedTimeslotId, editingClass.course_id);
+    updateRoomOptions(editingClass.room_id, selectedTimeslotId, editingClass.course_id);
     els.teacherSelect.value = editingClass.teacher_id || '';
     els.roomSelect.value = editingClass.room_id || '';
-    els.classForm.elements['expected_size'].value = editingClass.expected_size || '';
+    els.classForm.elements['expected_size'].value = editingClass.expected_size ?? '';
     els.classForm.elements['notes'].value = editingClass.notes || '';
   }
+
   openModal('classModal');
 }
 
@@ -4053,42 +4084,69 @@ function getProgramsForGroupIds(groupIds = []) {
   return (state.data.programs || []).filter(program => programIds.has(program.id));
 }
 
-function getDisabledProgramIdsForGroupIds(groupIds = [], timeslotId = null, excludeClassId = null) {
+function getDisabledProgramIdsForGroupIds(groupIds = [], timeslotId = null, excludeClassIds = null) {
+  // PROGRAM_BUNDLE_EDIT_V2
   if (!groupIds.length || timeslotId == null) return new Set();
+
+  const excludedIds = new Set(
+    (Array.isArray(excludeClassIds) ? excludeClassIds : (excludeClassIds != null ? [excludeClassIds] : []))
+      .map(Number)
+      .filter(id => Number.isFinite(id) && id > 0)
+  );
+
   const cellGroups = state.data.cells?.[String(timeslotId)] || {};
-  const programCodeToId = new Map((state.data.programs || []).map(program => [String(program.code || '').trim().toUpperCase(), program.id]));
+  const programCodeToId = new Map(
+    (state.data.programs || []).map(program => [
+      String(program.code || '').trim().toUpperCase(),
+      program.id,
+    ])
+  );
   const disabled = new Set();
+
   groupIds.forEach(groupId => {
     const items = cellGroups[String(groupId)] || [];
     items.forEach(item => {
-      const itemClassIds = Array.isArray(item.class_ids) ? item.class_ids : [item.id];
-      if (excludeClassId != null && itemClassIds.some(id => Number(id) === Number(excludeClassId))) {
-        return;
-      }
+      const itemClassIds = (Array.isArray(item.class_ids) ? item.class_ids : [item.id])
+        .map(Number)
+        .filter(id => Number.isFinite(id));
+
+      if (itemClassIds.some(id => excludedIds.has(id))) return;
+
       if (Array.isArray(item.program_codes)) {
         item.program_codes.forEach(code => {
           const normalized = String(code || '').trim().toUpperCase();
-          if (programCodeToId.has(normalized)) {
-            disabled.add(programCodeToId.get(normalized));
-          }
+          if (programCodeToId.has(normalized)) disabled.add(programCodeToId.get(normalized));
         });
       }
     });
   });
+
   return disabled;
 }
 
 function getDisabledGroupIdsForSelectedPrograms(selectedProgramIds, timeslotId = null) {
   if (!selectedProgramIds.length) return new Set();
+
   const disabled = new Set();
-  (state.data.groups || [] && !state.editingClassId).forEach(group => {
+  const excludedClassIds =
+    Array.isArray(state.editingClassIds) && state.editingClassIds.length
+      ? state.editingClassIds
+      : state.editingClassId;
+
+  (state.data.groups || []).forEach(group => {
     const groupProgramIds = new Set((group.programs || []).map(p => p.id));
     const hasAnySelectedProgram = selectedProgramIds.some(pid => groupProgramIds.has(pid));
-    const programConflicts = getDisabledProgramIdsForGroupIds([group.id], timeslotId, state.editingClassId);
-    if (!hasAnySelectedProgram || selectedProgramIds.some(pid => programConflicts.has(pid)) && !state.editingClassId) {
+    const programConflicts = getDisabledProgramIdsForGroupIds(
+      [group.id],
+      timeslotId,
+      excludedClassIds
+    );
+
+    if (!hasAnySelectedProgram || selectedProgramIds.some(pid => programConflicts.has(pid))) {
       disabled.add(group.id);
     }
   });
+
   return disabled;
 }
 
@@ -4145,7 +4203,8 @@ function refreshClassProgramOptions() {
   const currentProgramIds = collectCheckedValues(els.classProgramOptions);
   const allowedProgramIds = new Set(availablePrograms.map(p => p.id));
   const selectedTimeslotId = state.currentClassModalTimeslotId || state.selected[0]?.timeslotId || null;
-  const disabledProgramIds = getDisabledProgramIdsForGroupIds(selectedGroupIds, selectedTimeslotId, state.editingClassId);
+  const editingClassIdsToExclude = (Array.isArray(state.editingClassIds) && state.editingClassIds.length) ? state.editingClassIds : state.editingClassId;
+  const disabledProgramIds = getDisabledProgramIdsForGroupIds(selectedGroupIds, selectedTimeslotId, editingClassIdsToExclude);
   const selectedProgramIds = currentProgramIds.filter(id => allowedProgramIds.has(id) && !disabledProgramIds.has(id));
   renderProgramCheckboxes(els.classProgramOptions, availablePrograms, 'classPrograms', disabledProgramIds);
   precheckPrograms(els.classProgramOptions, selectedProgramIds);
@@ -4489,79 +4548,103 @@ function updateTeacherOptions(currentTeacherId = null, timeslotId = null, explic
 }
 
 async function submitClassForm(event) {
+  // PROGRAM_BUNDLE_EDIT_V2
   event.preventDefault();
+
   const formData = new FormData(els.classForm);
   const mode = formData.get('mode');
-  let selected = state.selected;
-  if (state.editingClassId) {
-    // If editing, use the selection from the class being edited
-    const editingClass = await (await fetch(`/api/classes/${state.editingClassId}`)).json();
-    selected = [{
-      groupId: editingClass.group_id,
-      groupCode: editingClass.group_code || '',
-      timeslotId: editingClass.timeslot_id,
-      slotLabel: editingClass.timeslot_label || ''
-    }];
-  }
-  const selectedGroupIds = getClassGroupIds();
   const selectedProgramIds = collectCheckedValues(els.classProgramOptions);
-  let targetGroupIds = selectedGroupIds.length ? selectedGroupIds.slice() : selected.map(item => item.groupId);
+  const selectedGroupIds = getClassGroupIds();
+
+  if (mode === 'program' && !selectedProgramIds.length) {
+    alert('Check at least one study program for a Study program class.');
+    return;
+  }
+
+  let targetGroupIds = selectedGroupIds.length
+    ? selectedGroupIds.slice()
+    : (
+        state.editingClassId &&
+        Array.isArray(state.editingClassGroupIds) &&
+        state.editingClassGroupIds.length
+      )
+      ? state.editingClassGroupIds.slice()
+      : (state.selected || []).map(item => item.groupId);
+
   if (mode === 'elective' && selectedProgramIds.length > 0) {
     const programGroupIds = (state.data.groups || [])
-      .filter(group => selectedProgramIds.some(pid => group.programs.some(p => p.id === pid)))
+      .filter(group => selectedProgramIds.some(pid => (group.programs || []).some(p => p.id === pid)))
       .map(group => group.id);
     targetGroupIds = Array.from(new Set([...targetGroupIds, ...programGroupIds]));
   }
-  if ((mode === 'program' || mode === 'elective') && !targetGroupIds.length && !state.editingClassId) {
-    targetGroupIds = selected.map(item => item.groupId);
+
+  targetGroupIds = [...new Set(targetGroupIds.map(Number).filter(id => Number.isFinite(id) && id > 0))];
+
+  const timeslotId =
+    state.currentClassModalTimeslotId ||
+    state.selected?.[0]?.timeslotId ||
+    null;
+
+  if (!timeslotId) {
+    alert('No timeslot is selected for this class.');
+    return;
   }
-  const payloadMode = mode;
+
   const payload = {
-    timeslot_id: selected[0].timeslotId,
+    timeslot_id: Number(timeslotId),
     target_group_ids: targetGroupIds,
-    mode: payloadMode,
+    class_ids: state.editingClassId
+      ? [...new Set(
+          (Array.isArray(state.editingClassIds) && state.editingClassIds.length
+            ? state.editingClassIds
+            : [state.editingClassId]).map(Number)
+        )]
+      : [],
+    mode,
     course_id: Number(formData.get('course_id')),
     teacher_id: toNullableNumber(formData.get('teacher_id')),
     room_id: toNullableNumber(formData.get('room_id')),
-    study_program_ids: payloadMode === 'program' ? selectedProgramIds : [],
+    study_program_ids: mode === 'program' ? selectedProgramIds : [],
     expected_size: toNullableNumber(formData.get('expected_size')),
     notes: formData.get('notes') || null,
   };
+
   if (!validateClassModeSelection()) return;
-  // Allow teacher conflict only for program classes when the same teacher+room is used
-  let allowTeacherConflict = false;
-  if (payload.mode === 'program') {
-    allowTeacherConflict = true;
-  }
+
+  const allowTeacherConflict = payload.mode === 'program';
+
   let url = '/api/classes';
   let method = 'POST';
   if (state.editingClassId) {
     url = `/api/classes/${state.editingClassId}`;
     method = 'PUT';
   }
+
   const res = await fetch(url, {
     method,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...payload, allow_teacher_conflict: allowTeacherConflict }),
   });
+
   const data = await safeJson(res);
+
   if (!res.ok || !data.ok) {
-    // If error is only about teacher conflict and allowTeacherConflict is true, ignore it
-    if (allowTeacherConflict && data.errors && data.errors.some(e => String(e).toLowerCase().includes('teacher conflict'))) {
-      // proceed as if success
-    } else {
-      const errors = data.errors || [formatError(data)];
-      els.classErrors.innerHTML = errors.map(err => `<div>${escapeHtml(err)}</div>`).join('');
-      return;
-    }
+    const errors = data.errors || [formatError(data)];
+    els.classErrors.innerHTML = errors.map(err => `<div>${escapeHtml(err)}</div>`).join('');
+    return;
   }
-  state.data = (data.bootstrap || data);
+
+  state.data = data.bootstrap || data;
   state.timetableId = state.data.selected_timetable_id || state.timetableId;
   closeModal('classModal');
   clearSelection(false);
+
   state.editingClassId = null;
-  state.editingClassProgramIds = null;
+  state.editingClassIds = [];
+  state.editingClassGroupIds = [];
+  state.editingClassProgramIds = [];
   state.editingClassCourseId = null;
+
   renderContextSelectors();
   renderEntityLists();
   renderBoard();
