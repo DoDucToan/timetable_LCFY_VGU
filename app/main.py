@@ -2354,28 +2354,77 @@ def get_class(class_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
     row = db.get(ScheduledClass, class_id)
     if not row:
         raise HTTPException(status_code=404, detail="Class not found.")
-    study_program_id = getattr(row, 'study_program_id', None)
+
+    timetable_id = cast(int, row.group.timetable_id)
+    study_program_id = getattr(row, "study_program_id", None)
+
+    if getattr(row, "shared_key", None):
+        bundle_rows = db.query(ScheduledClass).join(Group).filter(
+            ScheduledClass.shared_key == row.shared_key,
+            ScheduledClass.deploy.is_(True),
+            Group.timetable_id == timetable_id,
+        ).all()
+    elif study_program_id is not None:
+        bundle_rows = db.query(ScheduledClass).join(Group).filter(
+            ScheduledClass.timeslot_id == row.timeslot_id,
+            ScheduledClass.course_id == row.course_id,
+            ScheduledClass.study_program_id == study_program_id,
+            ScheduledClass.deploy.is_(True),
+            Group.timetable_id == timetable_id,
+        ).all()
+    else:
+        bundle_rows = [row]
+
+    if not bundle_rows:
+        bundle_rows = [row]
+
+    bundle_rows = sorted(
+        bundle_rows,
+        key=lambda item: (cast(int, item.group_id), cast(int, item.id)),
+    )
+    bundle_group_ids = sorted({cast(int, item.group_id) for item in bundle_rows})
+    bundle_program_ids = sorted({
+        cast(int, item.study_program_id)
+        for item in bundle_rows
+        if getattr(item, "study_program_id", None) is not None
+    })
+
+    group_codes = {
+        cast(int, g.id): str(g.code or "")
+        for g in db.query(Group).filter(Group.id.in_(bundle_group_ids)).all()
+    }
+
     return {
         "id": row.id,
         "group_id": row.group_id,
-        "group_code": getattr(row.group, 'code', ''),
+        "group_code": getattr(row.group, "code", ""),
         "timeslot_id": row.timeslot_id,
-        "timeslot_label": getattr(row.timeslot, 'label', ''),
+        "timeslot_label": getattr(row.timeslot, "label", ""),
         "course_id": row.course_id,
         "teacher_id": row.teacher_id,
         "room_id": row.room_id,
-        "mode": MODE_ELECTIVE if bool(row.course.elective) else (MODE_REQUIRED if bool(row.course.require_all_student_in_group) else MODE_PROGRAM),
+        "mode": MODE_ELECTIVE if bool(row.course.elective) else (
+            MODE_REQUIRED if bool(row.course.require_all_student_in_group) else MODE_PROGRAM
+        ),
         "study_program_ids": [study_program_id] if study_program_id is not None else [],
         "expected_size": row.expected_size,
         "notes": row.notes,
+        "bundle_class_ids": [cast(int, item.id) for item in bundle_rows],
+        "bundle_group_ids": bundle_group_ids,
+        "bundle_groups": [
+            {"id": group_id, "code": group_codes.get(group_id, "")}
+            for group_id in bundle_group_ids
+        ],
+        "bundle_study_program_ids": bundle_program_ids,
+        "shared_key": getattr(row, "shared_key", None),
     }
-
 
 @app.put("/api/classes/{class_id}")
 def update_class(class_id: int, payload: ClassCreateIn, db: Session = Depends(get_db)) -> Dict[str, Any]:
     row = db.get(ScheduledClass, class_id)
     if not row:
         raise HTTPException(status_code=404, detail="Class not found.")
+
     course = db.get(Course, payload.course_id)
     if not course:
         raise HTTPException(status_code=404, detail="Course not found.")
@@ -2392,89 +2441,123 @@ def update_class(class_id: int, payload: ClassCreateIn, db: Session = Depends(ge
     if mode == MODE_ELECTIVE and not bool(course.elective):
         raise HTTPException(status_code=400, detail="Selected course is not an elective.")
 
-    # PROGRAM_BUNDLE_EDIT_V2
-    if mode == MODE_PROGRAM and payload.class_ids:
-        bundle_ids = list(dict.fromkeys(int(cid) for cid in payload.class_ids if int(cid) > 0))
-        if class_id not in bundle_ids:
-            bundle_ids.insert(0, class_id)
+    timetable_id = cast(int, row.group.timetable_id)
 
-        bundle_rows = db.query(ScheduledClass).filter(
-            ScheduledClass.id.in_(bundle_ids),
-            ScheduledClass.deploy.is_(True),
-        ).all()
-
-        found_ids = {int(cast(int, item.id)) for item in bundle_rows}
-        missing_ids = [cid for cid in bundle_ids if cid not in found_ids]
-        if missing_ids:
-            raise HTTPException(status_code=404, detail=f"Class rows not found in merged bundle: {missing_ids}")
-
+    if mode == MODE_PROGRAM:
         if not payload.target_group_ids:
-            raise HTTPException(status_code=400, detail="Select at least one group for a Study program class.")
+            raise HTTPException(status_code=400, detail="Select at least one group.")
         if not payload.study_program_ids:
-            raise HTTPException(status_code=400, detail="Select at least one study program for a Study program class.")
+            raise HTTPException(status_code=400, detail="Select at least one study program.")
 
-        timetable_id = int(cast(int, row.group.timetable_id))
+        seed_ids = list(dict.fromkeys(
+            [class_id] + [int(cid) for cid in (payload.class_ids or []) if int(cid) > 0]
+        ))
+        seed_rows = db.query(ScheduledClass).join(Group).filter(
+            ScheduledClass.id.in_(seed_ids),
+            ScheduledClass.deploy.is_(True),
+            Group.timetable_id == timetable_id,
+        ).all()
+        if not seed_rows:
+            seed_rows = [row]
 
-        target_groups = db.query(Group).filter(Group.id.in_(payload.target_group_ids)).all()
-        found_group_ids = {int(cast(int, g.id)) for g in target_groups}
-        missing_group_ids = [gid for gid in payload.target_group_ids if gid not in found_group_ids]
-        if missing_group_ids:
-            raise HTTPException(status_code=404, detail=f"Groups not found: {missing_group_ids}")
+        expanded_by_id: Dict[int, ScheduledClass] = {}
+        for seed in seed_rows:
+            if getattr(seed, "shared_key", None):
+                related = db.query(ScheduledClass).join(Group).filter(
+                    ScheduledClass.shared_key == seed.shared_key,
+                    ScheduledClass.deploy.is_(True),
+                    Group.timetable_id == timetable_id,
+                ).all()
+            elif getattr(seed, "study_program_id", None) is not None:
+                related = db.query(ScheduledClass).join(Group).filter(
+                    ScheduledClass.timeslot_id == seed.timeslot_id,
+                    ScheduledClass.course_id == seed.course_id,
+                    ScheduledClass.study_program_id == seed.study_program_id,
+                    ScheduledClass.deploy.is_(True),
+                    Group.timetable_id == timetable_id,
+                ).all()
+            else:
+                related = [seed]
 
-        if any(int(cast(int, g.timetable_id)) != timetable_id for g in target_groups):
+            for item in related:
+                expanded_by_id[cast(int, item.id)] = item
+
+        bundle_rows = list(expanded_by_id.values())
+        if not bundle_rows:
+            bundle_rows = [row]
+
+        target_groups = db.execute(
+            select(Group)
+            .where(Group.id.in_(payload.target_group_ids))
+            .options(joinedload(Group.study_program_links))
+        ).unique().scalars().all()
+
+        found_group_ids = {cast(int, group.id) for group in target_groups}
+        missing_groups = [
+            gid for gid in payload.target_group_ids
+            if gid not in found_group_ids
+        ]
+        if missing_groups:
+            raise HTTPException(status_code=404, detail=f"Groups not found: {missing_groups}")
+        if any(cast(int, group.timetable_id) != timetable_id for group in target_groups):
             raise HTTPException(status_code=400, detail="All selected groups must belong to the same timetable.")
 
-        existing_program_ids = {
-            int(pid)
-            for pid in db.scalars(
-                select(StudyProgram.id).where(StudyProgram.id.in_(payload.study_program_ids))
-            ).all()
-        }
-        invalid_program_ids = [pid for pid in payload.study_program_ids if pid not in existing_program_ids]
+        existing_program_ids = set(db.scalars(
+            select(StudyProgram.id).where(
+                StudyProgram.id.in_(payload.study_program_ids)
+            )
+        ).all())
+        invalid_program_ids = [
+            pid for pid in payload.study_program_ids
+            if pid not in existing_program_ids
+        ]
         if invalid_program_ids:
-            raise HTTPException(status_code=400, detail=f"Study programs not found: {invalid_program_ids}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Study programs not found: {invalid_program_ids}",
+            )
 
         if payload.teacher_id is not None and not db.get(Teacher, payload.teacher_id):
             raise HTTPException(status_code=404, detail="Teacher not found.")
         if payload.room_id is not None and not db.get(Room, payload.room_id):
             raise HTTPException(status_code=404, detail="Room not found.")
 
-        for item in bundle_rows:
-            item.deploy = False  # type: ignore
+        for old in bundle_rows:
+            old.deploy = False  # type: ignore
         db.flush()
 
         try:
             created, errors = create_classes(
                 db,
-                target_group_ids=payload.target_group_ids,
+                target_group_ids=list(dict.fromkeys(payload.target_group_ids)),
                 timeslot_id=payload.timeslot_id,
                 course=course,
                 teacher_id=payload.teacher_id,
                 room_id=payload.room_id,
-                mode=mode,
-                study_program_ids=payload.study_program_ids,
+                mode=MODE_PROGRAM,
+                study_program_ids=list(dict.fromkeys(payload.study_program_ids)),
                 expected_size=payload.expected_size,
-                self_study=getattr(payload, "self_study", False),
+                self_study=False,
                 notes=payload.notes,
                 source="ui",
-                allow_teacher_conflict=getattr(payload, "allow_teacher_conflict", False),
+                allow_teacher_conflict=True,
             )
+
             if errors:
-                raise ValueError("; ".join(errors))
+                raise HTTPException(status_code=400, detail="; ".join(errors))
             if not created:
-                raise ValueError(
-                    "No class rows were created. Check that the selected study programs belong to the selected groups."
+                raise HTTPException(
+                    status_code=400,
+                    detail="No class rows were created. Check the selected groups and study programs.",
                 )
 
-            for item in bundle_rows:
-                db.delete(item)
+            for old in bundle_rows:
+                db.delete(old)
 
             db.commit()
-        except Exception as exc:
+        except Exception:
             db.rollback()
-            if isinstance(exc, HTTPException):
-                raise
-            raise HTTPException(status_code=400, detail=str(exc))
+            raise
 
         return {
             "ok": True,
@@ -2482,150 +2565,55 @@ def update_class(class_id: int, payload: ClassCreateIn, db: Session = Depends(ge
             "bootstrap": bootstrap_payload(db, timetable_id),
         }
 
-    # Existing Study program classes are edited as linked/bulk assignments.
-    # If the edit form does not re-select the program, preserve the program
-    # already stored on the class row instead of rejecting the edit.
-    effective_study_program_ids = list(payload.study_program_ids or [])
-    if (
-        mode == MODE_PROGRAM
-        and not effective_study_program_ids
-        and getattr(row, "study_program_id", None) is not None
-    ):
-        effective_study_program_ids = [cast(int, row.study_program_id)]
+    if payload.teacher_id is not None and not db.get(Teacher, payload.teacher_id):
+        raise HTTPException(status_code=404, detail="Teacher not found.")
+    if payload.room_id is not None and not db.get(Room, payload.room_id):
+        raise HTTPException(status_code=404, detail="Room not found.")
 
-    if mode == MODE_PROGRAM and len(effective_study_program_ids) != 1:
-        raise HTTPException(status_code=400, detail="Editing a program class must select exactly one study program.")
-
-    candidate_rows = [row]
-    # Prefer an explicit shared bundle. Otherwise only touch rows for the
-    # same study program; the old query could include unrelated program
-    # classes that happened to use the same course and timeslot.
-    if getattr(row, 'shared_key', None) is not None:
-        candidate_rows = db.query(ScheduledClass).filter(
+    rows = [row]
+    if mode == MODE_ELECTIVE and getattr(row, "shared_key", None):
+        rows = db.query(ScheduledClass).join(Group).filter(
             ScheduledClass.shared_key == row.shared_key,
             ScheduledClass.deploy.is_(True),
+            Group.timetable_id == timetable_id,
         ).all()
-    elif getattr(row, 'study_program_id', None) is not None:
-        candidate_rows = db.query(ScheduledClass).join(Group).filter(
-            ScheduledClass.timeslot_id == row.timeslot_id,
-            ScheduledClass.course_id == row.course_id,
-            Group.timetable_id == row.group.timetable_id,
-            ScheduledClass.deploy.is_(True),
-            ScheduledClass.study_program_id == row.study_program_id,
-        ).all()
-    target_group_ids = [cast(int, row.group_id)]
-    rows = [row]
-    is_multi_class_edit = (
-        mode == MODE_PROGRAM and getattr(row, 'study_program_id', None) is not None
-    ) or (
-        mode == MODE_ELECTIVE and getattr(row, 'shared_key', None) is not None
-    )
-    old_teacher_id = row.teacher_id
-    old_room_id = row.room_id
-    changing_teacher = payload.teacher_id != old_teacher_id
-    changing_room = payload.room_id != old_room_id
 
-    if mode == MODE_REQUIRED and len(target_group_ids) > 1:
-        raise HTTPException(status_code=400, detail="Require-all-students classes must be edited one group at a time.")
-
-
-    custom_bulk_update = False
-    if is_multi_class_edit and len(candidate_rows) > 1 and (changing_teacher or changing_room):
-        if changing_teacher and not changing_room:
-            if any(r.room_id != old_room_id for r in candidate_rows):
-                raise HTTPException(
-                    status_code=400,
-                    detail="Cannot bulk update teacher because other same-course classes use a different room in this timeslot. Change only the teacher or update individually."
-                )
-        if changing_room and not changing_teacher:
-            if any(r.teacher_id != old_teacher_id for r in candidate_rows):
-                raise HTTPException(
-                    status_code=400,
-                    detail="Cannot bulk update room because other same-course classes use a different teacher in this timeslot. Change only the room or update individually."
-                )
-
-        rows = candidate_rows
-        target_group_ids = [cast(int, r.group_id) for r in rows]
-        custom_bulk_update = True
-
-    for r in rows:
-        setattr(r, 'deploy', False)
+    for old in rows:
+        old.deploy = False  # type: ignore
     db.flush()
 
     try:
-        if custom_bulk_update:
-            errors: List[str] = []
-            if changing_teacher and payload.teacher_id is not None:
-                existing_conflict = db.scalar(
-                    select(func.count())
-                    .where(
-                        ScheduledClass.deploy.is_(True),
-                        ScheduledClass.timeslot_id == payload.timeslot_id,
-                        ScheduledClass.teacher_id == payload.teacher_id,
-                        ScheduledClass.id.notin_([r.id for r in rows]),
-                    )
-                )
-                if existing_conflict:
-                    errors.append('Teacher conflict prevents bulk teacher update for this timeslot.')
-            if changing_room and payload.room_id is not None:
-                existing_conflict = db.scalar(
-                    select(func.count())
-                    .where(
-                        ScheduledClass.deploy.is_(True),
-                        ScheduledClass.timeslot_id == payload.timeslot_id,
-                        ScheduledClass.room_id == payload.room_id,
-                        ScheduledClass.id.notin_([r.id for r in rows]),
-                    )
-                )
-                if existing_conflict:
-                    errors.append('Room is already occupied in this timeslot; cannot bulk update room.')
-        else:
-            errors = validate_new_class(
-                db,
-                target_group_ids=target_group_ids,
-                timeslot_id=payload.timeslot_id,
-                course=course,
-                teacher_id=payload.teacher_id,
-                room_id=payload.room_id,
-                mode=mode,
-                study_program_ids=effective_study_program_ids,
-                expected_size=payload.expected_size,
-                self_study=getattr(payload, 'self_study', False),
-                allow_teacher_conflict=getattr(payload, 'allow_teacher_conflict', False),
-            )
+        errors = validate_new_class(
+            db,
+            target_group_ids=[cast(int, item.group_id) for item in rows],
+            timeslot_id=payload.timeslot_id,
+            course=course,
+            teacher_id=payload.teacher_id,
+            room_id=payload.room_id,
+            mode=mode,
+            study_program_ids=[],
+            expected_size=payload.expected_size,
+            self_study=getattr(payload, "self_study", False),
+            allow_teacher_conflict=getattr(payload, "allow_teacher_conflict", False),
+        )
     finally:
-        for r in rows:
-            setattr(r, 'deploy', True)
+        for old in rows:
+            old.deploy = True  # type: ignore
         db.flush()
 
     if errors:
         raise HTTPException(status_code=400, detail="; ".join(errors))
 
-    for r in rows:
-        r.timeslot_id = payload.timeslot_id  # type: ignore
-        if custom_bulk_update:
-            if changing_teacher:
-                r.teacher_id = payload.teacher_id  # type: ignore
-            if changing_room:
-                r.room_id = payload.room_id  # type: ignore
-        else:
-            r.course_id = payload.course_id  # type: ignore
-            r.teacher_id = payload.teacher_id  # type: ignore
-            r.room_id = payload.room_id  # type: ignore
-            r.study_program_id = effective_study_program_ids[0] if effective_study_program_ids else None  # type: ignore
-        r.expected_size = payload.expected_size  # type: ignore
-        r.notes = payload.notes  # type: ignore
+    for item in rows:
+        item.timeslot_id = payload.timeslot_id  # type: ignore
+        item.course_id = payload.course_id  # type: ignore
+        item.teacher_id = payload.teacher_id  # type: ignore
+        item.room_id = payload.room_id  # type: ignore
+        item.expected_size = payload.expected_size  # type: ignore
+        item.notes = payload.notes  # type: ignore
+
     db.commit()
-
-    def get_int(val: object) -> int:
-        if isinstance(val, int):
-            return val
-        if hasattr(val, 'value'):
-            return int(getattr(val, 'value'))
-        return int(str(val))
-    timetable_id = get_int(row.group.timetable_id)
     return {"ok": True, "bootstrap": bootstrap_payload(db, timetable_id)}
-
 
 @app.delete("/api/classes/{class_id}")
 def delete_class(class_id: int, db: Session = Depends(get_db)):

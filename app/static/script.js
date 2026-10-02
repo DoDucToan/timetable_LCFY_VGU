@@ -3923,36 +3923,56 @@ async function deleteGroupById(groupId) {
 }
 
 async function openClassModal(classId = null, mergedClassIds = null) {
-  // PROGRAM_BUNDLE_EDIT_V2
   els.classForm.reset();
   els.classErrors.innerHTML = '';
 
   let selected = state.selected || [];
   let editingClass = null;
-  let editingClasses = [];
+
+  state.editingClassIds = [];
+  state.editingClassGroupIds = [];
+  state.editingClassProgramIds = [];
+  state.editingClassCourseId = null;
 
   if (classId) {
     const requestedIds = [...new Set(
-      (Array.isArray(mergedClassIds) && mergedClassIds.length ? mergedClassIds : [classId])
-        .map(Number)
+      [Number(classId), ...(Array.isArray(mergedClassIds) ? mergedClassIds.map(Number) : [])]
         .filter(id => Number.isFinite(id) && id > 0)
     )];
 
-    const clickedId = Number(classId);
-    if (!requestedIds.includes(clickedId)) requestedIds.unshift(clickedId);
-
+    const details = [];
     for (const id of requestedIds) {
       const res = await fetch(`/api/classes/${id}`);
-      if (!res.ok) continue;
-      editingClasses.push(await res.json());
+      if (res.ok) details.push(await res.json());
     }
+    if (!details.length) return;
 
     editingClass =
-      editingClasses.find(item => Number(item.id) === clickedId) ||
-      editingClasses[0] ||
-      null;
+      details.find(item => Number(item.id) === Number(classId)) ||
+      details[0];
 
-    if (!editingClass) return;
+    const bundleClassIds = new Set();
+    const bundleGroupIds = new Set();
+    const bundleProgramIds = new Set();
+    const bundleGroupsById = new Map();
+
+    details.forEach(item => {
+      (item.bundle_class_ids || [item.id]).forEach(id => bundleClassIds.add(Number(id)));
+      (item.bundle_group_ids || [item.group_id]).forEach(id => bundleGroupIds.add(Number(id)));
+      (item.bundle_study_program_ids || item.study_program_ids || []).forEach(id => bundleProgramIds.add(Number(id)));
+      (item.bundle_groups || []).forEach(group => {
+        bundleGroupsById.set(Number(group.id), group.code || '');
+      });
+      if (item.group_id != null && !bundleGroupsById.has(Number(item.group_id))) {
+        bundleGroupsById.set(Number(item.group_id), item.group_code || '');
+      }
+    });
+
+    state.editingClassId = Number(classId);
+    state.editingClassIds = [...bundleClassIds].filter(id => id > 0);
+    state.editingClassGroupIds = [...bundleGroupIds].filter(id => id > 0);
+    state.editingClassProgramIds = [...bundleProgramIds].filter(id => id > 0);
+    state.editingClassCourseId = Number(editingClass.course_id) || null;
 
     const timeslot = (state.data.timeslots || [])
       .find(ts => Number(ts.id) === Number(editingClass.timeslot_id));
@@ -3960,48 +3980,18 @@ async function openClassModal(classId = null, mergedClassIds = null) {
       ? `${timeslot.weekday || ''} ${editingClass.timeslot_label || ''}`.trim()
       : (editingClass.timeslot_label || '');
 
-    state.editingClassId = clickedId;
-    state.editingClassIds = [...new Set(editingClasses.map(item => Number(item.id)))];
-    state.editingClassGroupIds = [...new Set(
-      editingClasses.map(item => Number(item.group_id)).filter(id => id > 0)
-    )];
-
-    const programIds = new Set();
-    const addProgramId = value => {
-      const id = Number(value);
-      if (Number.isFinite(id) && id > 0) programIds.add(id);
-    };
-
-    editingClasses.forEach(item => {
-      addProgramId(item.study_program_id);
-      addProgramId(item.program_id);
-      (Array.isArray(item.study_program_ids) ? item.study_program_ids : []).forEach(addProgramId);
-      (Array.isArray(item.study_programs) ? item.study_programs : [])
-        .forEach(program => addProgramId(program?.id ?? program?.study_program_id ?? program));
-    });
-
-    state.editingClassProgramIds = [...programIds];
-    state.editingClassCourseId = Number(editingClass.course_id) || null;
-
-    const seenGroups = new Set();
-    selected = [];
-    editingClasses.forEach(item => {
-      const groupId = Number(item.group_id);
-      if (!groupId || seenGroups.has(groupId)) return;
-      seenGroups.add(groupId);
-      selected.push({
+    selected = state.editingClassGroupIds.map(groupId => {
+      const groupFromState = (state.data.groups || [])
+        .find(group => Number(group.id) === Number(groupId));
+      return {
         groupId,
-        groupCode: item.group_code || '',
-        timeslotId: item.timeslot_id,
+        groupCode: groupFromState?.code || bundleGroupsById.get(groupId) || '',
+        timeslotId: Number(editingClass.timeslot_id),
         slotLabel,
-      });
+      };
     });
   } else {
     state.editingClassId = null;
-    state.editingClassIds = [];
-    state.editingClassGroupIds = [];
-    state.editingClassProgramIds = [];
-    state.editingClassCourseId = null;
   }
 
   if (!selected.length) return;
@@ -4026,15 +4016,14 @@ async function openClassModal(classId = null, mergedClassIds = null) {
     if (defaultRadio) defaultRadio.checked = true;
   }
 
-  els.classUpdateWarning?.classList.add('hidden');
-  if (editingClass && state.editingClassProgramIds.length) {
-    els.classUpdateWarning?.classList.remove('hidden');
-  }
-
-  const selectedTimeslotId = selected[0]?.timeslotId || null;
+  const selectedTimeslotId = Number(selected[0].timeslotId);
   state.currentClassModalTimeslotId = selectedTimeslotId;
 
-  renderGroupCheckboxes(els.classGroupOptions, state.data.groups || [], 'classGroups');
+  renderGroupCheckboxes(
+    els.classGroupOptions,
+    state.data.groups || [],
+    'classGroups'
+  );
 
   const preselectedGroupIds = editingClass
     ? state.editingClassGroupIds
@@ -4042,17 +4031,20 @@ async function openClassModal(classId = null, mergedClassIds = null) {
 
   precheckGroups(els.classGroupOptions, preselectedGroupIds);
 
-  els.classGroupOptions.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-    cb.addEventListener('change', () => {
+  els.classGroupOptions
+    .querySelectorAll('input[type="checkbox"]')
+    .forEach(cb => cb.addEventListener('change', () => {
       refreshClassProgramOptions();
       syncClassFormVisibility();
-    });
-  });
+    }));
 
   refreshClassProgramOptions();
 
   if (editingClass) {
-    precheckPrograms(els.classProgramOptions, state.editingClassProgramIds);
+    precheckPrograms(
+      els.classProgramOptions,
+      state.editingClassProgramIds
+    );
   }
 
   syncClassFormVisibility(editingClass ? editingClass.course_id : null);
@@ -4063,11 +4055,20 @@ async function openClassModal(classId = null, mergedClassIds = null) {
     precheckPrograms(els.classProgramOptions, state.editingClassProgramIds);
 
     els.courseSelect.value = editingClass.course_id || '';
-    updateTeacherOptions(editingClass.teacher_id, selectedTimeslotId, editingClass.course_id);
-    updateRoomOptions(editingClass.room_id, selectedTimeslotId, editingClass.course_id);
+    updateTeacherOptions(
+      editingClass.teacher_id,
+      selectedTimeslotId,
+      editingClass.course_id
+    );
+    updateRoomOptions(
+      editingClass.room_id,
+      selectedTimeslotId,
+      editingClass.course_id
+    );
     els.teacherSelect.value = editingClass.teacher_id || '';
     els.roomSelect.value = editingClass.room_id || '';
-    els.classForm.elements['expected_size'].value = editingClass.expected_size ?? '';
+    els.classForm.elements['expected_size'].value =
+      editingClass.expected_size ?? '';
     els.classForm.elements['notes'].value = editingClass.notes || '';
   }
 
@@ -4548,45 +4549,45 @@ function updateTeacherOptions(currentTeacherId = null, timeslotId = null, explic
 }
 
 async function submitClassForm(event) {
-  // PROGRAM_BUNDLE_EDIT_V2
   event.preventDefault();
 
   const formData = new FormData(els.classForm);
   const mode = formData.get('mode');
   const selectedProgramIds = collectCheckedValues(els.classProgramOptions);
-  const selectedGroupIds = getClassGroupIds();
+  let targetGroupIds = getClassGroupIds();
 
   if (mode === 'program' && !selectedProgramIds.length) {
-    alert('Check at least one study program for a Study program class.');
+    els.classErrors.innerHTML = '<div>Select at least one study program.</div>';
     return;
   }
 
-  let targetGroupIds = selectedGroupIds.length
-    ? selectedGroupIds.slice()
-    : (
-        state.editingClassId &&
-        Array.isArray(state.editingClassGroupIds) &&
-        state.editingClassGroupIds.length
-      )
-      ? state.editingClassGroupIds.slice()
+  if (!targetGroupIds.length) {
+    targetGroupIds = state.editingClassId
+      ? [...(state.editingClassGroupIds || [])]
       : (state.selected || []).map(item => item.groupId);
+  }
 
   if (mode === 'elective' && selectedProgramIds.length > 0) {
     const programGroupIds = (state.data.groups || [])
-      .filter(group => selectedProgramIds.some(pid => (group.programs || []).some(p => p.id === pid)))
+      .filter(group =>
+        selectedProgramIds.some(pid =>
+          (group.programs || []).some(p => p.id === pid)
+        )
+      )
       .map(group => group.id);
-    targetGroupIds = Array.from(new Set([...targetGroupIds, ...programGroupIds]));
+    targetGroupIds = [...new Set([...targetGroupIds, ...programGroupIds])];
   }
 
-  targetGroupIds = [...new Set(targetGroupIds.map(Number).filter(id => Number.isFinite(id) && id > 0))];
+  targetGroupIds = [...new Set(
+    targetGroupIds.map(Number).filter(id => Number.isFinite(id) && id > 0)
+  )];
 
   const timeslotId =
     state.currentClassModalTimeslotId ||
-    state.selected?.[0]?.timeslotId ||
-    null;
+    state.selected?.[0]?.timeslotId;
 
   if (!timeslotId) {
-    alert('No timeslot is selected for this class.');
+    els.classErrors.innerHTML = '<div>No timeslot selected.</div>';
     return;
   }
 
@@ -4595,9 +4596,10 @@ async function submitClassForm(event) {
     target_group_ids: targetGroupIds,
     class_ids: state.editingClassId
       ? [...new Set(
-          (Array.isArray(state.editingClassIds) && state.editingClassIds.length
+          (state.editingClassIds?.length
             ? state.editingClassIds
-            : [state.editingClassId]).map(Number)
+            : [state.editingClassId]
+          ).map(Number)
         )]
       : [],
     mode,
@@ -4611,31 +4613,34 @@ async function submitClassForm(event) {
 
   if (!validateClassModeSelection()) return;
 
-  const allowTeacherConflict = payload.mode === 'program';
-
-  let url = '/api/classes';
-  let method = 'POST';
-  if (state.editingClassId) {
-    url = `/api/classes/${state.editingClassId}`;
-    method = 'PUT';
-  }
-
-  const res = await fetch(url, {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...payload, allow_teacher_conflict: allowTeacherConflict }),
-  });
+  const res = await fetch(
+    state.editingClassId
+      ? `/api/classes/${state.editingClassId}`
+      : '/api/classes',
+    {
+      method: state.editingClassId ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...payload,
+        allow_teacher_conflict: mode === 'program',
+      }),
+    }
+  );
 
   const data = await safeJson(res);
 
   if (!res.ok || !data.ok) {
     const errors = data.errors || [formatError(data)];
-    els.classErrors.innerHTML = errors.map(err => `<div>${escapeHtml(err)}</div>`).join('');
+    els.classErrors.innerHTML = errors
+      .map(err => `<div>${escapeHtml(err)}</div>`)
+      .join('');
     return;
   }
 
   state.data = data.bootstrap || data;
-  state.timetableId = state.data.selected_timetable_id || state.timetableId;
+  state.timetableId =
+    state.data.selected_timetable_id || state.timetableId;
+
   closeModal('classModal');
   clearSelection(false);
 
