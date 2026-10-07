@@ -2629,7 +2629,19 @@ def delete_class(class_id: int, db: Session = Depends(get_db)):
     timetable_id = get_int(row.group.timetable_id)
     shared_key = getattr(row, 'shared_key', None)
     if shared_key is not None:
-        db.query(ScheduledClass).filter(ScheduledClass.shared_key == shared_key).delete(synchronize_session=False)
+        # IMPORTANT:
+        # Duplicated timetables may contain ScheduledClass rows that still have
+        # the same shared_key as the source timetable. Never delete by
+        # shared_key globally, otherwise deleting a bundled class in the copy
+        # can also delete the corresponding class in the source timetable.
+        timetable_group_ids = select(Group.id).where(
+            Group.timetable_id == timetable_id
+        )
+
+        db.query(ScheduledClass).filter(
+            ScheduledClass.shared_key == shared_key,
+            ScheduledClass.group_id.in_(timetable_group_ids),
+        ).delete(synchronize_session=False)
     elif getattr(row, 'study_program_id', None) is not None:
         db.query(ScheduledClass).filter(
             ScheduledClass.group_id == row.group_id,
