@@ -2845,3 +2845,21 @@ body[data-active-section] .dashboard-card {
     width: 100%;
   }
 }
+
+/* LCFY_SCHEDULE_NOTES_PATCH_V2: visible, wrapping notes in schedule detail modals */
+#teacherScheduleTableWrapper,
+#groupScheduleTableWrapper,
+#roomScheduleTableWrapper {
+  overflow-x: auto;
+  max-width: 100%;
+}
+#teacherScheduleTableWrapper .schedule-notes-cell,
+#groupScheduleTableWrapper .schedule-notes-cell,
+#roomScheduleTableWrapper .schedule-notes-cell {
+  min-width: 170px;
+  max-width: 360px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+  text-align: left;
+}

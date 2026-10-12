@@ -819,12 +819,15 @@ def _build_teacher_schedule_rows(
             {
                 "group_codes": set(),
                 "program_codes": set(),
+                "notes": set(),
             },
         )
         if cls.group and cls.group.code:
             entry["group_codes"].add(cls.group.code)
         if cls.study_program and cls.study_program.code:
             entry["program_codes"].add(cls.study_program.code)
+        if cls.notes and str(cls.notes).strip():
+            entry["notes"].add(str(cls.notes).strip())
 
     rows: List[Dict[str, Any]] = []
     for key in sorted(grouped.keys(), key=lambda k: (k[1], k[2], k[3], k[0])):
@@ -840,6 +843,7 @@ def _build_teacher_schedule_rows(
                 "program_code": ", ".join(sorted(entry["program_codes"])),
                 "room_name": room_name,
                 "course_name": course_name,
+                "notes": _safe_notes_excel(" | ".join(sorted(entry["notes"]))),
             }
         )
     return rows
@@ -852,13 +856,13 @@ def _write_teacher_schedule_sheet(
     border: Border,
 ) -> None:
     ws.title = _sanitize_sheet_title(teacher_name)
-    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=6)
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=7)
     title_cell = _cell(ws, 1, 1, f"Teacher: {teacher_name}")
     title_cell.font = default_font(bold=True, size=15)
     title_cell.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[1].height = 30
 
-    headers = ["Day", "Timeslot", "Group", "Program", "Room", "Course"]
+    headers = ["Day", "Timeslot", "Group", "Program", "Room", "Course", "Notes"]
     for idx, label in enumerate(headers, start=1):
         cell = ws.cell(row=2, column=idx, value=label)
         cell.font = default_font(bold=True, size=11)
@@ -871,6 +875,7 @@ def _write_teacher_schedule_sheet(
     ws.column_dimensions["D"].width = float(18)
     ws.column_dimensions["E"].width = float(12)
     ws.column_dimensions["F"].width = float(26)
+    ws.column_dimensions["G"].width = float(42)
 
     if not rows:
         cell = _cell(ws, 3, 1, "No scheduled classes for this teacher.")
@@ -886,7 +891,11 @@ def _write_teacher_schedule_sheet(
         course_cell = ws.cell(row=idx, column=6, value=row_info["course_name"])
         course_cell.border = border
         course_cell.alignment = Alignment(wrap_text=True, horizontal="left", vertical="center")
-        ws.row_dimensions[idx].height = 24
+        notes_text = row_info.get("notes", "")
+        notes_cell = ws.cell(row=idx, column=7, value=notes_text)
+        notes_cell.border = border
+        notes_cell.alignment = Alignment(wrap_text=True, horizontal="left", vertical="center")
+        ws.row_dimensions[idx].height = max(24, _row_height_for_text(notes_text, width_cols=38, min_height=24, font_size=11))
 
 
 def _build_course_schedule_rows(
@@ -1776,6 +1785,86 @@ def _write_timetable_sheet(
     ws.column_dimensions["B"].width = float(16)
 
 
+
+def _safe_notes_excel(value: Any) -> str:
+    """Prevent spreadsheet formula interpretation of user supplied notes."""
+    text = str(value or "")
+    if text.lstrip().startswith(("=", "+", "-", "@")):
+        return "'" + text
+    return text
+
+
+def _schedule_detail_rows(payload: Dict[str, Any], room_code: Optional[str] = None) -> List[Dict[str, str]]:
+    """One row per rendered class (and group) with a separate Notes column."""
+    rows: List[Dict[str, str]] = []
+    seen: Set[Tuple[str, str, str]] = set()
+    for slot in sorted(payload.get("timeslots", []), key=lambda ts: (ts.get("day_index", 0), ts.get("sort_order", 0))):
+        by_group = payload.get("cells", {}).get(str(slot["id"]), {})
+        for group in payload.get("groups", []):
+            gid = str(group["id"])
+            for item in by_group.get(gid, []):
+                if room_code is not None and str(item.get("room_name") or "") != room_code:
+                    continue
+                key = (str(slot["id"]), gid, str(item.get("id", "")))
+                if key in seen:
+                    continue
+                seen.add(key)
+                rows.append({
+                    "weekday": str(slot.get("weekday") or ""),
+                    "timeslot": str(slot.get("label") or ""),
+                    "group": str(group.get("code") or ""),
+                    "program": ", ".join(map(str, item.get("program_codes") or [])),
+                    "teacher": str(item.get("teacher_name") or ""),
+                    "room": str(item.get("room_name") or ""),
+                    "course": ("(Elective) " if item.get("kind") == "elective" else "") + str(item.get("course_name") or ""),
+                    "notes": _safe_notes_excel(item.get("notes")),
+                })
+    return rows
+
+
+def _write_schedule_details_sheet(
+    ws: Worksheet,
+    payload: Dict[str, Any],
+    *,
+    room_code: Optional[str] = None,
+) -> None:
+    headers = ["Day", "Timeslot", "Group", "Program", "Teacher", "Room", "Course", "Notes"]
+    ws.freeze_panes = "A2"
+    for column, heading in enumerate(headers, start=1):
+        cell = ws.cell(row=1, column=column, value=heading)
+        cell.font = default_font(bold=True, size=11, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="1F4E78")
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+    for col, width in zip("ABCDEFGH", (15, 22, 15, 20, 25, 15, 35, 45)):
+        ws.column_dimensions[col].width = float(width)
+    field_names = ("weekday", "timeslot", "group", "program", "teacher", "room", "course", "notes")
+    for row_number, record in enumerate(_schedule_detail_rows(payload, room_code=room_code), start=2):
+        for column, field in enumerate(field_names, start=1):
+            cell = ws.cell(row=row_number, column=column, value=record[field])
+            cell.alignment = Alignment(wrap_text=True, vertical="top")
+        ws.row_dimensions[row_number].height = float(max(
+            27, _row_height_for_text(record["notes"], width_cols=40, min_height=27, font_size=11),
+        ))
+    ws.auto_filter.ref = f"A1:H{max(ws.max_row, 2)}"
+    ws.sheet_view.showGridLines = False
+
+
+def export_room_schedule_xlsx(
+    db: Session, output_path: str | Path, timetable_id: int, room_id: int,
+) -> Path:
+    from .models import Room
+    room = db.get(Room, room_id)
+    if room is None:
+        raise ValueError(f"Room {room_id} not found")
+    payload = build_timetable_payload(db, timetable_id)
+    workbook = Workbook()
+    worksheet = cast(Worksheet, workbook.active)
+    worksheet.title = _sanitize_sheet_title(str(room.code) or "Room")
+    _write_schedule_details_sheet(worksheet, payload, room_code=str(room.code))
+    output = Path(output_path)
+    workbook.save(output)
+    return output
+
 def export_timetable_xlsx(
     db: Session,
     output_path: str | Path,
@@ -1865,6 +1954,7 @@ def export_timetable_xlsx(
                 ws = wb.create_sheet(title=sheet_title)
             _write_group_timetable_sheet(ws, payload, group, blank_fill, border, program_color_map)
             _insert_logo(ws)
+        _write_schedule_details_sheet(wb.create_sheet(title="Schedule Details"), payload)
         wb.save(output_path)
         return output_path
 
@@ -1924,5 +2014,8 @@ def export_timetable_xlsx(
             )
             _insert_logo(program_ws)
 
+    _write_schedule_details_sheet(wb.create_sheet(title="Schedule Details"), payload)
     wb.save(output_path)
     return output_path
+
+# LCFY_SCHEDULE_NOTES_PATCH_V2

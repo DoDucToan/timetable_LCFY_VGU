@@ -583,7 +583,9 @@ def build_timetable_payload(
             "course_code": _sanitize_text(first.course.code),
             "course_name": _sanitize_text(first.course.name),
             "teacher_name": _sanitize_text(first.teacher.name if first.teacher else ""),
+            "teacher_id": first.teacher_id,
             "room_name": _sanitize_text(first.room.code if first.room else ""),
+            "room_id": first.room_id,
             "program_codes": [_sanitize_text(code) for code in programs],
             "group_codes": group_codes,
             "group_tag_code": group_tag_code,
@@ -680,5 +682,7 @@ def teacher_load_rows(
     from .models import Teacher
     for teacher_id, count in rows:
         teacher = db.get(Teacher, teacher_id)
-        result.append({"teacher": teacher.name if teacher else str(teacher_id), "timeslot_count": int(count)})
+        result.append({"teacher_id": teacher_id, "teacher": teacher.name if teacher else str(teacher_id), "timeslot_count": int(count)})
     return result
+
+# LCFY_SCHEDULE_NOTES_PATCH_V2

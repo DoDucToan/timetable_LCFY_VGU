@@ -18,7 +18,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 from .database import SessionLocal, get_db
-from .excel_exporter import export_timetable_xlsx
+from .excel_exporter import export_timetable_xlsx, export_room_schedule_xlsx
 from openpyxl import Workbook, load_workbook
 from openpyxl.worksheet.worksheet import Worksheet
 from .models import (
@@ -2716,6 +2716,38 @@ def delete_group_only_requirement(requirement_id: int, db: Session = Depends(get
     return bootstrap_payload(db, int(timetable_id) if timetable_id is not None else None)
 
 
+
+@app.get("/export-room.xlsx")
+def export_room_schedule_file(
+    room_id: int = Query(...),
+    timetable_id: Optional[int] = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    """Export one room's deployed timetable as a table with a Notes column."""
+    timetable = _selected_timetable(db, timetable_id)
+    if timetable is None:
+        raise HTTPException(status_code=404, detail="Timetable not found.")
+    room = db.get(Room, room_id)
+    if room is None:
+        raise HTTPException(status_code=404, detail="Room not found.")
+    count = db.scalar(
+        select(func.count()).select_from(ScheduledClass).join(Group).where(
+            ScheduledClass.deploy.is_(True),
+            ScheduledClass.room_id == room_id,
+            Group.timetable_id == timetable.id,
+        )
+    )
+    if not count:
+        raise HTTPException(status_code=404, detail="No scheduled classes for this room.")
+    safe_room = re.sub(r'[^\w\-]', '_', str(room.code))[:40]
+    out_path = EXPORT_DIR / f"room_schedule_{timetable.id}_{safe_room}_{time.time_ns()}.xlsx"
+    export_room_schedule_xlsx(db, out_path, int(timetable.id), room_id)
+    return FileResponse(
+        out_path,
+        filename=out_path.name,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
 @app.get("/export.xlsx")
 def export_file(
     timetable_id: Optional[int] = Query(default=None),
@@ -3180,3 +3212,4 @@ def add_study_program_requirements(payload: Dict[str, Any] = Body(...), db: Sess
         _upsert_program_requirement(db, int(timetable_id), study_program_id, course_id, sessions_required)
     db.commit()
     return bootstrap_payload(db)
+# LCFY_SCHEDULE_NOTES_PATCH_V2

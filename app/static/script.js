@@ -2031,12 +2031,45 @@ function renderTeacherLoad() {
   });
 }
 
+// Export the currently open schedule while preserving timetable/cycle selection.
+function attachScheduleNotesExportButton(modalId, kind, entityId) {
+  const modal = document.getElementById(modalId);
+  const header = modal?.querySelector('.modal-header');
+  if (!header || entityId == null) return;
+  let button = header.querySelector('[data-schedule-notes-export]');
+  if (!button) {
+    button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'ghost-btn small';
+    button.textContent = 'Export Excel';
+    button.dataset.scheduleNotesExport = '1';
+    button.addEventListener('click', () => {
+      const exportKind = button.dataset.exportKind;
+      const id = button.dataset.exportId;
+      if (!id || !state.timetableId) return;
+      const params = new URLSearchParams({ timetable_id: String(state.timetableId) });
+      let path = '/export.xlsx';
+      if (exportKind === 'teacher') params.append('teacher_ids', id);
+      else if (exportKind === 'group') params.append('group_ids', id);
+      else if (exportKind === 'room') {
+        path = '/export-room.xlsx';
+        params.append('room_id', id);
+      } else return;
+      window.location.href = `${path}?${params.toString()}`;
+    });
+    header.insertBefore(button, header.lastElementChild);
+  }
+  button.dataset.exportKind = kind;
+  button.dataset.exportId = String(entityId);
+}
+
 function openTeacherScheduleModal(item) {
   if (!els.teacherScheduleModal || !els.teacherScheduleModalTitle || !els.teacherScheduleTableWrapper) return;
   const teacherName = item.teacher;
   const teacherId = item.teacher_id ?? null;
   els.teacherScheduleModalTitle.textContent = `Teacher schedule: ${teacherName}`;
   renderTeacherScheduleTable(teacherId, teacherName);
+  attachScheduleNotesExportButton('teacherScheduleModal', 'teacher', teacherId);
   openModal('teacherScheduleModal');
 }
 
@@ -2050,6 +2083,7 @@ function openGroupScheduleModal(item) {
   els.groupScheduleModalTitle.textContent = `Group schedule: ${groupCode}`;
   renderGroupScheduleProgramPicker(groupId);
   renderGroupScheduleTable(groupId, groupCode);
+  attachScheduleNotesExportButton('groupScheduleModal', 'group', groupId);
   openModal('groupScheduleModal');
 }
 
@@ -2578,6 +2612,7 @@ function openRoomScheduleModal(item) {
   const roomId = toNullableNumber(item.id);
   els.roomScheduleModalTitle.textContent = `Room schedule: ${roomName}`;
   renderRoomScheduleTable(roomId, roomName);
+  attachScheduleNotesExportButton('roomScheduleModal', 'room', roomId);
   openModal('roomScheduleModal');
 }
 
@@ -2604,6 +2639,7 @@ function renderRoomScheduleTable(roomId, roomName) {
       <th>Program</th>
       <th>Teacher</th>
       <th>Course</th>
+      <th>Notes</th>
     </tr>
   `;
   table.appendChild(thead);
@@ -2617,6 +2653,7 @@ function renderRoomScheduleTable(roomId, roomName) {
       <td>${escapeHtml(row.program_code)}</td>
       <td>${escapeHtml(row.teacher_name)}</td>
       <td>${escapeHtml(row.course_name)}</td>
+      <td class="schedule-notes-cell">${escapeHtml(row.notes || "")}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -2640,7 +2677,7 @@ function buildRoomScheduleRows(roomId, roomName) {
         const normalizedItemRoomId = item.room_id != null ? Number(item.room_id) : null;
         const normalizedRoomName = String(roomName || '').trim().toLowerCase();
         const normalizedItemRoomName = String(item.room_name || '').trim().toLowerCase();
-        const matchesRoom = normalizedRoomId != null
+        const matchesRoom = normalizedRoomId != null && normalizedItemRoomId != null
           ? normalizedItemRoomId === normalizedRoomId
           : normalizedRoomName && normalizedItemRoomName === normalizedRoomName;
         if (!matchesRoom) return;
@@ -2660,6 +2697,7 @@ function buildRoomScheduleRows(roomId, roomName) {
           teacher_name: item.teacher_name || '',
           course_name: item.kind === 'elective' ? `(Elective) ${item.course_name || ''}` : item.course_name || '',
           program_codes: new Set(),
+          notes: new Set(),
         };
 
         const groupCode = groupMap.get(groupId)?.code || '';
@@ -2672,6 +2710,8 @@ function buildRoomScheduleRows(roomId, roomName) {
             if (code) existing.program_codes.add(code);
           });
         }
+        const classNote = String(item.notes || "").trim();
+        if (classNote) existing.notes.add(classNote);
         grouped.set(rowKey, existing);
       });
     });
@@ -2685,6 +2725,7 @@ function buildRoomScheduleRows(roomId, roomName) {
     program_code: Array.from(entry.program_codes).sort().join(', '),
     teacher_name: entry.teacher_name,
     course_name: entry.course_name,
+    notes: Array.from(entry.notes).sort().join(" | "),
   }));
 
   rows.sort((a, b) => a.sort_order - b.sort_order || a.weekday.localeCompare(b.weekday) || a.timeslot.localeCompare(b.timeslot));
@@ -2762,6 +2803,7 @@ function renderTeacherScheduleTable(teacherId, teacherName) {
       <th>Program</th>
       <th>Room</th>
       <th>Course</th>
+      <th>Notes</th>
     </tr>
   `;
   table.appendChild(thead);
@@ -2775,6 +2817,7 @@ function renderTeacherScheduleTable(teacherId, teacherName) {
       <td>${escapeHtml(row.program_code)}</td>
       <td>${escapeHtml(row.room_name)}</td>
       <td>${escapeHtml(row.course_name)}</td>
+      <td class="schedule-notes-cell">${escapeHtml(row.notes || "")}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -2805,6 +2848,7 @@ function renderGroupScheduleTable(groupId, groupCode) {
       <th>Program</th>
       <th>Room</th>
       <th>Course</th>
+      <th>Notes</th>
     </tr>
   `;
   table.appendChild(thead);
@@ -2821,6 +2865,7 @@ function renderGroupScheduleTable(groupId, groupCode) {
       <td>${escapeHtml(row.program_code)}</td>
       <td>${escapeHtml(row.room_name)}</td>
       <td>${escapeHtml(row.course_name)}</td>
+      <td class="schedule-notes-cell">${escapeHtml(row.notes || "")}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -2880,6 +2925,7 @@ function buildGroupScheduleRows(groupId, groupCode) {
           course_name: item.kind === 'elective' ? `(Elective) ${courseLabel}` : courseLabel,
           kind: item.kind || '',
           program_codes: new Set(),
+          notes: new Set(),
         };
 
         if (Array.isArray(item.program_codes)) {
@@ -2887,6 +2933,8 @@ function buildGroupScheduleRows(groupId, groupCode) {
             if (code) existing.program_codes.add(code);
           });
         }
+        const classNote = String(item.notes || "").trim();
+        if (classNote) existing.notes.add(classNote);
         grouped.set(rowKey, existing);
       });
     });
@@ -2900,6 +2948,7 @@ function buildGroupScheduleRows(groupId, groupCode) {
     program_code: Array.from(entry.program_codes).sort().join(', '),
     room_name: entry.room_name,
     course_name: entry.course_name,
+    notes: Array.from(entry.notes).sort().join(" | "),
     kind: entry.kind,
   }));
 
@@ -2919,7 +2968,9 @@ function buildTeacherScheduleRows(teacherId, teacherName) {
     Object.entries(groups).forEach(([groupId, items]) => {
       if (!Array.isArray(items)) return;
       items.forEach(item => {
-        const matchesTeacher = teacherId != null ? item.teacher_id === teacherId : item.teacher_name === teacherName;
+        const matchesTeacher = teacherId != null && item.teacher_id != null
+          ? Number(item.teacher_id) === Number(teacherId)
+          : item.teacher_name === teacherName;
         if (!matchesTeacher) return;
         const rowKey = [
           String(timeslot.weekday || ''),
@@ -2935,6 +2986,7 @@ function buildTeacherScheduleRows(teacherId, teacherName) {
           timeslot: timeslot.label || '',
           group_codes: new Set(),
           program_codes: new Set(),
+          notes: new Set(),
           room_name: item.room_name || '',
           course_name: item.course_name || '',
         };
@@ -2948,6 +3000,8 @@ function buildTeacherScheduleRows(teacherId, teacherName) {
             if (code) existing.program_codes.add(code);
           });
         }
+        const classNote = String(item.notes || "").trim();
+        if (classNote) existing.notes.add(classNote);
         grouped.set(rowKey, existing);
       });
     });
@@ -2961,6 +3015,7 @@ function buildTeacherScheduleRows(teacherId, teacherName) {
     program_code: Array.from(entry.program_codes).sort().join(', '),
     room_name: entry.room_name,
     course_name: entry.course_name,
+    notes: Array.from(entry.notes).sort().join(" | "),
   }));
 
   rows.sort((a, b) => a.sort_order - b.sort_order || a.weekday.localeCompare(b.weekday) || a.timeslot.localeCompare(b.timeslot));
@@ -5686,3 +5741,5 @@ async function deleteRequirement(type, tagOrProgId, courseId) {
   await refreshData(state.timetableId);
   refreshRequirementsModalIfOpen();
 }
+
+// LCFY_SCHEDULE_NOTES_PATCH_V2
