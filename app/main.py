@@ -2723,6 +2723,50 @@ def delete_group_only_requirement(requirement_id: int, db: Session = Depends(get
 
 
 
+# LCFY_GROUP_PROGRAM_EXPORT_PATCH_V4
+@app.get("/export-group-schedule.xlsx")
+def export_filtered_group_schedule_file(
+    group_id: int = Query(...),
+    timetable_id: int = Query(...),
+    program_ids: Optional[List[int]] = Query(default=None),
+    include_electives: bool = Query(default=True),
+    db: Session = Depends(get_db),
+):
+    """Export the current group modal view, not the full/unfiltered group grid."""
+    from .group_schedule_export import build_group_schedule_rows, write_group_schedule_xlsx
+
+    timetable = db.get(Timetable, timetable_id)
+    if timetable is None:
+        raise HTTPException(status_code=404, detail="Timetable not found.")
+    group = db.get(Group, group_id)
+    if group is None or int(group.timetable_id) != int(timetable.id):
+        raise HTTPException(status_code=404, detail="Group not found in this timetable.")
+    selected = list(dict.fromkeys(program_ids or []))
+    allowed = set(db.scalars(
+        select(GroupStudyProgram.study_program_id).where(GroupStudyProgram.group_id == group_id)
+    ).all())
+    if any(pid not in allowed for pid in selected):
+        raise HTTPException(status_code=400, detail="Selected program is not in this group.")
+    payload = _build_timetable_payload(db, timetable_id)
+    rows = build_group_schedule_rows(payload, group_id, selected, include_electives)
+    if not rows:
+        raise HTTPException(status_code=404, detail="No scheduled classes match these filters.")
+    selected_codes = [
+        str(prog["code"]) for prog in next(
+            (g for g in payload["groups"] if int(g["id"]) == group_id), {}
+        ).get("programs", []) if int(prog["id"]) in selected
+    ]
+    group_code = re.sub(r"[^A-Za-z0-9_-]+", "_", str(group.code))[:32] or "group"
+    program_suffix = "_".join(re.sub(r"[^A-Za-z0-9_-]+", "_", code) for code in sorted(selected_codes)) or "all"
+    program_suffix = program_suffix[:60]
+    output_path = EXPORT_DIR / f"group_{group_code}_{program_suffix}_{time.time_ns()}.xlsx"
+    write_group_schedule_xlsx(payload, output_path, group_id, selected, include_electives)
+    return FileResponse(
+        output_path,
+        filename=output_path.name,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
 @app.get("/export-room.xlsx")
 def export_room_schedule_file(
     room_id: int = Query(...),

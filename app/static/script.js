@@ -2050,7 +2050,15 @@ function attachScheduleNotesExportButton(modalId, kind, entityId) {
       const params = new URLSearchParams({ timetable_id: String(state.timetableId) });
       let path = '/export.xlsx';
       if (exportKind === 'teacher') params.append('teacher_ids', id);
-      else if (exportKind === 'group') params.append('group_ids', id);
+      else if (exportKind === 'group') {
+        // Export the current Group schedule filter, not every program in the group.
+        path = '/export-group-schedule.xlsx';
+        params.append('group_id', id);
+        (state.groupScheduleSelectedProgramIds || []).forEach(programId => {
+          params.append('program_ids', String(programId));
+        });
+        params.append('include_electives', String(state.groupScheduleShowElectives !== false));
+      }
       else if (exportKind === 'room') {
         path = '/export-room.xlsx';
         params.append('room_id', id);
@@ -2069,7 +2077,6 @@ function openTeacherScheduleModal(item) {
   const teacherId = item.teacher_id ?? null;
   els.teacherScheduleModalTitle.textContent = `Teacher schedule: ${teacherName}`;
   renderTeacherScheduleTable(teacherId, teacherName);
-  attachScheduleNotesExportButton('teacherScheduleModal', 'teacher', teacherId);
   openModal('teacherScheduleModal');
 }
 
@@ -5743,3 +5750,4 @@ async function deleteRequirement(type, tagOrProgId, courseId) {
 }
 
 // LCFY_SCHEDULE_NOTES_PATCH_V2
+// LCFY_GROUP_PROGRAM_EXPORT_PATCH_V4
