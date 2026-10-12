@@ -590,7 +590,11 @@ def build_timetable_payload(
             "group_codes": group_codes,
             "group_tag_code": group_tag_code,
             "all_group": all_group,
-            "notes": _sanitize_text(first.notes or ""),
+            "notes": " | ".join(dict.fromkeys(
+                _sanitize_text(getattr(cls, "notes", "") or "")
+                for cls in bundle
+                if str(getattr(cls, "notes", "") or "").strip()
+            )),
             "kind": kind,
             "color_key": color_key,
             "fill_color": fill_color,
@@ -686,3 +690,5 @@ def teacher_load_rows(
     return result
 
 # LCFY_SCHEDULE_NOTES_PATCH_V2
+
+# LCFY_SCHEDULE_NOTES_PATCH_V3

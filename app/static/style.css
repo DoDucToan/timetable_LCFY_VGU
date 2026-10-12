@@ -2863,3 +2863,53 @@ body[data-active-section] .dashboard-card {
   vertical-align: top;
   text-align: left;
 }
+
+/* LCFY_SCHEDULE_NOTES_PATCH_V3
+   Header space for Export Excel + Close (Close was absolutely positioned). */
+#teacherScheduleModal .modal-header,
+#roomScheduleModal .modal-header,
+#groupScheduleModal .modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  flex-wrap: nowrap;
+  padding-right: 18px;
+}
+#teacherScheduleModal .modal-header h2,
+#roomScheduleModal .modal-header h2,
+#groupScheduleModal .modal-header h2 {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+#teacherScheduleModal .modal-header [data-schedule-notes-export],
+#roomScheduleModal .modal-header [data-schedule-notes-export],
+#groupScheduleModal .modal-header [data-schedule-notes-export] {
+  position: static;
+  flex: 0 0 auto;
+  margin-left: auto;
+  white-space: nowrap;
+  width: auto;
+  max-width: none;
+}
+#teacherScheduleModal .modal-header .icon-btn,
+#roomScheduleModal .modal-header .icon-btn,
+#groupScheduleModal .modal-header .icon-btn {
+  position: static;
+  top: auto;
+  right: auto;
+  flex: 0 0 38px;
+  margin: 0;
+  width: 38px;
+  height: 38px;
+}
+@media (max-width: 560px) {
+  #teacherScheduleModal .modal-header,
+  #roomScheduleModal .modal-header,
+  #groupScheduleModal .modal-header { gap: 8px; }
+  #teacherScheduleModal .modal-header h2,
+  #roomScheduleModal .modal-header h2,
+  #groupScheduleModal .modal-header h2 { font-size: 16px; }
+}

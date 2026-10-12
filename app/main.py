@@ -1508,6 +1508,12 @@ def _build_timetable_payload(db: Session, timetable_id: Optional[int], cycle_id:
                 "course_id": first.course.id if first.course else None,
                 "course_code": getattr(first.course, 'code', '') or '',
                 "course_name": getattr(first.course, 'name', '') or getattr(first.course, 'code', '') or '',
+                # Preserve notes from every class in a merged/shared bundle.
+                "notes": " | ".join(dict.fromkeys(
+                    _sanitize_text(getattr(cls, 'notes', '') or '')
+                    for cls in bundle
+                    if str(getattr(cls, 'notes', '') or '').strip()
+                )),
                 "teacher_id": first.teacher.id if first.teacher else None,
                 "teacher_name": first.teacher.name if first.teacher else "",
                 "room_id": first.room.id if first.room else None,
@@ -3213,3 +3219,5 @@ def add_study_program_requirements(payload: Dict[str, Any] = Body(...), db: Sess
     db.commit()
     return bootstrap_payload(db)
 # LCFY_SCHEDULE_NOTES_PATCH_V2
+
+# LCFY_SCHEDULE_NOTES_PATCH_V3
